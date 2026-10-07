@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="sandbox">
+      <UniqueIdentifier>{DA2C0FBD-B2EA-554F-879D-58F110476F1B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="sandbox\sandbox_helper_main.cpp">
+      <Filter>sandbox</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

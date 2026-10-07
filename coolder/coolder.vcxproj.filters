@@ -1,0 +1,94 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="action">
+      <UniqueIdentifier>{EA54193B-D497-5BCC-92A3-388A868C7632}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="action\ai">
+      <UniqueIdentifier>{EB44AB3F-F8AE-529E-BADA-3007A1639E60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="html">
+      <UniqueIdentifier>{82284634-F360-550C-97AF-19AA2E61F31B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="server">
+      <UniqueIdentifier>{B2C111F9-AD7D-565B-981D-A73B0E2F8CD4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tools">
+      <UniqueIdentifier>{D2EA2F8E-CC12-51C0-A568-C6AA87D60815}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="server\ai_policy.cpp">
+      <Filter>server</Filter>
+    </ClCompile>
+    <ClCompile Include="server\attachments.cpp">
+      <Filter>server</Filter>
+    </ClCompile>
+    <ClCompile Include="server\auth.cpp">
+      <Filter>server</Filter>
+    </ClCompile>
+    <ClCompile Include="server\host.cpp">
+      <Filter>server</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_agent_actions.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_agent_common.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_agent_projects.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_agent_reviews.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_agent_sessions.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_provider_actions.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_workspace_actions.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="server\attachments.h">
+      <Filter>server</Filter>
+    </ClInclude>
+    <ClInclude Include="server\auth.h">
+      <Filter>server</Filter>
+    </ClInclude>
+    <ClInclude Include="server\host.h">
+      <Filter>server</Filter>
+    </ClInclude>
+    <ClInclude Include="action\action_util.h">
+      <Filter>action</Filter>
+    </ClInclude>
+    <ClInclude Include="action\actions.h">
+      <Filter>action</Filter>
+    </ClInclude>
+    <ClInclude Include="action\ai\ai_agent_actions.h">
+      <Filter>action\ai</Filter>
+    </ClInclude>
+    <ClInclude Include="action\ai\ai_agent_actions_internal.h">
+      <Filter>action\ai</Filter>
+    </ClInclude>
+    <ClInclude Include="action\ai\ai_provider_actions.h">
+      <Filter>action\ai</Filter>
+    </ClInclude>
+    <ClInclude Include="action\ai\ai_workspace_actions.h">
+      <Filter>action\ai</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="tools\bundle_frontend.cmake">
+      <Filter>tools</Filter>
+    </None>
+    <None Include="html\index.html">
+      <Filter>html</Filter>
+    </None>
+  </ItemGroup>
+</Project>

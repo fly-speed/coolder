@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="$(MSBuildThisFileDirectory)coolder.local.props" Condition="Exists('$(MSBuildThisFileDirectory)coolder.local.props')" />
+  <PropertyGroup Label="UserMacros">
+    <CoolderOpenSSLRoot Condition="'$(CoolderOpenSSLRoot)'==''">$(MSBuildThisFileDirectory)..\third-party\openssl</CoolderOpenSSLRoot>
+    <CoolderOpenSSLLibDir Condition="'$(CoolderOpenSSLLibDir)'==''">$(CoolderOpenSSLRoot)\lib</CoolderOpenSSLLibDir>
+    <CoolderCMake Condition="'$(CoolderCMake)'=='' And Exists('$(VSInstallDir)Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe')">$(VSInstallDir)Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe</CoolderCMake>
+    <CoolderCMake Condition="'$(CoolderCMake)'==''">cmake</CoolderCMake>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments Condition="'$(MSBuildProjectName)'=='coolder'">--html "$(OutDir)html" --data "$(ProjectDir)var"</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..;$(CoolderOpenSSLRoot)\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;COOLDER_HTML_DIR="html";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>$(CoolderOpenSSLLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

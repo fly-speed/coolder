@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="agent">
+      <UniqueIdentifier>{A8B1CD5F-BEB6-4A19-AEE1-E33D4379010C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common">
+      <UniqueIdentifier>{F173F694-3839-4B1F-A770-FC35C2229A08}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="context">
+      <UniqueIdentifier>{D5F2D453-81FA-4FD6-BD47-F0CBA5088AA8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="project">
+      <UniqueIdentifier>{D0B73AF3-C480-494B-B50F-BBCEDB06CAC2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="prompt">
+      <UniqueIdentifier>{38DBE00D-F879-4FBB-B5D9-6F115E4BA46A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="provider">
+      <UniqueIdentifier>{D749FD23-73AA-44BC-A202-AB7376807B72}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="runtime">
+      <UniqueIdentifier>{6C8ADC07-D900-4551-89D2-A192D00ED7D8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sandbox">
+      <UniqueIdentifier>{7AE05404-6954-48D0-B6C6-FB0CEFB71383}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="storage">
+      <UniqueIdentifier>{950FED29-D82E-4232-A412-65C6F8CB495F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="validation">
+      <UniqueIdentifier>{FB51D222-E521-47D9-90E8-E7109B4D2AD2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="workspace">
+      <UniqueIdentifier>{D46F2314-F6B0-45E7-84AD-F74DEECA7347}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="runtime\browser_debug.cpp" />
+    <ClCompile Include="agent\agent_execution_mode.cpp">
+      <Filter>agent</Filter>
+    </ClCompile>
+    <ClCompile Include="agent\agent_progress_supervisor.cpp">
+      <Filter>agent</Filter>
+    </ClCompile>
+    <ClCompile Include="agent\agent_protocol.cpp">
+      <Filter>agent</Filter>
+    </ClCompile>
+    <ClCompile Include="agent\agent_registry.cpp">
+      <Filter>agent</Filter>
+    </ClCompile>
+    <ClCompile Include="agent\agent_run_scheduler.cpp">
+      <Filter>agent</Filter>
+    </ClCompile>
+    <ClCompile Include="agent\ai_admin_policy.cpp">
+      <Filter>agent</Filter>
+    </ClCompile>
+    <ClCompile Include="project\agent_project_index.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="project\agent_project_store.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="project\preview_project_context.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="project\project_diagnostics.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="project\project_plan_template.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="project\project_scaffold.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="project\project_toolchain.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_client.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_common.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_diagnostics.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_request.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_response.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_store.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_stream.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_transport.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\provider_request_scheduler.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_context.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_drafts.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_loop.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_runtime.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_batch.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_context.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_edits.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_proposals.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_protocol.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_read.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_search.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_tools_validation.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_worker.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\assistant_images.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_acceptance.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_context.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_feedback.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_repair.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_request.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_response.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_startup.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_tools.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\coding_tool_loop_transport.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\runtime_common.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="sandbox\program_sandbox.cpp">
+      <Filter>sandbox</Filter>
+    </ClCompile>
+    <ClCompile Include="sandbox\sandbox_execution.cpp">
+      <Filter>sandbox</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="storage\agent_checkpoint_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_draft_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_progress_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_request_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_result_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_run_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_session_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_workflow_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\assistant_session_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\task_contract_store.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_review_state.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace_dependencies.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace_fingerprint.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace_io.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace_mutations.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace_query.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\agent_workspace_roots.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\workspace_change_set.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\workspace_patch.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="runtime\browser_debug.h" />
+    <ClInclude Include="agent\agent_execution_mode.h">
+      <Filter>agent</Filter>
+    </ClInclude>
+    <ClInclude Include="agent\agent_progress_supervisor.h">
+      <Filter>agent</Filter>
+    </ClInclude>
+    <ClInclude Include="agent\agent_protocol.h">
+      <Filter>agent</Filter>
+    </ClInclude>
+    <ClInclude Include="agent\agent_registry.h">
+      <Filter>agent</Filter>
+    </ClInclude>
+    <ClInclude Include="agent\agent_run_scheduler.h">
+      <Filter>agent</Filter>
+    </ClInclude>
+    <ClInclude Include="agent\ai_admin_policy.h">
+      <Filter>agent</Filter>
+    </ClInclude>
+    <ClInclude Include="coding.h" />
+    <ClInclude Include="common\ai_error_log.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\file_ops.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\identifiers.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\json_value.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\platform_compat.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\record_codec.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\utf8_text.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="common\webcool_mutex.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="context\agent_context_limits.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\agent_context_window.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\agent_read_coverage.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\agent_staged_context.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\repair_context_evidence.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\repair_edit_evidence.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\repair_review_context.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\requirement_progress.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\task_delivery_summary.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="context\text_read_page.h">
+      <Filter>context</Filter>
+    </ClInclude>
+    <ClInclude Include="project\agent_project_index.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\agent_project_store.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\preview_project_context.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\project_diagnostics.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\project_plan_template.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\project_scaffold.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\project_toolchain.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="project\supported_languages.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClInclude Include="prompt\prompt_language.h">
+      <Filter>prompt</Filter>
+    </ClInclude>
+    <ClInclude Include="prompt\prompt_templates.h">
+      <Filter>prompt</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\ai_provider_client.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\ai_provider_client_internal.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\ai_provider_store.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\output_token_limit.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\provider_output_limit_cache.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\provider_request_scheduler.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\provider_stream_progress.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\storage_paths.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\ai_agent_tools_internal.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\coding_runtime.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\coding_tool_loop.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\coding_tool_loop_internal.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="sandbox\program_sandbox.h">
+      <Filter>sandbox</Filter>
+    </ClInclude>
+    <ClInclude Include="sandbox\sandbox_execution.h">
+      <Filter>sandbox</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="storage\agent_checkpoint_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_draft_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_progress_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_request_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_result_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_run_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_session_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\agent_workflow_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\assistant_session_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\task_contract_store.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\ctest_io_template.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\diagnostic_source.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\draft_cycle_tracker.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\placeholder_proposal.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\proposal_validation.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\repair_failure_tracker.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\repair_scope.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\task_acceptance.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\validation_test_evidence.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="validation\verification_task.h">
+      <Filter>validation</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\agent_change_limits.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\agent_review_state.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\agent_workspace.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\agent_workspace_internal.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\diff_preview.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\line_diff.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\workspace_change_set.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+    <ClInclude Include="workspace\workspace_patch.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

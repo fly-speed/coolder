@@ -1,0 +1,1532 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>coolder · AI 编程工作台</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script defer src="/coolder.js"></script>
+  </head>
+  <body>
+    <main id="coding-layout">
+      <aside id="project-panel">
+        <div class="sidebar-heading">
+          <a
+            class="brand sidebar-brand coolder-app-icon"
+            href="/"
+            title="Coolder"
+            aria-label="Coolder"
+            ><svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 64 64"
+              fill="none"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <defs>
+                <linearGradient
+                  id="coolder-tile"
+                  x1="7"
+                  y1="4"
+                  x2="58"
+                  y2="61"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stop-color="#192b50" />
+                  <stop offset="1" stop-color="#17142f" />
+                </linearGradient>
+                <linearGradient
+                  id="coolder-link"
+                  x1="15"
+                  y1="17"
+                  x2="49"
+                  y2="47"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stop-color="#66f5ec" />
+                  <stop offset="0.5" stop-color="#79adff" />
+                  <stop offset="1" stop-color="#c59aff" />
+                </linearGradient>
+              </defs>
+              <rect x="1" y="1" width="62" height="62" rx="17" fill="url(#coolder-tile)" />
+              <rect
+                x="1.5"
+                y="1.5"
+                width="61"
+                height="61"
+                rx="16.5"
+                stroke="#9faeff"
+                stroke-opacity=".3"
+              />
+              <path
+                d="m16 24-8 8 8 8M48 24l8 8-8 8"
+                stroke="url(#coolder-link)"
+                stroke-width="3.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M32 24v8m0 0L22 42m10-10 10 10M22 45h20"
+                stroke="url(#coolder-link)"
+                stroke-width="2.5"
+                stroke-linecap="round"
+              />
+              <circle cx="32" cy="16" r="5" fill="#78f0ec" />
+              <path
+                d="M25 27a7 7 0 0 1 14 0"
+                stroke="#78f0ec"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <circle cx="22" cy="39" r="4.5" fill="#85b7ff" />
+              <path
+                d="M15.5 50a6.5 6.5 0 0 1 13 0"
+                stroke="#85b7ff"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <circle cx="42" cy="39" r="4.5" fill="#c59aff" />
+              <path
+                d="M35.5 50a6.5 6.5 0 0 1 13 0"
+                stroke="#c59aff"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <circle cx="32" cy="32" r="2.5" fill="#eefaff" /></svg
+            ><span class="coolder-wordmark">Coolder</span></a
+          ><button
+            id="collapse-left"
+            class="pane-toggle"
+            type="button"
+            aria-controls="project-panel"
+            aria-expanded="true"
+            title="收起左栏"
+            aria-label="收起左栏"
+            data-i18n-title="收起左栏"
+            data-i18n-aria-label="收起左栏"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m15 6-6 6 6 6" />
+            </svg>
+          </button>
+        </div>
+        <button
+          id="expand-left"
+          class="pane-toggle pane-expand"
+          type="button"
+          aria-controls="project-panel"
+          aria-expanded="true"
+          title="展开左栏"
+          aria-label="展开左栏"
+          data-i18n-title="展开左栏"
+          data-i18n-aria-label="展开左栏"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
+        <div class="section-title">
+          <span data-i18n="项目">项目</span>
+          <button id="new-project" title="创建或导入项目" data-i18n-title="创建或导入项目">
+            ＋
+          </button>
+        </div>
+        <div id="projects" class="list"></div>
+        <div class="section-title">
+          <span data-i18n="会话">会话</span>
+          <button id="new-session" title="新建会话" data-i18n-title="新建会话">＋</button>
+        </div>
+        <div id="sessions" class="list"></div>
+        <div class="sidebar-foot">
+          <span id="connection"><span data-i18n="连接中">连接中</span></span>
+          <button
+            id="admin-settings"
+            class="icon-button"
+            type="button"
+            title="管理控制台"
+            aria-label="管理控制台"
+            data-i18n-title="管理控制台"
+            data-i18n-aria-label="管理控制台"
+            hidden
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M4 7h4m4 0h8M4 17h8m4 0h4" />
+              <circle cx="10" cy="7" r="2" />
+              <circle cx="14" cy="17" r="2" />
+            </svg>
+          </button>
+          <button
+            id="password-settings"
+            class="icon-button"
+            type="button"
+            title="个人设置"
+            aria-label="个人设置"
+            data-i18n-title="个人设置"
+            data-i18n-aria-label="个人设置"
+            hidden
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="8" r="3" />
+              <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+            </svg>
+          </button>
+          <button
+            id="logout"
+            class="icon-button"
+            type="button"
+            title="退出"
+            aria-label="退出"
+            data-i18n-title="退出"
+            data-i18n-aria-label="退出"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 4H4v16h5M9 12h11m-4-4 4 4-4 4" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+      <div
+        id="left-splitter"
+        class="pane-splitter"
+        role="separator"
+        tabindex="0"
+        aria-label="调整项目栏宽度"
+        aria-orientation="vertical"
+        aria-controls="project-panel"
+        title="左右拖动调整宽度，双击恢复默认；方向键微调"
+        data-i18n-aria-label="调整项目栏宽度"
+        data-i18n-title="左右拖动调整宽度，双击恢复默认；方向键微调"
+      ></div>
+      <section class="conversation" id="conversation-panel">
+        <div class="toolbar body-toolbar">
+          <div class="body-project-heading">
+            <h1 id="project-title"><span data-i18n="开始一个项目">开始一个项目</span></h1>
+            <small id="project-path"
+              ><span data-i18n="创建项目或导入已有目录">创建项目或导入已有目录</span></small
+            >
+          </div>
+          <nav class="body-tabs" role="tablist" aria-label="正文区" data-i18n-aria-label="正文区">
+            <button
+              id="conversation-tab"
+              role="tab"
+              aria-controls="conversation-pane"
+              aria-selected="true"
+              class="active"
+            >
+              <span data-i18n="会话">会话</span>
+            </button>
+            <button
+              id="source-tab"
+              role="tab"
+              aria-controls="source-pane"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <span data-i18n="源文件">源文件</span>
+            </button>
+            <button
+              id="review-tab"
+              role="tab"
+              aria-controls="review-pane"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <span data-i18n="差异确认">差异确认</span>
+            </button>
+          </nav>
+          <details class="body-project-menu">
+            <summary
+              data-i18n="项目操作"
+              aria-label="项目操作"
+              data-i18n-aria-label="项目操作"
+              title="项目操作"
+              data-i18n-title="项目操作"
+            >
+              项目操作
+            </summary>
+            <div class="body-project-actions">
+              <button id="plan"><span data-i18n="项目计划">项目计划</span></button>
+              <button id="history"><span data-i18n="运行记录">运行记录</span></button>
+              <button id="export-session"><span data-i18n="导出会话">导出会话</span></button>
+            </div>
+          </details>
+          <div class="body-window-controls">
+            <button
+              id="body-maximize"
+              class="icon-button"
+              type="button"
+              title="最大化"
+              aria-label="最大化"
+              data-i18n-title="最大化"
+              data-i18n-aria-label="最大化"
+              aria-pressed="false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  class="icon-default"
+                  d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
+                />
+                <path
+                  class="icon-active"
+                  d="M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
+                />
+              </svg>
+            </button>
+            <button
+              id="body-fullscreen"
+              class="icon-button"
+              type="button"
+              title="全屏"
+              aria-label="全屏"
+              data-i18n-title="全屏"
+              data-i18n-aria-label="全屏"
+              aria-pressed="false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path class="icon-default" d="M9 4H4v5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+                <path class="icon-active" d="M4 9h5V4M20 9h-5V4M15 20v-5h5M9 20v-5H4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="conversation-pane"
+          class="body-pane"
+          role="tabpanel"
+          aria-labelledby="conversation-tab"
+        >
+          <div class="conversation-history">
+            <nav
+              id="request-index"
+              aria-label="提问索引"
+              data-i18n-aria-label="提问索引"
+              hidden
+            ></nav>
+            <div id="request-index-preview" role="tooltip" hidden></div>
+            <div id="messages" aria-live="polite">
+              <div class="empty">
+                <div class="mark">◆</div>
+                <h2><span data-i18n="从想法到可运行的代码">从想法到可运行的代码</span></h2>
+                <p>
+                  <span data-i18n="选择一个项目，配置模型，然后描述你想实现的功能。"
+                    >选择一个项目，配置模型，然后描述你想实现的功能。</span
+                  ><br /><span data-i18n="在右侧查看文件、执行进度和代码差异。"
+                    >在右侧查看文件、执行进度和代码差异。</span
+                  >
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="composer" id="composer">
+            <button
+              id="toggle-composer"
+              type="button"
+              aria-expanded="true"
+              aria-controls="composer-content"
+              aria-label="收起输入框"
+              title="收起输入框"
+              data-i18n-title="收起输入框"
+              data-i18n-aria-label="收起输入框"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+              <span data-i18n="展开输入框">展开输入框</span>
+            </button>
+            <div class="run-state">
+              <div class="spacer"></div>
+              <button id="pause" disabled><span data-i18n="暂停">暂停</span></button>
+              <button id="cancel" disabled><span data-i18n="取消任务">取消任务</span></button>
+              <button id="recover" hidden>
+                <span data-i18n="从检查点继续">从检查点继续</span>
+              </button>
+            </div>
+            <div id="composer-content">
+              <form id="prompt-form">
+                <label for="prompt" class="sr-only"
+                  ><span data-i18n="编程任务">编程任务</span></label
+                >
+                <textarea
+                  id="prompt"
+                  rows="3"
+                  placeholder="描述需求、问题或要修改的代码…"
+                  data-i18n-placeholder="描述需求、问题或要修改的代码…"
+                ></textarea>
+                <div
+                  id="prompt-attachments"
+                  class="prompt-attachments"
+                  aria-live="polite"
+                  hidden
+                ></div>
+                <input id="attachment-input" type="file" multiple hidden />
+                <small data-i18n="可粘贴、拖入图片或文本文件；图片需模型支持视觉。"
+                  >可粘贴、拖入图片或文本文件；图片需模型支持视觉。</small
+                >
+                <div class="compose-options">
+                  <button
+                    id="attach-files"
+                    type="button"
+                    title="添加附件"
+                    aria-label="添加附件"
+                    data-i18n-title="添加附件"
+                    data-i18n-aria-label="添加附件"
+                  >
+                    ＋
+                  </button>
+                  <select id="provider" aria-label="模型" data-i18n-aria-label="模型"></select>
+                  <select id="mode" aria-label="执行模式" data-i18n-aria-label="执行模式">
+                    <option value="standard">标准模式</option>
+                    <option value="quick">快速模式</option>
+                    <option value="large">大型任务</option>
+                  </select>
+                  <div class="spacer"></div>
+                  <div class="send-controls">
+                    <button id="send" type="submit" class="primary">
+                      <span data-i18n="发送">发送</span>
+                    </button>
+                    <details id="send-options" class="send-options">
+                      <summary
+                        title="发送选项"
+                        aria-label="发送选项"
+                        data-i18n-title="发送选项"
+                        data-i18n-aria-label="发送选项"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </summary>
+                      <div class="send-options-menu">
+                        <label
+                          ><input id="enter-to-send" type="checkbox" checked /><span
+                            data-i18n="回车发送"
+                            >回车发送</span
+                          ></label
+                        >
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </form>
+              <small
+                ><span data-i18n="生成的文件先保存在修订区；在“变更”中接受后写入正式项目目录。"
+                  >生成的文件先保存在修订区；在“变更”中接受后写入正式项目目录。</span
+                ></small
+              >
+            </div>
+          </div>
+        </div>
+        <div id="source-pane" class="body-pane" role="tabpanel" aria-labelledby="source-tab" hidden>
+          <div
+            id="source-file-tabs"
+            class="file-tabs"
+            role="tablist"
+            aria-label="源文件"
+            data-i18n-aria-label="源文件"
+          ></div>
+          <div id="source-file-panel" class="body-pane">
+            <div class="toolbar source-toolbar">
+              <h3 id="file-title"><span data-i18n="文件预览">文件预览</span></h3>
+              <span id="code-mode" class="muted" role="status" data-i18n="只读">只读</span>
+              <button id="edit-file" disabled><span data-i18n="编辑文件">编辑文件</span></button>
+              <div id="code-inline-toolbar" class="code-toolbar" hidden>
+                <button id="code-find" type="button" data-i18n="查找替换">查找替换</button>
+                <button id="code-wrap" type="button" aria-pressed="false" data-i18n="自动换行">
+                  自动换行
+                </button>
+                <button id="code-preview" type="button" class="primary" data-i18n="预览差异">
+                  预览差异
+                </button>
+                <button id="close-code" type="button" data-i18n="退出编辑">退出编辑</button>
+              </div>
+            </div>
+            <div id="code-viewer" hidden></div>
+            <textarea
+              id="code-fallback"
+              aria-label="文件内容"
+              data-i18n-aria-label="文件内容"
+              hidden
+            ></textarea>
+            <pre id="file-content"><span data-i18n="选择文件查看内容">选择文件查看内容</span></pre>
+          </div>
+        </div>
+        <div id="review-pane" class="body-pane" role="tabpanel" aria-labelledby="review-tab" hidden>
+          <div
+            id="review-file-tabs"
+            class="file-tabs"
+            role="tablist"
+            aria-label="差异确认"
+            data-i18n-aria-label="差异确认"
+          ></div>
+          <div id="code-review" class="body-pane" hidden>
+            <div class="toolbar source-toolbar">
+              <h3 id="review-title"></h3>
+              <button id="code-back" type="button" data-i18n="返回修改">返回修改</button>
+              <button id="code-save" type="button" class="primary" disabled data-i18n="确认保存">
+                确认保存
+              </button>
+            </div>
+            <p id="code-status" class="muted" role="status"></p>
+            <div id="code-diff-host" hidden></div>
+            <pre id="code-diff-fallback" hidden></pre>
+          </div>
+          <div id="changes-pane">
+            <p class="muted">
+              <span data-i18n="每个文件版本可独立审核；拒绝前会检查当前版本，避免覆盖其他修改。"
+                >每个文件版本可独立审核；拒绝前会检查当前版本，避免覆盖其他修改。</span
+              >
+            </p>
+            <div id="changes"></div>
+          </div>
+        </div>
+      </section>
+      <div
+        id="right-splitter"
+        class="pane-splitter"
+        role="separator"
+        tabindex="0"
+        aria-label="调整文件栏宽度"
+        aria-orientation="vertical"
+        aria-controls="inspector-panel"
+        title="左右拖动调整宽度，双击恢复默认；方向键微调"
+        data-i18n-aria-label="调整文件栏宽度"
+        data-i18n-title="左右拖动调整宽度，双击恢复默认；方向键微调"
+      ></div>
+      <section class="inspector" id="inspector-panel">
+        <button
+          id="expand-right"
+          class="pane-toggle pane-expand"
+          type="button"
+          aria-controls="inspector-panel"
+          aria-expanded="true"
+          title="展开右栏"
+          aria-label="展开右栏"
+          data-i18n-title="展开右栏"
+          data-i18n-aria-label="展开右栏"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m15 6-6 6 6 6" />
+          </svg>
+        </button>
+        <nav>
+          <button id="files-tab" class="active"><span data-i18n="文件">文件</span></button>
+          <button id="changes-tab"><span data-i18n="变更">变更</span></button>
+          <button id="tools-tab"><span data-i18n="工具">工具</span></button
+          ><button
+            id="collapse-right"
+            class="pane-toggle"
+            type="button"
+            aria-controls="inspector-panel"
+            aria-expanded="true"
+            title="收起右栏"
+            aria-label="收起右栏"
+            data-i18n-title="收起右栏"
+            data-i18n-aria-label="收起右栏"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </button>
+        </nav>
+        <div id="files-pane">
+          <div class="toolbar">
+            <button id="collapse-files"><span data-i18n="全部折叠">全部折叠</span></button>
+            <small id="folder"> </small>
+            <button id="refresh-files"><span data-i18n="刷新">刷新</span></button>
+          </div>
+          <ul
+            id="files"
+            class="file-tree"
+            role="tree"
+            aria-label="项目文件"
+            data-i18n-aria-label="项目文件"
+          ></ul>
+        </div>
+        <div id="tools-pane" hidden>
+          <div id="tools"></div>
+        </div>
+      </section>
+    </main>
+    <footer id="status-bar" aria-label="状态栏" data-i18n-aria-label="状态栏">
+      <span id="phase" role="status" aria-live="polite"><span data-i18n="就绪">就绪</span></span>
+      <span id="notice" role="status" aria-live="polite" hidden></span>
+    </footer>
+    <dialog id="login-dialog">
+      <form id="login-form">
+        <h2 id="login-title"><span data-i18n="登录 coolder">登录 coolder</span></h2>
+        <p id="login-description">
+          <span data-i18n="使用管理员为你创建的账户登录。">使用管理员为你创建的账户登录。</span>
+        </p>
+        <label
+          ><span data-i18n="用户名">用户名</span
+          ><input
+            name="username"
+            required
+            maxlength="32"
+            pattern="[A-Za-z0-9_-]+"
+            autocomplete="username"
+        /></label>
+        <label
+          ><span data-i18n="密码">密码</span
+          ><input
+            name="password"
+            type="password"
+            required
+            maxlength="128"
+            autocomplete="current-password"
+        /></label>
+        <label id="confirm-label" hidden
+          ><span data-i18n="确认密码">确认密码</span
+          ><input name="confirm" type="password" autocomplete="new-password"
+        /></label>
+        <p id="login-error" class="error"></p>
+        <button class="primary"><span data-i18n="进入工作台">进入工作台</span></button>
+      </form>
+    </dialog>
+    <dialog id="admin-dialog" aria-labelledby="admin-window-title">
+      <div class="dialog-title admin-titlebar" id="admin-titlebar">
+        <h2 id="admin-window-title"><span data-i18n="管理控制台">管理控制台</span></h2>
+        <div class="admin-window-actions">
+          <button
+            type="button"
+            id="admin-minimize"
+            class="icon-button"
+            aria-label="最小化管理控制台"
+            title="最小化"
+            data-i18n-aria-label="最小化管理控制台"
+            data-i18n-title="最小化"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            id="admin-maximize"
+            class="icon-button"
+            aria-pressed="false"
+            aria-label="最大化管理控制台"
+            title="最大化"
+            data-i18n-aria-label="最大化管理控制台"
+            data-i18n-title="最大化"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                class="icon-default"
+                d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
+              />
+              <path
+                class="icon-active"
+                d="M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            data-close
+            aria-label="关闭管理控制台"
+            data-i18n-aria-label="关闭管理控制台"
+            class="dialog-close icon-button"
+            title="关闭"
+            data-i18n-title="关闭"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <nav class="admin-tabs" role="tablist" aria-label="管理功能" data-i18n-aria-label="管理功能">
+        <button
+          id="users-tab"
+          role="tab"
+          aria-controls="users-panel"
+          aria-selected="true"
+          tabindex="0"
+        >
+          <span data-i18n="用户管理">用户管理</span></button
+        ><button
+          id="policy-tab"
+          role="tab"
+          aria-controls="policy-panel"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          <span data-i18n="智能体设置">智能体设置</span></button
+        ><button
+          id="settings"
+          role="tab"
+          aria-controls="providers-panel"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          <span data-i18n="大模型厂商">大模型厂商</span>
+        </button>
+      </nav>
+      <div id="admin-content">
+        <section id="users-panel" role="tabpanel" aria-labelledby="users-tab">
+          <h3><span data-i18n="用户管理">用户管理</span></h3>
+          <p class="muted">
+            <span data-i18n="普通用户拥有独立项目与会话，共用管理员配置的模型。"
+              >普通用户拥有独立项目与会话，共用管理员配置的模型。</span
+            >
+          </p>
+          <div id="user-list"></div>
+          <h3><span data-i18n="创建普通用户">创建普通用户</span></h3>
+          <form id="user-create-form">
+            <div class="grid">
+              <label
+                ><span data-i18n="用户名">用户名</span
+                ><input
+                  name="username"
+                  required
+                  maxlength="32"
+                  pattern="[A-Za-z0-9_-]+"
+                  autocomplete="off"
+              /></label>
+              <label
+                ><span data-i18n="初始密码">初始密码</span
+                ><input
+                  name="password"
+                  type="password"
+                  required
+                  minlength="10"
+                  maxlength="128"
+                  autocomplete="new-password"
+              /></label>
+            </div>
+            <button class="primary"><span data-i18n="创建用户">创建用户</span></button>
+          </form>
+          <form id="user-reset-form" hidden>
+            <h3><span data-i18n="重置用户密码">重置用户密码</span></h3>
+            <label><span data-i18n="用户名">用户名</span><input name="username" readonly /></label>
+            <label
+              ><span data-i18n="新密码">新密码</span
+              ><input
+                name="password"
+                type="password"
+                required
+                minlength="10"
+                maxlength="128"
+                autocomplete="new-password"
+            /></label>
+            <button>
+              <span data-i18n="保存新密码并退出该用户的所有登录"
+                >保存新密码并退出该用户的所有登录</span
+              >
+            </button>
+          </form>
+        </section>
+        <section id="policy-panel" role="tabpanel" aria-labelledby="policy-tab" hidden>
+          <h3><span data-i18n="智能体设置">智能体设置</span></h3>
+          <p class="muted">
+            <span data-i18n="保存后用于新发起的任务；已开始的任务沿用启动时的配置。"
+              >保存后用于新发起的任务；已开始的任务沿用启动时的配置。</span
+            >
+          </p>
+          <form id="policy-form" class="account-password-form">
+            <label class="account-password-label"
+              ><input id="admin-ai-enabled" type="checkbox" /><span
+                ><span data-i18n="启用AI智能体">启用AI智能体</span></span
+              ></label
+            >
+            <label class="account-password-label"
+              ><input id="admin-ai-allow-admin" type="checkbox" /><span
+                ><span data-i18n="允许管理员使用">允许管理员使用</span></span
+              ></label
+            >
+            <label class="account-password-label"
+              ><input id="admin-ai-allow-users" type="checkbox" /><span
+                ><span data-i18n="允许普通用户使用">允许普通用户使用</span></span
+              ></label
+            >
+            <label class="account-password-label"
+              ><input
+                id="admin-ai-allow-users-shared-projects"
+                disabled
+                title="coolder 尚未接入此目录权限模块"
+                type="checkbox"
+                data-i18n-title="coolder 尚未接入此目录权限模块"
+              /><span
+                ><span data-i18n="允许普通用户在共享目录创建或导入项目"
+                  >允许普通用户在共享目录创建或导入项目</span
+                ></span
+              ></label
+            >
+            <label class="account-password-label"
+              ><input
+                id="admin-ai-allow-users-local-projects"
+                disabled
+                title="coolder 尚未接入此目录权限模块"
+                type="checkbox"
+                data-i18n-title="coolder 尚未接入此目录权限模块"
+              /><span
+                ><span data-i18n="允许普通用户在本地磁盘创建或导入项目"
+                  >允许普通用户在本地磁盘创建或导入项目</span
+                ></span
+              ></label
+            >
+            <label class="account-password-label"
+              ><input id="admin-ai-allow-build-network" type="checkbox" /><span
+                ><span data-i18n="允许 CMake 构建联网下载依赖（可访问外网及内网）"
+                  >允许 CMake 构建联网下载依赖（可访问外网及内网）</span
+                ></span
+              ></label
+            >
+            <small class="admin-view-desc"
+              ><span
+                data-i18n="coolder 当前仅支持各用户自己的工作区，尚未接入 webcool 的共享目录和本地磁盘权限模块，因此这两个选项暂不可用。"
+                >coolder 当前仅支持各用户自己的工作区，尚未接入 webcool
+                的共享目录和本地磁盘权限模块，因此这两个选项暂不可用。</span
+              ></small
+            >
+            <label class="account-password-label"
+              ><input
+                id="admin-ai-allow-browser-debug"
+                type="checkbox"
+                checked
+                disabled
+                aria-describedby="admin-ai-browser-debug-detection"
+              /><span><span data-i18n="允许浏览器调试">允许浏览器调试</span></span></label
+            >
+            <small id="admin-ai-browser-debug-detection" class="admin-view-desc" role="status"
+              ><span data-i18n="正在检测浏览器调试环境…">正在检测浏览器调试环境…</span></small
+            >
+            <div class="admin-ai-language-tools" data-admin-ai-field-container>
+              <strong id="admin-ai-language-tools-title"
+                ><span data-i18n="语言构建/检查工具">语言构建/检查工具</span></strong
+              >
+              <input id="admin-ai-language-tools" type="hidden" />
+              <div
+                class="admin-ai-language-tool-options"
+                role="group"
+                aria-labelledby="admin-ai-language-tools-title"
+                aria-describedby="admin-ai-language-tools-help"
+              >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="go" /><span
+                    >Go</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="java" /><span
+                    >Java</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="python" /><span
+                    >Python</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="javascript" /><span
+                    >JavaScript / Node.js</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="rust" /><span
+                    >Rust</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="objective-c" /><span
+                    >Objective-C</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="swift" /><span
+                    >Swift</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="csharp" /><span
+                    >C#</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="kotlin" /><span
+                    >Kotlin</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="php" /><span
+                    >PHP</span
+                  ></label
+                >
+                <label class="admin-ai-language-tool-option"
+                  ><input type="checkbox" data-admin-ai-language-tool value="d" /><span
+                    >D</span
+                  ></label
+                >
+              </div>
+              <div class="admin-ai-language-tool-builtin">
+                <strong>C/C++</strong
+                ><span
+                  ><span data-i18n="内置工具链，无需加入白名单"
+                    >内置工具链，无需加入白名单</span
+                  ></span
+                >
+              </div>
+              <small id="admin-ai-language-tools-help" class="admin-view-desc"
+                ><span
+                  data-i18n="勾选后，AI 智能体才能在识别到对应项目时使用该语言的固定构建、语法检查和测试命令。配置下方环境路径不会自动启用语言。"
+                  >勾选后，AI
+                  智能体才能在识别到对应项目时使用该语言的固定构建、语法检查和测试命令。配置下方环境路径不会自动启用语言。</span
+                ></small
+              >
+            </div>
+            <label
+              ><span
+                ><span data-i18n="Node.js 可执行文件路径（留空时自动查找）"
+                  >Node.js 可执行文件路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-node-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-node-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Python 可执行文件路径（留空时自动查找）"
+                  >Python 可执行文件路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-python-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-python-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Java 编译器路径（留空时自动查找）"
+                  >Java 编译器路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-javac-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-javac-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Java 运行时路径（留空时自动查找）"
+                  >Java 运行时路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-java-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-java-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Go 可执行文件路径（留空时自动查找）"
+                  >Go 可执行文件路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-go-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small id="admin-ai-go-detection" class="admin-view-desc"></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Rust Cargo 路径（留空时自动查找）"
+                  >Rust Cargo 路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-cargo-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-cargo-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Objective-C Make 路径（留空时自动查找）"
+                  >Objective-C Make 路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-make-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-make-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Swift 可执行文件路径（留空时自动查找）"
+                  >Swift 可执行文件路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-swift-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-swift-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="C# .NET 路径（留空时自动查找）"
+                  >C# .NET 路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-dotnet-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-dotnet-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="Kotlin 编译器路径（留空时自动查找）"
+                  >Kotlin 编译器路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-kotlinc-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-kotlinc-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="PHP 可执行文件路径（留空时自动查找）"
+                  >PHP 可执行文件路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-php-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-php-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span
+                ><span data-i18n="D 编译器路径（留空时自动查找）"
+                  >D 编译器路径（留空时自动查找）</span
+                ></span
+              ><input
+                id="admin-ai-dmd-executable-path"
+                class="admin-storage-input"
+                type="text"
+                maxlength="2048" /><small
+                id="admin-ai-dmd-detection"
+                class="admin-view-desc"
+              ></small
+            ></label>
+            <label
+              ><span data-i18n="额外敏感路径（相对路径前缀，逗号分隔）"
+                >额外敏感路径（相对路径前缀，逗号分隔）</span
+              ><input
+                id="admin-ai-sensitive-paths"
+                class="admin-storage-input"
+                type="text"
+                maxlength="4096"
+            /></label>
+            <label
+              ><span data-i18n="每用户并发任务数">每用户并发任务数</span
+              ><input
+                id="admin-ai-max-runs"
+                class="admin-storage-input"
+                type="number"
+                min="1"
+                max="16"
+            /></label>
+            <label
+              ><span><span data-i18n="单次最大输出 Token">单次最大输出 Token</span></span
+              ><input
+                id="admin-ai-max-tokens"
+                class="admin-storage-input"
+                type="number"
+                min="256"
+                max="1000000"
+              /><small class="admin-view-desc"
+                ><span data-i18n="最大硬限制：1,000,000 Token"
+                  >最大硬限制：1,000,000 Token</span
+                ></small
+              ></label
+            >
+            <label
+              ><span><span data-i18n="快速模式最大输出 Token">快速模式最大输出 Token</span></span
+              ><input
+                id="admin-ai-quick-max-tokens"
+                class="admin-storage-input"
+                type="number"
+                min="256"
+                max="262144"
+              /><small class="admin-view-desc"
+                ><span data-i18n="最高 256K（262,144）Token，同时受单次最大输出 Token 限制"
+                  >最高 256K（262,144）Token，同时受单次最大输出 Token 限制</span
+                ></small
+              ></label
+            >
+            <label
+              ><span><span data-i18n="大模型连接超时（秒）">大模型连接超时（秒）</span></span
+              ><input
+                id="admin-ai-provider-connect-timeout"
+                class="admin-storage-input"
+                type="number"
+                min="5"
+                max="300"
+            /></label>
+            <label
+              ><span
+                ><span data-i18n="大模型流式空闲超时（秒）">大模型流式空闲超时（秒）</span></span
+              ><input
+                id="admin-ai-provider-stream-timeout"
+                class="admin-storage-input"
+                type="number"
+                min="30"
+                max="3600"
+            /></label>
+            <label
+              ><span><span data-i18n="快速模式工具调用额度">快速模式工具调用额度</span></span
+              ><input
+                id="admin-ai-quick-tool-calls"
+                class="admin-storage-input"
+                type="number"
+                min="8"
+                max="256"
+            /></label>
+            <label
+              ><span><span data-i18n="标准模式工具调用额度">标准模式工具调用额度</span></span
+              ><input
+                id="admin-ai-standard-tool-calls"
+                class="admin-storage-input"
+                type="number"
+                min="8"
+                max="256"
+            /></label>
+            <label
+              ><span><span data-i18n="大项目模式工具调用额度">大项目模式工具调用额度</span></span
+              ><input
+                id="admin-ai-large-tool-calls"
+                class="admin-storage-input"
+                type="number"
+                min="8"
+                max="256"
+            /></label>
+            <label
+              ><span><span data-i18n="连续无进展工具调用上限">连续无进展工具调用上限</span></span
+              ><input
+                id="admin-ai-max-no-progress-tool-calls"
+                class="admin-storage-input"
+                type="number"
+                min="3"
+                max="32"
+            /></label>
+            <label
+              ><span><span data-i18n="浏览器调试触发次数">浏览器调试触发次数</span></span
+              ><input
+                id="admin-ai-browser-debug-report-threshold"
+                class="admin-storage-input"
+                type="number"
+                min="1"
+                max="20"
+                step="1"
+              /><small class="admin-view-desc"
+                ><span data-i18n="同一显示问题尝试此次数后，再次尝试时询问是否调试，默认 3 次。"
+                  >同一显示问题尝试此次数后，再次尝试时询问是否调试，默认 3 次。</span
+                ></small
+              ></label
+            >
+            <label
+              ><span
+                ><span data-i18n="工具上下文压缩阈值（KiB）">工具上下文压缩阈值（KiB）</span></span
+              ><input
+                id="admin-ai-tool-context-compaction"
+                class="admin-storage-input"
+                type="number"
+                min="16"
+                max="96"
+            /></label>
+            <label
+              ><span
+                ><span data-i18n="单次读取大小（KiB，1–64，默认 8）"
+                  >单次读取大小（KiB，1–64，默认 8）</span
+                ></span
+              ><input
+                id="admin-ai-read-chunk"
+                class="admin-storage-input"
+                type="number"
+                min="1"
+                max="64"
+            /></label>
+            <label
+              ><span
+                ><span data-i18n="单文件读取上限（KiB，默认 1024，不小于单次读取大小）"
+                  >单文件读取上限（KiB，默认 1024，不小于单次读取大小）</span
+                ></span
+              ><input
+                id="admin-ai-read-file-limit"
+                class="admin-storage-input"
+                type="number"
+                min="1"
+                max="1024"
+            /></label>
+            <label
+              ><span data-i18n="沙盒超时（毫秒）">沙盒超时（毫秒）</span
+              ><input
+                id="admin-ai-timeout"
+                class="admin-storage-input"
+                type="number"
+                min="1000"
+                max="300000"
+            /></label>
+            <label
+              ><span data-i18n="沙盒 CPU 时间（秒）">沙盒 CPU 时间（秒）</span
+              ><input id="admin-ai-cpu" class="admin-storage-input" type="number" min="1" max="300"
+            /></label>
+            <label
+              ><span data-i18n="沙盒内存（MiB）">沙盒内存（MiB）</span
+              ><input
+                id="admin-ai-memory"
+                class="admin-storage-input"
+                type="number"
+                min="64"
+                max="16384"
+            /></label>
+            <label
+              ><span data-i18n="沙盒进程数">沙盒进程数</span
+              ><input
+                id="admin-ai-processes"
+                class="admin-storage-input"
+                type="number"
+                min="1"
+                max="256"
+            /></label>
+            <label
+              ><span data-i18n="沙盒输出上限（KiB）">沙盒输出上限（KiB）</span
+              ><input
+                id="admin-ai-output"
+                class="admin-storage-input"
+                type="number"
+                min="4"
+                max="16384"
+            /></label>
+            <div class="account-password-actions">
+              <button
+                id="admin-ai-policy-submit"
+                class="admin-storage-choose-btn"
+                type="submit"
+                disabled
+              >
+                <span data-i18n="保存">保存</span>
+              </button>
+            </div>
+          </form>
+          <div class="admin-ai-key-rotation">
+            <h3><span data-i18n="AI密钥加密主密钥">AI密钥加密主密钥</span></h3>
+            <p class="admin-view-desc">
+              <span data-i18n="coolder 的独立模型存储尚未接入主密钥轮换流程，此操作暂不可用。"
+                >coolder 的独立模型存储尚未接入主密钥轮换流程，此操作暂不可用。</span
+              >
+            </p>
+            <button
+              id="admin-ai-master-key-rotate-btn"
+              disabled
+              class="admin-user-action danger"
+              type="button"
+            >
+              <span data-i18n="轮换加密主密钥">轮换加密主密钥</span>
+            </button>
+          </div>
+        </section>
+        <section id="providers-panel" role="tabpanel" aria-labelledby="settings" hidden>
+          <div class="provider-sidebar">
+            <div class="provider-list-toolbar">
+              <strong data-i18n="已添加的模型">已添加的模型</strong>
+              <button id="new-provider" type="button" data-i18n="新增模型">新增模型</button>
+            </div>
+            <div
+              id="provider-list"
+              class="list"
+              aria-label="已添加的模型"
+              data-i18n-aria-label="已添加的模型"
+            ></div>
+            <p id="provider-empty" class="muted" data-i18n="尚未添加模型">尚未添加模型</p>
+          </div>
+          <form id="provider-form">
+            <div class="dialog-title">
+              <h2 id="provider-form-title" data-i18n="新增模型">新增模型</h2>
+            </div>
+            <label for="provider-vendor"><span data-i18n="常见厂商预设">常见厂商预设</span></label>
+            <select id="provider-vendor">
+              <option value="custom">自定义厂商</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="kimi">Kimi</option>
+              <option value="qwen">千问</option>
+            </select>
+            <p class="muted">
+              <span
+                data-i18n="选择厂商预设会新建配置，自动填写接口和默认模型；填写自己的 API Key 后保存。预设模型列表与 webcool 一致，也可手动修改。"
+                >选择厂商预设会新建配置，自动填写接口和默认模型；填写自己的 API Key
+                后保存。预设模型列表与 webcool 一致，也可手动修改。</span
+              >
+            </p>
+            <input name="id" type="hidden" />
+            <div class="grid">
+              <label
+                ><span data-i18n="名称">名称</span
+                ><input
+                  name="name"
+                  required
+                  placeholder="我的编程模型"
+                  data-i18n-placeholder="我的编程模型"
+                />
+              </label>
+              <label
+                ><span data-i18n="协议">协议</span
+                ><select name="protocol">
+                  <option value="openai_compatible">OpenAI compatible</option>
+                  <option value="openai_responses">OpenAI Responses</option>
+                  <option value="openai_chat">OpenAI Chat</option>
+                  <option value="anthropic_messages">Anthropic Messages</option>
+                  <option value="gemini_native">Gemini</option>
+                  <option value="ollama">Ollama</option>
+                </select>
+              </label>
+            </div>
+            <label
+              >API Base URL<input
+                name="base_url"
+                type="url"
+                required
+                placeholder="https://your-provider.example/v1"
+              />
+            </label>
+            <label id="provider-model-options" hidden
+              ><span data-i18n="常用模型">常用模型</span>
+              <select id="provider-model-preset">
+                <option value="">自定义模型</option>
+              </select>
+            </label>
+            <label
+              ><span data-i18n="模型名称">模型名称</span
+              ><input
+                name="model"
+                required
+                placeholder="服务商提供的模型 ID"
+                data-i18n-placeholder="服务商提供的模型 ID"
+            /></label>
+            <label
+              >API Key<input
+                name="api_key"
+                type="password"
+                autocomplete="off"
+                placeholder="编辑时留空保留原密钥"
+                data-i18n-placeholder="编辑时留空保留原密钥"
+              />
+            </label>
+            <label class="check">
+              <input name="allow_file_content" type="checkbox" /><span
+                data-i18n="允许向此模型发送项目代码"
+                >允许向此模型发送项目代码</span
+              ></label
+            >
+            <label class="check"
+              ><input name="enabled" type="checkbox" checked /><span data-i18n="启用此模型"
+                >启用此模型</span
+              ></label
+            >
+            <label class="check">
+              <input name="is_default" type="checkbox" /><span data-i18n="设为默认模型"
+                >设为默认模型</span
+              ></label
+            >
+            <p class="muted">
+              <span data-i18n="密钥由 libai 加密保存在服务端，列表不会返回密钥。"
+                >密钥由 libai 加密保存在服务端，列表不会返回密钥。</span
+              >
+            </p>
+            <div class="actions">
+              <button type="button" id="delete-provider"><span data-i18n="删除">删除</span></button>
+              <button type="button" id="test-provider">
+                <span data-i18n="测试已保存配置">测试已保存配置</span>
+              </button>
+              <button class="primary"><span data-i18n="保存配置">保存配置</span></button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </dialog>
+    <button id="admin-restore" hidden>
+      <span data-i18n="管理控制台 · 恢复窗口">管理控制台 · 恢复窗口</span>
+    </button>
+    <dialog id="password-dialog">
+      <div class="dialog-title">
+        <h2><span data-i18n="个人设置">个人设置</span></h2>
+        <button
+          type="button"
+          data-close
+          class="dialog-close icon-button"
+          title="关闭"
+          data-i18n-title="关闭"
+          aria-label="关闭"
+          data-i18n-aria-label="关闭"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <form id="preferences-form">
+        <label
+          ><span data-i18n="语言设置">语言设置</span
+          ><select name="language" id="personal-language"></select
+        ></label>
+        <label
+          ><span data-i18n="界面风格">界面风格</span
+          ><select name="theme" id="personal-theme">
+            <option value="default">默认暗色</option>
+            <option value="blue">晴空蓝</option>
+            <option value="green">薄荷绿</option>
+            <option value="purple">淡雅紫</option>
+            <option value="sand">暖沙色</option>
+            <option value="gray">雾灰色</option>
+            <option value="pink">柔粉色</option>
+            <option value="ocean">深海青</option>
+          </select></label
+        >
+        <label
+          ><span data-i18n="字体大小">字体大小</span
+          ><select name="font_size" id="personal-font-size">
+            <option value="sm">小</option>
+            <option value="md">中</option>
+            <option value="lg">大</option>
+          </select></label
+        >
+        <p class="muted">
+          <span data-i18n="设置仅对当前账户生效，保存后立即应用。"
+            >设置仅对当前账户生效，保存后立即应用。</span
+          >
+        </p>
+        <button class="primary"><span data-i18n="保存设置">保存设置</span></button>
+      </form>
+      <hr />
+      <details>
+        <summary><span data-i18n="修改密码">修改密码</span></summary>
+        <form id="password-form">
+          <label
+            ><span data-i18n="原密码">原密码</span
+            ><input
+              name="current_password"
+              type="password"
+              required
+              autocomplete="current-password"
+          /></label>
+          <label
+            ><span data-i18n="新密码">新密码</span
+            ><input
+              name="password"
+              type="password"
+              required
+              minlength="10"
+              maxlength="128"
+              autocomplete="new-password"
+          /></label>
+          <label
+            ><span data-i18n="确认新密码">确认新密码</span
+            ><input name="confirm" type="password" required autocomplete="new-password"
+          /></label>
+          <button class="primary"><span data-i18n="保存密码">保存密码</span></button>
+        </form>
+      </details>
+    </dialog>
+    <dialog id="project-dialog">
+      <form id="project-form">
+        <div class="dialog-title">
+          <h2><span data-i18n="添加项目">添加项目</span></h2>
+          <button
+            type="button"
+            data-close
+            class="dialog-close icon-button"
+            title="关闭"
+            data-i18n-title="关闭"
+            aria-label="关闭"
+            data-i18n-aria-label="关闭"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <label
+          ><span data-i18n="方式">方式</span
+          ><select name="operation">
+            <option value="create">创建新项目</option>
+            <option value="ensure">导入工作区内已有目录</option>
+            <option value="import-git">导入工作区内 Git 仓库</option>
+          </select>
+        </label>
+        <label
+          ><span data-i18n="项目路径">项目路径</span
+          ><input name="path" placeholder="projects/hello-world" required />
+        </label>
+        <p class="muted">
+          <span data-i18n="路径相对于启动参数 --workspace 指定的工作区；默认 var/workspace。"
+            >路径相对于启动参数 --workspace 指定的工作区；默认 var/workspace。</span
+          >
+        </p>
+        <label
+          ><span data-i18n="语言">语言</span
+          ><select name="language">
+            <option value="cpp">C++</option>
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="go">Go</option>
+            <option value="java">Java</option>
+            <option value="rust">Rust</option>
+          </select>
+        </label>
+        <button class="primary"><span data-i18n="添加项目">添加项目</span></button>
+      </form>
+    </dialog>
+    <dialog id="detail-dialog">
+      <div class="dialog-title">
+        <h2 id="detail-title"></h2>
+        <button
+          data-close
+          type="button"
+          class="dialog-close icon-button"
+          title="关闭"
+          data-i18n-title="关闭"
+          aria-label="关闭"
+          data-i18n-aria-label="关闭"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <div id="detail-content"></div>
+    </dialog>
+  </body>
+</html>

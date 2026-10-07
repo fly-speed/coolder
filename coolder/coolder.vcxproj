@@ -1,0 +1,166 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64EC">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64EC</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64EC">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64EC</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{00AD5349-AA8E-5E34-A098-ED9CE01E6E37}</ProjectGuid>
+    <RootNamespace>coolder</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="coolder.windows.props" />
+  <PropertyGroup>
+    <TargetName>coolder</TargetName>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <IntDir>$(ProjectDir)obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;iphlpapi.lib;crypt32.lib;shell32.lib;user32.lib;userenv.lib;bcrypt.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;iphlpapi.lib;crypt32.lib;shell32.lib;user32.lib;userenv.lib;bcrypt.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="server\ai_policy.cpp" />
+    <ClCompile Include="server\attachments.cpp" />
+    <ClCompile Include="server\auth.cpp" />
+    <ClCompile Include="server\host.cpp" />
+    <ClCompile Include="action\ai\ai_agent_actions.cpp" />
+    <ClCompile Include="action\ai\ai_agent_common.cpp" />
+    <ClCompile Include="action\ai\ai_agent_projects.cpp" />
+    <ClCompile Include="action\ai\ai_agent_reviews.cpp" />
+    <ClCompile Include="action\ai\ai_agent_sessions.cpp" />
+    <ClCompile Include="action\ai\ai_provider_actions.cpp" />
+    <ClCompile Include="action\ai\ai_workspace_actions.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="server\attachments.h" />
+    <ClInclude Include="server\auth.h" />
+    <ClInclude Include="server\host.h" />
+    <ClInclude Include="action\action_util.h" />
+    <ClInclude Include="action\actions.h" />
+    <ClInclude Include="action\ai\ai_agent_actions.h" />
+    <ClInclude Include="action\ai\ai_agent_actions_internal.h" />
+    <ClInclude Include="action\ai\ai_provider_actions.h" />
+    <ClInclude Include="action\ai\ai_workspace_actions.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="tools\bundle_frontend.cmake" />
+    <None Include="html\index.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\third-party\acl\lib_acl\lib_acl_vc2022.vcxproj">
+      <Project>{B40213C2-507C-4C7F-A6E1-B850C9BDC27B}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\third-party\acl\lib_protocol\lib_protocol_vc2022.vcxproj">
+      <Project>{FE724EF7-3763-4E78-BDF5-BCBC075719FD}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\third-party\acl\lib_acl_cpp\lib_acl_cpp_vc2022.vcxproj">
+      <Project>{6EC1F44E-6A6A-48E9-B699-D7E89B63C8DC}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\third-party\acl\lib_fiber\c\libfiber_vc2022.vcxproj">
+      <Project>{AD99B75A-40BF-46DC-844B-23417FDC8690}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\third-party\acl\lib_fiber\cpp\libfiber_cpp_vc2022.vcxproj">
+      <Project>{F2479E2C-7267-436C-A1F1-A63B39E7CB30}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\third-party\zlib-1.2.11\visualc\vc2022\zlib.vcxproj">
+      <Project>{EBE2BD9D-26AC-4476-A843-21FE77B66757}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\libai\libai.vcxproj">
+      <Project>{95D55176-4806-4E55-AEAF-4A624014DA18}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="coolder-sandbox-helper.vcxproj">
+      <Project>{2CBD0E97-91D8-5CC3-A43C-4A11D4673272}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="BundleCoolderFrontend" BeforeTargets="PrepareForBuild">
+    <Exec Command="&quot;$(CoolderCMake)&quot; -P &quot;$(ProjectDir)tools\bundle_frontend.cmake&quot;" />
+  </Target>
+  <Target Name="CopyCoolderRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <CoolderFrontend Include="$(ProjectDir)html\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CoolderFrontend)" DestinationFiles="@(CoolderFrontend-&gt;'$(OutDir)html\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <MSBuild Projects="$(ProjectDir)..\third-party\zlib-1.2.11\visualc\vc2022\zlib.vcxproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);Platform=$(Platform)">
+      <Output TaskParameter="TargetOutputs" ItemName="CoolderZlibRuntime" />
+    </MSBuild>
+    <Copy SourceFiles="@(CoolderZlibRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <CoolderOpenSslDll Include="$(CoolderOpenSSLRoot)\bin\*.dll;$(CoolderOpenSSLLibDir)\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CoolderOpenSslDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(CoolderOpenSslDll)'!=''" />
+  </Target>
+</Project>

@@ -1,0 +1,10 @@
+/build*/
+/var/
+*.log
+
+# Visual Studio build output and local settings
+/bin/
+/obj/
+/.vs/
+*.vcxproj.user
+/coolder.local.props
