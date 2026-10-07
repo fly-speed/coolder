@@ -47,7 +47,7 @@ build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+# Keep source Makefiles; generated build directories are ignored above.
 install_manifest.txt
 compile_commands.json
 

@@ -38,10 +38,16 @@ target_include_directories(webcool_ai_dependencies INTERFACE
  "${ACL_PATH}/lib_protocol/include" "${ACL_PATH}/lib_fiber/c/include"
  "${ACL_PATH}/lib_fiber/cpp/include" ${_ai_ssl_include})
 target_link_libraries(webcool_ai_dependencies INTERFACE ${_ai_libs} ${_ai_ssl} Threads::Threads ${CMAKE_DL_LIBS})
+# Prefer the local zlib built by third-party/Makefile on Unix.
+set(_ai_z z)
+set(_ai_z_archive "${CMAKE_CURRENT_LIST_DIR}/../../third-party/zlib-1.2.11/install/lib/libz.a")
+if(EXISTS "${_ai_z_archive}")
+ set(_ai_z "${_ai_z_archive}")
+endif()
 if(WIN32)
  target_link_libraries(webcool_ai_dependencies INTERFACE ws2_32 iphlpapi advapi32 crypt32 shell32 user32)
 elseif(APPLE)
- target_link_libraries(webcool_ai_dependencies INTERFACE z iconv)
+ target_link_libraries(webcool_ai_dependencies INTERFACE ${_ai_z} iconv)
 else()
- target_link_libraries(webcool_ai_dependencies INTERFACE z rt)
+ target_link_libraries(webcool_ai_dependencies INTERFACE ${_ai_z} rt)
 endif()
