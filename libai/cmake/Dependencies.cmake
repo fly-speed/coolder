@@ -33,6 +33,16 @@ foreach(_name fiber_cpp acl_cpp protocol acl fiber)
   list(APPEND _ai_libs "${AI_${_name}_LIBRARY}")
  endif()
 endforeach()
+# ACL's prebuilt fiber archive may have been built with HAS_IO_URING=yes.
+# Carry its optional dependency to every libai consumer, after the ACL archives.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ find_library(AI_URING_LIBRARY NAMES uring-ffi uring)
+ if(AI_URING_LIBRARY)
+  list(APPEND _ai_libs "${AI_URING_LIBRARY}")
+ elseif(HAS_IO_URING)
+  message(FATAL_ERROR "ACL io_uring support requires liburing; install liburing development libraries or set AI_URING_LIBRARY")
+ endif()
+endif()
 target_include_directories(webcool_ai_dependencies INTERFACE
  "${ACL_PATH}/lib_acl/include" "${ACL_PATH}/lib_acl_cpp/include"
  "${ACL_PATH}/lib_protocol/include" "${ACL_PATH}/lib_fiber/c/include"

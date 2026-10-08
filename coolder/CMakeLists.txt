@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.16)
 project(coolder VERSION 1.0.0 LANGUAGES C CXX)
 
 option(BUILD_ACL "Build ACL from the sibling third-party source tree" OFF)
+option(HAS_IO_URING "Require liburing for ACL's io_uring backend on Linux" OFF)
+
 set(ACL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/acl"
 	CACHE PATH "ACL root")
 if(BUILD_ACL)

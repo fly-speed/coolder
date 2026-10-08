@@ -23,6 +23,8 @@ ctest --test-dir coolder/build --output-on-failure
 
 首次检出尚未构建 ACL 时，先执行 `make acl`，或者配置 coolder 时指定 `-DBUILD_ACL=ON`。依赖不在默认位置时可设置 `-DACL_PATH=/absolute/acl -DOPENSSL_PATH=/absolute/openssl`。
 
+Linux 上，libai 自动查找并链接 liburing（优先 `uring-ffi`，其次 `uring`），以支持启用了 io_uring 的 ACL 静态库。`make -C coolder HAS_IO_URING=yes` 或 CMake 的 `-DHAS_IO_URING=ON` 可要求配置阶段检查此依赖；自定义库路径可通过 `-DAI_URING_LIBRARY=/absolute/path/to/liburing.a` 指定。此选项不改变预编译 ACL 的功能。
+
 在浏览器打开 **http://127.0.0.1:18095**。首次进入时创建管理员账户，之后使用用户名和密码登录。普通用户由管理员创建，不开放自助注册。用户名允许 1–32 位英文字母、数字、下划线或连字符，密码为 10–128 字节。默认数据目录是启动时当前目录下的 `var/`。
 
 ```sh
