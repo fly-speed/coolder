@@ -100,6 +100,80 @@ flowchart TB
 
 “生成完成”可能仍表示有修订等待审核，尚未写入项目；构建成功也不等于全部测试通过或需求已完成，应结合验证报告与实际使用结果判断。
 
+## 智能体推理机制
+
+Coolder 采用 **ReAct 风格的模型与工具循环，并结合构建验证和自动修复**：模型根据当前证据决定下一步，运行时负责执行动作、反馈结果和约束任务。这是对实现方式的概括，不表示项目依赖某个同名框架。
+
+### 模型决策与运行时控制
+
+| 层次 | 职责 |
+| --- | --- |
+| 模型推理 | 理解需求、分析源码、形成修改方案、选择工具，并根据执行结果调整方案 |
+| 运行时控制 | 组装上下文、检查权限与预算、执行工具、维护隔离草稿、触发验证、检测无进展和保存检查点 |
+| 用户审核 | 检查结果与差异，决定哪些修订写入正式项目 |
+
+主执行路径围绕单个任务所选模型展开逐轮决策，没有独立的规划、实现、评审模型协作调度，也没有多候选方案搜索树。部分读取工具可以并行执行，但工具并行不等于多个智能体并行推理。
+
+```mermaid
+flowchart TD
+    A[用户需求与已有上下文] --> B[组装模型请求]
+    B --> C[模型判断下一步]
+    C --> D{返回内容}
+    D -->|工具调用| E[权限与预算检查]
+    E --> F[读取源码 / 搜索 / 提交修订]
+    F --> G[工具结果与构建诊断]
+    G --> H[更新上下文与检查点]
+    H --> B
+    D -->|最终结果| I[检查修订与验证证据]
+    I -->|失败且允许重试| B
+    I -->|结束运行| J[结果与待审核修订]
+```
+
+模型会随着证据更新方案。例如修复编译错误时，先读取报错位置及相关声明，再提交相关修改；运行时构建隔离草稿，模型依据新的诊断继续修复。它不要求在开始时就制定完整且不可变的执行计划。具体编排见 [工具循环实现](libai/runtime/coding_tool_loop.cpp)。
+
+### 上下文与任务记忆
+
+模型通过请求上下文和工具读取逐步了解项目，不会自动获得整个仓库。每轮请求结合用户需求、任务契约 `task_contract`、可用会话与工具历史、已读取源码、当前修订、验证能力及诊断结果。
+
+任务契约持续保留用户要求，降低多轮执行时遗漏需求的风险；它不能保证模型已经正确理解每条要求。上下文过大时，运行时压缩历史，保留源码工作集、近期交互、修订状态与关键结果，并清理部分原生工具历史。被移除的代码可能需要重新读取。
+
+检查点保存的是可恢复的任务状态与上下文，而不是模型永久记忆或可直接恢复的内部思维状态。详见 [请求组装](libai/runtime/coding_tool_loop_request.cpp) 和 [上下文压缩与检查点](libai/runtime/coding_tool_loop_feedback.cpp)。
+
+### 思考强度与执行模式
+
+| 配置 | 作用 | 边界 |
+| --- | --- | --- |
+| `thinking_enabled` | 请求启用或关闭模型思考，任务接口默认开启 | 只有模型和适配器支持时才会发送相应开关 |
+| `reasoning_effort` | 任务接口接受 `low`、`high`、`max`，请求对应思考强度 | 实际参数与行为由 Provider 适配和模型能力决定 |
+| `quick / standard / large` | 设置任务的工具调用、输出及部分上下文预算 | 不会因此自动更换模型，也不表示启用多智能体 |
+
+界面或日志中的 reasoning 来自服务商返回的推理文本或摘要，不能据此观察模型完整的内部推理过程。更大的思考或执行预算也不保证更准确的结果。
+
+如果模型耗尽输出预算却未给出答案或工具调用，适配层会按模型能力处理：对支持相应控制的模型可尝试关闭思考后恢复输出；对不支持关闭思考的特定模型，避免重复同样的自动请求，并保留可恢复状态。普通检查点恢复不会无条件降低用户指定的思考强度。详见 [任务参数处理](coolder/action/ai/ai_agent_actions.cpp) 和 [模型请求恢复](libai/provider/ai_provider_client.cpp)。
+
+### 验证驱动修复与完成判断
+
+运行时主动对保存后的修订进行构建检查，并把报告送回下一轮模型请求。模型返回最终结果时，还会检查当前修订的验证状态；最终文字中的“完成”本身不构成成功证据。
+
+当前最终结果处理在满足预算和错误类型等条件时，允许编译失败最多额外进行 3 次最终验证修复，其他验证失败最多额外进行 1 次；这些次数只针对最终结果阶段，不是整个任务的总修改次数。验证环境不可用等情况会区别处理。
+
+验收机制只从运行时验证报告提取可信证据，并核对报告对应的草稿与源码基线。配置测试通过不等于全部用户需求已得到覆盖，也不等于用户已经接受修订。详见 [最终结果与修复处理](libai/runtime/coding_tool_loop_response.cpp) 和 [任务验收证据](libai/runtime/coding_tool_loop_acceptance.cpp)。
+
+### 防止重复探索与无效循环
+
+- 新的有效观察或草稿变化被视为进展；重复且无效的调用会触发调整策略提示，达到无进展阈值后停止。
+- 实现任务的探索达到检查点后，运行时收紧可用工具范围，要求进入实现阶段，并为缺失源码保留有限补充读取机会。当前阈值为 `max(1, min(24, 工具预算 / 2))`；只读分析和纯验证任务有相应例外。
+- 连续 6 轮未执行工具且没有正常结束时，停止协议或策略重试，并尝试保存可恢复检查点。
+- 总工具预算、输出限制、超时、暂停和取消共同约束任务执行。
+
+这些机制减少反复读文件、只输出计划或持续无效修复的情况；预算过紧也可能使复杂任务过早结束。相关决策见 [进展监督器](libai/agent/agent_progress_supervisor.cpp)。
+
+### 能力与局限
+
+这种方式适合范围明确、能够通过构建或测试获得反馈的增量开发任务。效果同时取决于模型能力、上下文质量、工具可用性和验收覆盖率。需求理解仍主要依赖模型，上下文压缩可能丢失细节，提示词与规则需要持续维护，而架构合理性、交互体验及未转化为断言的业务要求仍需要人工判断。
+
+以上描述基于当前源码实现，不代表已对不同模型的正确率、速度或成本完成对比评测。
+
 ## 功能组成
 
 ### 项目管理与规划
@@ -403,6 +477,80 @@ flowchart TB
 7. **Continue iterating**: Sessions and run records remain available for follow-up tasks. The runtime can use checkpoints after an interruption; recovery is triggered by status queries.
 
 “Generation complete” may still mean revisions are awaiting review and have not been written to the project. A successful build does not establish that all tests passed or all requirements were met; consult the validation reports and verify the resulting behavior.
+
+## Agent Reasoning Mechanism
+
+Coolder uses a **ReAct-style model and tool loop combined with build validation and automatic repair**. The model selects the next action from the available evidence, while the runtime executes actions, returns observations, and constrains the task. This describes the implementation pattern; it does not imply a dependency on a framework named ReAct.
+
+### Model Decisions and Runtime Control
+
+| Layer | Responsibilities |
+| --- | --- |
+| Model reasoning | Interpret requirements, analyze source code, form an implementation approach, select tools, and revise the approach using execution results |
+| Runtime control | Assemble context, check permissions and budgets, execute tools, maintain isolated drafts, trigger validation, detect lack of progress, and save checkpoints |
+| User review | Inspect results and diffs and decide which revisions to apply to the project |
+
+The main execution path makes successive decisions using the model selected for a task. It does not orchestrate separate planning, implementation, and review models or search a tree of candidate solutions. Some read tools execute in parallel, but parallel tools do not imply multiple reasoning agents.
+
+```mermaid
+flowchart TD
+    A[User Requirements and Existing Context] --> B[Assemble Model Request]
+    B --> C[Model Selects Next Step]
+    C --> D{Response Type}
+    D -->|Tool Call| E[Permission and Budget Checks]
+    E --> F[Read Source / Search / Propose Revisions]
+    F --> G[Tool Results and Build Diagnostics]
+    G --> H[Update Context and Checkpoint]
+    H --> B
+    D -->|Final Result| I[Check Revisions and Validation Evidence]
+    I -->|Failure with Retry Available| B
+    I -->|End Run| J[Result and Revisions Awaiting Review]
+```
+
+The model adjusts its approach as evidence arrives. For a compiler error, it can read the failing source and related declarations, propose coordinated edits, and use diagnostics from the runtime's isolated draft build to guide another repair. It does not require a complete, immutable plan before execution begins. See the [tool loop implementation](libai/runtime/coding_tool_loop.cpp).
+
+### Context and Task Memory
+
+The model learns about a project through request context and tool reads; it does not automatically receive the entire repository. Each request combines user requirements, the `task_contract`, available conversation and tool history, retained source, current revisions, validation capabilities, and diagnostics.
+
+The task contract preserves user requests across turns to reduce omissions, but it does not establish that the model has interpreted every requirement correctly. When context grows too large, the runtime compacts history, retains a source working set, recent exchanges, revision state, and key results, and clears some native tool history. Evicted source may need to be read again.
+
+Checkpoints preserve recoverable task state and context, rather than permanent model memory or a directly resumable internal thought state. See [request assembly](libai/runtime/coding_tool_loop_request.cpp) and [context compaction and checkpoints](libai/runtime/coding_tool_loop_feedback.cpp).
+
+### Thinking Effort and Execution Modes
+
+| Setting | Purpose | Boundary |
+| --- | --- | --- |
+| `thinking_enabled` | Requests model thinking on or off; enabled by default in the task API | A corresponding toggle is sent only when supported by the model and adapter |
+| `reasoning_effort` | The task API accepts `low`, `high`, and `max` to request an effort level | Effective parameters and behavior depend on provider adaptation and model capabilities |
+| `quick / standard / large` | Controls tool-call, output, and some context budgets for a task | Does not automatically change models or enable multiple agents |
+
+Reasoning shown in the interface or logs is text or a summary returned by the provider; it does not expose the model's complete internal reasoning process. Larger thinking or execution budgets do not guarantee more accurate results.
+
+If a model exhausts its output budget without producing an answer or tool call, recovery depends on its capabilities. Supported models may retry with thinking disabled; certain models without a thinking-off control avoid an identical automatic retry and retain recoverable state. Ordinary checkpoint recovery does not unconditionally lower the user's requested effort. See [task parameter handling](coolder/action/ai/ai_agent_actions.cpp) and [model request recovery](libai/provider/ai_provider_client.cpp).
+
+### Validation-Driven Repair and Completion
+
+The runtime proactively checks builds after revisions are saved and feeds reports into subsequent model requests. When the model returns a final result, the runtime also checks validation for the current revision. A textual claim of completion is not itself evidence of success.
+
+Under the applicable budget and error conditions, final-result handling currently permits up to 3 additional final-validation repair attempts for compiler failures and 1 for other validation failures. These limits apply to the final-result stage, not to the total number of edits in a task. Unavailable validation environments and other special cases are handled separately.
+
+Acceptance uses trusted runtime validation reports and checks their draft and source baseline against the current state. Passing configured tests does not establish coverage of every user requirement or mean that the user has accepted the revisions. See [final-result and repair handling](libai/runtime/coding_tool_loop_response.cpp) and [task acceptance evidence](libai/runtime/coding_tool_loop_acceptance.cpp).
+
+### Repeated Investigation and Loop Limits
+
+- New successful observations or draft changes count as progress. Repeated unproductive calls trigger guidance to change approach, and the run stops at the no-progress threshold.
+- At an investigation checkpoint, implementation tasks receive a narrower tool set and guidance to implement, with a limited allowance for missing source reads. The current threshold is `max(1, min(24, tool budget / 2))`; read-only analysis and verification-only tasks have corresponding exceptions.
+- After 6 consecutive turns without tool execution or normal completion, protocol or policy retries stop and the runtime attempts to save a recoverable checkpoint.
+- Total tool budgets, output limits, timeouts, pause, and cancellation also constrain execution.
+
+These controls reduce repeated reads, plan-only responses, and unproductive repairs. Tight budgets can also end complex tasks too early. See the [progress supervisor](libai/agent/agent_progress_supervisor.cpp).
+
+### Strengths and Limitations
+
+This approach fits incremental development with clear scope and actionable build or test feedback. Results depend on model capabilities, context quality, available tools, and acceptance coverage. Requirement interpretation still relies mainly on the model, context compaction can lose details, prompts and rules need ongoing maintenance, and architectural quality, user experience, and business requirements without executable assertions still require human judgment.
+
+This description reflects the current source implementation; it is not a comparative evaluation of model accuracy, speed, or cost.
 
 ## Capabilities
 
