@@ -305,8 +305,13 @@
             ></nav>
             <div id="request-index-preview" role="tooltip" hidden></div>
             <div id="messages" aria-live="polite">
-              <div class="empty">
-                <div class="mark">◆</div>
+              <div class="empty welcome">
+                <div class="welcome-symbol" aria-hidden="true">
+                  <svg viewBox="0 0 48 48" fill="none">
+                    <path d="m16 15-9 9 9 9m16-18 9 9-9 9M27 11l-6 26" />
+                  </svg>
+                </div>
+                <span class="welcome-eyebrow">COOLDER / AI WORKSPACE</span>
                 <h2><span data-i18n="从想法到可运行的代码">从想法到可运行的代码</span></h2>
                 <p>
                   <span data-i18n="选择一个项目，配置模型，然后描述你想实现的功能。"
@@ -315,6 +320,15 @@
                     >在右侧查看文件、执行进度和代码差异。</span
                   >
                 </p>
+                <button id="welcome-create-project" class="primary" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" /></svg>
+                  <span data-i18n="创建或导入项目">创建或导入项目</span>
+                </button>
+                <ol class="welcome-steps">
+                  <li><span class="step-number" aria-hidden="true">01</span><span data-i18n="项目">项目</span></li>
+                  <li><span class="step-number" aria-hidden="true">02</span><span data-i18n="编程任务">编程任务</span></li>
+                  <li><span class="step-number" aria-hidden="true">03</span><span data-i18n="差异确认">差异确认</span></li>
+                </ol>
               </div>
             </div>
           </div>
@@ -553,6 +567,7 @@
     </footer>
     <dialog id="login-dialog">
       <form id="login-form">
+        <div class="login-brand" aria-hidden="true"><span>&lt;/&gt;</span> Coolder</div>
         <h2 id="login-title"><span data-i18n="登录 coolder">登录 coolder</span></h2>
         <p id="login-description">
           <span data-i18n="使用管理员为你创建的账户登录。">使用管理员为你创建的账户登录。</span>

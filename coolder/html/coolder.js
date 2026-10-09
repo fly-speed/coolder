@@ -1127,6 +1127,7 @@ $('new-session').onclick = task(async () => {
 });
 
 $('new-project').onclick = () => $('project-dialog').showModal();
+$('welcome-create-project').onclick = () => $('new-project').click();
 
 let projectDirectory = '', projectDirectoryParent = '', directoryRequest = 0;
 

@@ -5,6 +5,8 @@
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
     sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -268,7 +270,9 @@ select:focus {
   display: flex;
   gap: 8px;
   border-bottom: 1px solid var(--border);
-  padding: 18px 14px;
+  min-height: 65px;
+  padding: 14px 12px;
+  align-items: center;
 }
 .inspector nav button {
   border: none;
@@ -365,8 +369,8 @@ dialog {
   box-shadow: 0 28px 100px #0009;
 }
 dialog::backdrop {
-  background: #080d17ba;
-  backdrop-filter: blur(5px);
+  background: #080d17b8;
+  backdrop-filter: blur(8px);
 }
 dialog h2 {
   font-size: 1.5rem;
@@ -714,17 +718,17 @@ body.resizing-panes * {
 }
 
 :root {
-  --text: #dce4f0;
-  --muted: #8e9bad;
-  --bg: #10141b;
-  --surface: #161b24;
-  --border: #2b3240;
-  --button: #202938;
-  --hover: #2a3950;
-  --accent: #a9c0ff;
-  --accent-hover: #c2d4ff;
-  --on-accent: #121d32;
-  --input: #121a27;
+  --text: #e5e9f3;
+  --muted: #929db2;
+  --bg: #0e1118;
+  --surface: #141923;
+  --border: #293142;
+  --button: #1e2635;
+  --hover: #28344a;
+  --accent: #a3b8ff;
+  --accent-hover: #c2cfff;
+  --on-accent: #131d3a;
+  --input: #171e2b;
   --error: #ffb9b5;
   --error-bg: #453039;
   --error-border: #815963;
@@ -1584,11 +1588,11 @@ html[data-ui-theme='ocean'] {
 
 /* Workspace surfaces follow the selected account theme. */
 #project-panel {
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent));
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent));
   padding: 16px 12px 12px;
 }
 #project-panel .sidebar-heading {
-  padding: 0 4px 8px;
+  padding: 4px 4px 20px;
 }
 #project-panel .sidebar-brand {
   letter-spacing: -0.035em;
@@ -1648,10 +1652,11 @@ html[data-ui-theme='ocean'] {
   border-color: color-mix(in srgb, var(--border) 65%, transparent);
 }
 #conversation-panel {
-  background: color-mix(in srgb, var(--bg) 48%, var(--surface));
+  background: var(--bg);
 }
 #conversation-panel .body-toolbar {
-  padding: 8px 12px;
+  min-height: 65px;
+  padding: 10px 16px;
   background: var(--surface);
   border-bottom-color: color-mix(in srgb, var(--border) 70%, transparent);
 }
@@ -1661,6 +1666,9 @@ html[data-ui-theme='ocean'] {
 }
 #conversation-panel .body-tabs {
   gap: 3px;
+  padding: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 65%, var(--surface));
 }
 #conversation-panel .body-tabs button {
   padding: 7px 12px;
@@ -1715,7 +1723,9 @@ html[data-ui-theme='ocean'] {
   background: var(--hover);
 }
 #conversation-panel #messages {
-  padding: 22px 24px 12px;
+  padding: 28px clamp(16px, 4cqi, 64px) 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 #conversation-panel .message {
   background: transparent;
@@ -1739,7 +1749,7 @@ html[data-ui-theme='ocean'] {
 }
 #conversation-panel .composer {
   border-top: 0;
-  padding: 8px 20px 12px;
+  padding: 8px clamp(16px, 4cqi, 64px) 18px;
   background: transparent;
 }
 #conversation-panel .run-state {
@@ -1750,11 +1760,11 @@ html[data-ui-theme='ocean'] {
   display: none;
 }
 #conversation-panel #prompt-form {
-  padding: 8px 12px 4px;
+  padding: 12px 16px 6px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 18px;
   background: var(--input);
-  box-shadow: 0 3px 12px #00000006;
+  box-shadow: 0 8px 28px #00000012;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease;
@@ -1764,7 +1774,7 @@ html[data-ui-theme='ocean'] {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 #conversation-panel #prompt {
-  min-height: 76px;
+  min-height: 88px;
   border: 0;
   padding: 8px 2px;
   background: transparent;
@@ -2117,4 +2127,194 @@ html[data-ui-theme='ocean'] {
 .project-directory-list button {
   text-align: left;
   overflow-wrap: anywhere;
+}
+
+/* Shared polish stays token-based so all account themes remain supported. */
+button,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+button:disabled:hover {
+  border-color: var(--border);
+}
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.welcome {
+  height: auto;
+  min-height: 100%;
+  padding: 32px 0;
+}
+.welcome-symbol {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 22px;
+  color: var(--accent);
+  background: linear-gradient(145deg, var(--hover), var(--surface));
+  box-shadow: 0 12px 48px color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.welcome-symbol svg {
+  width: 38px;
+  height: 38px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.welcome-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+}
+.welcome h2 {
+  margin: 14px 0 0;
+  font-size: clamp(1.6rem, 4.5cqi, 2.3rem);
+  line-height: 1.45;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.welcome p {
+  max-width: 440px;
+  margin: 16px 0 24px;
+  font-size: 0.9rem;
+  text-wrap: pretty;
+}
+#welcome-create-project {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 10px;
+}
+#welcome-create-project svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.welcome-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 22px;
+  margin: 30px 0 0;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+  font-size: 0.8rem;
+}
+.welcome-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.step-number {
+  color: var(--accent);
+  font: 0.72rem ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.inspector nav button {
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+.inspector nav .active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.inspector .toolbar button {
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  font-size: 0.8rem;
+}
+.inspector .toolbar button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+#status-bar {
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+#login-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 32px;
+  border-radius: 20px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 6%, var(--surface)), var(--surface) 55%);
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.login-brand span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--button);
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+#login-title {
+  margin-bottom: 10px;
+  letter-spacing: -0.03em;
+}
+#login-description {
+  margin-bottom: 24px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+#login-form input {
+  padding: 12px;
+  border-radius: 9px;
+}
+#login-form > .primary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 9px;
+}
+#composer-content > small {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  line-height: 1.6;
+}
+@container (max-width: 480px) {
+  .welcome {
+    padding: 20px 0;
+  }
+  .welcome-symbol {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 18px;
+    border-radius: 17px;
+  }
+  .welcome-steps {
+    gap: 10px 14px;
+    margin-top: 22px;
+  }
+}
+@media (max-width: 620px) {
+  #login-dialog {
+    padding: 24px;
+  }
 }
