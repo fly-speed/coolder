@@ -43,6 +43,7 @@ inline std::string normalize_requirement_progress(acl::json_node *value)
 	}
 	return count ? std::string(result.to_string().c_str()) : "";
 }
+// Format recorded progress against the task's acceptance requirements.
 inline std::string requirement_progress_summary(
     const std::string &value, bool chinese)
 {

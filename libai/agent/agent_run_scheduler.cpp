@@ -56,6 +56,8 @@ bool within_project(const std::string &path, const std::string &project)
 }
 }
 
+// Compare scopes only within one user. Document-only and chat-only runs have
+// narrower conflicts than runs that can modify an entire project tree.
 bool agent_run_scopes_conflict(
     const agent_run_scope_t &left, const agent_run_scope_t &right)
 {

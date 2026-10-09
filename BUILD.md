@@ -53,6 +53,9 @@ python3 -m venv /tmp/coolder-style-venv
 /tmp/coolder-style-venv/bin/pip install -r coolder/tools/style-requirements.txt
 find libai coolder -type f \( -name '*.cpp' -o -name '*.h' \) -not -path '*/build/*' -print0 | xargs -0 /tmp/coolder-style-venv/bin/clang-format --dry-run --Werror
 /tmp/coolder-style-venv/bin/python coolder/tools/check_cpp_structure.py
+/tmp/coolder-style-venv/bin/python coolder/tools/check_header_comments.py
 ```
 
 结构检查使用 C++ 语法树计算函数范围，不代替编译。拆分 `.cpp` 后，CMake 会重新发现模块源码；同时需要维护对应的 `.vcxproj` 和 `.vcxproj.filters`。Windows 源码覆盖检查可用 `python3 coolder/tests/vs_project_test.py`，完整检查要求已初始化 ACL 子模块。
+
+头文件中的类、结构体、成员变量及函数声明需提供英文注释，说明用途以及必要的单位、所有权或调用约束。同一声明包含多个成员时，逐个注明其含义。源码注释重点说明事务边界、并发协调、恢复条件和资源生命周期。注释检查覆盖声明及内联定义；注释准确性仍需结合实现审查。

@@ -21,6 +21,7 @@ inline int hex_value(char ch)
 		return -1;
 	return ch - 'A' + 10;
 }
+// Encode bytes as hexadecimal text for persistent records.
 inline std::string hex_encode(const unsigned char *data, size_t size)
 {
 	static const char *digits = "0123456789abcdef";
@@ -32,6 +33,7 @@ inline std::string hex_encode(const unsigned char *data, size_t size)
 	}
 	return out;
 }
+// Encode bytes as hexadecimal text for persistent records.
 inline std::string hex_encode(const std::string &value)
 {
 	return hex_encode(reinterpret_cast<const unsigned char *>(value.data()),
@@ -54,6 +56,7 @@ inline bool hex_decode(const std::string &value, std::string &output)
 	}
 	return true;
 }
+// Split the tab-delimited fields used by the record format.
 inline void split_tabs(
     const std::string &line, std::vector<std::string> &fields)
 {

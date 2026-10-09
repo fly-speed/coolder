@@ -126,6 +126,8 @@ int run_browser_probe(const options_t &options)
 #endif
 }
 
+// Each readiness attempt owns its socket and closes it on every outcome; a
+// failed attempt must not exhaust descriptors during the bounded retry loop.
 static bool http_service_ready(unsigned short port, const std::string &path)
 {
 	const int descriptor = socket(AF_INET, SOCK_STREAM, 0);

@@ -627,6 +627,8 @@ bool workspace_change_set_store_t::apply(const std::string &id,
 	return apply_locked(id, results, err);
 }
 
+// Structural changes can require two filesystem operations. Repair a partial
+// operation here before the caller rolls back earlier completed operations.
 static bool apply_planned_change(agent_workspace_t &workspace,
     const stored_change_t &change, const std::string &original,
     std::string &err)
@@ -678,6 +680,8 @@ static bool apply_planned_change(agent_workspace_t &workspace,
 	return ok;
 }
 
+// Preview hashes are optimistic concurrency checks: a confirmed plan must
+// still match the live source before any operation in the batch is applied.
 static bool revalidate_existing_change(agent_workspace_t &workspace,
     const stored_change_t &change, std::string &original,
     const std::vector<std::string> &planned_directories,

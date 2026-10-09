@@ -108,6 +108,8 @@ static void cleanup_failed_provider_batch(const std::string &user_root,
 	}
 }
 
+// A passing report is reusable only with both its draft fingerprint and its
+// source baseline; later batch mutations must not inherit stale success.
 static void record_batch_validation(batch_validation_evidence_t &verified,
     const std::string &result, const std::string &baseline_before,
     const std::vector<agent_change_proposal_t> &candidate)

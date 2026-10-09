@@ -173,6 +173,8 @@ static void merge_reviewed_progress(webcool::ai::agent_progress_t &progress,
 	}
 }
 
+// Publish the already reconciled review snapshot while holding the runtime
+// mutex; disk reads and checkpoint writes remain outside this critical section.
 static void publish_progress_reviews(
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
     const webcool::ai::agent_progress_t &progress)

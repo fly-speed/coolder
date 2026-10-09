@@ -19,18 +19,21 @@ inline bool supported_project_language(const std::string &value)
 	    value == "d";
 }
 
+// Recognize a language toolchain supported by administrator configuration.
 inline bool supported_configurable_language_tool(const std::string &value)
 {
 	return supported_project_language(value) && value != "cpp" &&
 	    value != "c";
 }
 
+// Recognize a supported project target platform.
 inline bool supported_project_platform(const std::string &value)
 {
 	return value == "cross-platform" || value == "windows" ||
 	    value == "linux" || value == "macos";
 }
 
+// Check whether the requested language supports the selected platform.
 inline bool project_language_supports_platform(
     const std::string &language, const std::string &platform)
 {

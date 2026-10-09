@@ -15,11 +15,16 @@ namespace ai
 // Keeping indexes here lets preview renderers report exact source line numbers.
 enum line_diff_kind_t { line_diff_equal, line_diff_removed, line_diff_added };
 
+// One operation in the line-based edit sequence.
 struct line_diff_op_t {
+	// Diff operation category: equal, insertion or deletion.
 	line_diff_kind_t kind;
+	// Position in the original line sequence.
 	size_t old_index;
+	// Position in the revised line sequence.
 	size_t new_index;
 
+	// Initialize line diff op state from the supplied arguments.
 	line_diff_op_t(
 	    line_diff_kind_t value, size_t old_value, size_t new_value)
 	        : kind(value)

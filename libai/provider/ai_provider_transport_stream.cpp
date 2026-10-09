@@ -79,6 +79,8 @@ public:
 	}
 };
 
+// The timer fiber may outlive the request scope. Shared state keeps its stop
+// flag alive, and the post-delay check avoids touching an expired observer.
 static void watch_stream_worker(
     const std::shared_ptr<stream_watch_state_t> &shared, ACL_FIBER *worker)
 {

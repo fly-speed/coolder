@@ -8,10 +8,14 @@ namespace webcool
 namespace ai
 {
 
+// Filesystem capability enforcing access within an authorized workspace.
 class agent_workspace_t;
 
+// Paths and metadata produced by trusted project scaffolding.
 struct project_scaffold_result_t {
+	// Language label used to select prompts or toolchains.
 	std::string language;
+	// Target platform selected for project creation or validation.
 	std::string platform;
 	// True when the wizard had already created the selected empty directory.
 	// Non-empty directories are never reused or overwritten.

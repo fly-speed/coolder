@@ -53,6 +53,7 @@ inline bool make_private_directory(const std::string &path)
 	return mkdir(path.c_str(), 0700) == 0 && safe_directory(path);
 #endif
 }
+// Check for a filesystem entry without requiring a regular file.
 inline bool path_entry_exists(const std::string &path)
 {
 #ifdef _WIN32

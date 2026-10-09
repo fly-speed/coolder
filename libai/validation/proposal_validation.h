@@ -13,12 +13,17 @@ namespace ai
 // Stable causes identify failed preconditions, independent of source text or
 // whether the provider submitted a single proposal or a batch.
 struct proposal_validation_error_t {
+	// Machine-readable diagnostic or validation error code.
 	std::string code;
+	// Path of the file or resource associated with this record.
 	std::string path;
+	// Secondary path associated with this validation error.
 	std::string related_path;
+	// Additional diagnostic detail for the owning operation.
 	std::string detail;
 };
 
+// Check project containment using normalized path-component boundaries.
 inline bool path_is_in_project(
     const std::string &project, const std::string &path)
 {
@@ -98,6 +103,8 @@ inline bool stage_missing_proposal_parent(agent_workspace_t &workspace,
 }
 
 template <typename Reject>
+// Inspect the proposed target and reject unsafe or conflicting filesystem
+// state.
 inline bool inspect_proposal_target(agent_workspace_t &workspace,
     const std::string &target, bool &target_exists, const Reject &reject)
 {
@@ -126,6 +133,7 @@ inline bool inspect_proposal_target(agent_workspace_t &workspace,
 }
 
 template <typename Reject>
+// Check that a proposal's parent path exists or is created by this batch.
 inline bool inspect_proposal_parent(agent_workspace_t &workspace,
     const std::string &project_path, const agent_change_proposal_t &change,
     const std::string &normalized,
@@ -176,6 +184,7 @@ inline bool inspect_proposal_parent(agent_workspace_t &workspace,
 	return true;
 }
 
+// Validate and normalize proposals against the current workspace baseline.
 inline size_t validate_change_proposals(
     webcool::ai::agent_workspace_t &workspace, const std::string &project_path,
     std::vector<agent_change_proposal_t> &changes,

@@ -3,6 +3,7 @@ namespace webcool
 {
 namespace ai
 {
+// Return the CMake helper used to register generated I/O tests.
 inline const char *ctest_registration_template()
 {
 	return R"WEBCOOL(# Fixed registration for webcool_io_test.cmake. Requires CMake 3.16.
@@ -39,6 +40,7 @@ function(webcool_add_io_test)
 endfunction()
 )WEBCOOL";
 }
+// Return the CMake script used to verify generated I/O test results.
 inline const char *ctest_io_template()
 {
 	return R"WEBCOOL(# Reusable CTest stdin/stdout check; no shell or nested CMake process.

@@ -10,6 +10,7 @@ namespace webcool
 namespace ai
 {
 
+// Return the storage path used for staged interface.
 inline bool staged_interface_path(const std::string &path)
 {
 	const size_t dot = path.rfind('.');
@@ -59,6 +60,7 @@ inline void append_staged_source(const agent_change_proposal_t &change,
 	}
 }
 
+// Serialize current staged source versions as bounded context records.
 inline std::string staged_source_records(
     const std::vector<agent_change_proposal_t> &changes, size_t budget)
 {

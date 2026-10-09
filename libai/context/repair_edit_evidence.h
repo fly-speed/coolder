@@ -7,11 +7,16 @@ namespace webcool
 {
 namespace ai
 {
+// Bounded source excerpt surrounding an edit location.
 struct edit_excerpt_t {
+	// Starting byte offset of this excerpt in the complete source.
 	size_t offset;
+	// Text payload associated with this operation.
 	std::string content;
+	// Whether limits prevented returning the complete result.
 	bool truncated;
 };
+// Extract bounded context around the supplied edit offset.
 inline edit_excerpt_t edit_excerpt(
     const std::string &source, size_t at, size_t budget)
 {
@@ -24,6 +29,7 @@ inline edit_excerpt_t edit_excerpt(
 	return { start, content,
 		start != 0 || content.size() != source.size() };
 }
+// Find the first byte at which the two source versions differ.
 inline size_t first_edit_offset(
     const std::string &before, const std::string &after)
 {

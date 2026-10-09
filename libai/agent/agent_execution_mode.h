@@ -8,10 +8,15 @@ namespace webcool
 namespace ai
 {
 
+// Immutable tool, context and token budgets for one execution mode.
 struct agent_execution_profile_t {
+	// Maximum number of tool calls allowed for this run.
 	size_t max_tool_calls = 0;
+	// Consecutive unproductive calls allowed before intervention.
 	size_t max_no_progress_calls = 0;
+	// Prompt size in bytes that triggers context compaction.
 	size_t context_compaction_bytes = 0;
+	// Upper bound on generated tokens for one provider request.
 	long long max_output_tokens = 0;
 };
 

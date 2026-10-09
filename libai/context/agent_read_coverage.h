@@ -11,17 +11,26 @@ namespace ai
 {
 // Only coverage metadata, never source text. Reset when model history is compacted.
 class agent_read_coverage_t {
+	// Cached source version and the context records retained for that
+	// file.
 	struct file_t {
+		// Content identity shared by the tracked byte ranges.
 		std::string version;
+		// Already supplied byte ranges, merged into nonoverlapping
+		// intervals.
 		std::vector<std::pair<size_t, size_t>> ranges;
 	};
+	// Source records indexed by path for bounded context retention.
 	std::map<std::string, file_t> files_;
 
 public:
+	// Reset accumulated entries and counters for reuse.
 	void clear()
 	{
 		files_.clear();
 	}
+	// Merge the supplied range and return the number of newly covered
+	// bytes.
 	size_t observe(const std::string &path, const std::string &version,
 	    size_t begin, size_t end)
 	{

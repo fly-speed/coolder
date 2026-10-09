@@ -350,6 +350,8 @@ bool load_file_review_result(file_review_context_t &context, request_t &req,
 	return false;
 }
 
+// Match the exact proposal generation before inferring a parent-directory
+// dependency; a review of an older draft cannot authorize a newer child edit.
 static bool review_requires_directory(const file_review_context_t &context,
     const webcool::ai::agent_change_proposal_t &directory)
 {

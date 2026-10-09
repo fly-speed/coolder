@@ -8,6 +8,7 @@ namespace ai
 {
 namespace identifiers
 {
+// Validate the identifier before using it in a storage path.
 inline bool valid_id(const std::string &id)
 {
 	if (id.size() != 32)

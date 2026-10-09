@@ -8,6 +8,7 @@ namespace ai
 {
 namespace storage_detail
 {
+// Create missing parent directories using the platform path adapter.
 inline bool make_dir_recursive(const char *path)
 {
 #ifdef _WIN32

@@ -42,6 +42,8 @@ void coding_tool_loop_t::initialize_transcript()
 	rejected_changes = 0;
 }
 
+// Reconcile durable review decisions before restoring provider continuation
+// and draft state, so an accepted generation is not proposed again on resume.
 bool coding_tool_loop_t::restore_checkpoint_contents(
     const webcool::ai::agent_progress_t &restored, std::string &restore_err)
 {

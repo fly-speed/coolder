@@ -4,6 +4,7 @@ namespace webcool
 {
 namespace ai
 {
+// Recognize placeholder text that is not a complete source implementation.
 inline std::string placeholder_marker(std::string value)
 {
 	const size_t first = value.find_first_not_of(" \t\r\n");

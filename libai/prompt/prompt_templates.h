@@ -14,6 +14,7 @@ namespace ai
 namespace prompt_detail
 {
 
+// Register localized coding setup prompts in the prompt catalog.
 inline void add_coding_setup_prompts(
     std::map<prompt_id, prompt_entry_t> &entries)
 {
@@ -103,6 +104,7 @@ inline void add_coding_setup_prompts(
 	        });
 }
 
+// Register localized coding system prompts in the prompt catalog.
 inline void add_coding_system_prompts(
     std::map<prompt_id, prompt_entry_t> &entries)
 {
@@ -234,6 +236,7 @@ inline void add_coding_system_prompts(
 	});
 }
 
+// Register localized context prompts in the prompt catalog.
 inline void add_context_prompts(std::map<prompt_id, prompt_entry_t> &entries)
 {
 	entries
@@ -352,6 +355,7 @@ inline void add_context_prompts(std::map<prompt_id, prompt_entry_t> &entries)
 	        });
 }
 
+// Register localized provider recovery prompts in the prompt catalog.
 inline void add_provider_recovery_prompts(
     std::map<prompt_id, prompt_entry_t> &entries)
 {
@@ -492,6 +496,7 @@ inline void add_provider_recovery_prompts(
 	        });
 }
 
+// Register localized tools prompts in the prompt catalog.
 inline void add_tools_prompts(std::map<prompt_id, prompt_entry_t> &entries)
 {
 	entries
@@ -623,6 +628,7 @@ inline void add_tools_prompts(std::map<prompt_id, prompt_entry_t> &entries)
 	        });
 }
 
+// Register localized validation prompts in the prompt catalog.
 inline void add_validation_prompts(std::map<prompt_id, prompt_entry_t> &entries)
 {
 	entries.insert({
@@ -735,6 +741,7 @@ inline void add_validation_prompts(std::map<prompt_id, prompt_entry_t> &entries)
 
 } // namespace prompt_detail
 
+// Return the lazily initialized catalog of localized prompt entries.
 inline const std::map<prompt_id, prompt_entry_t> &prompt_catalog()
 {
 	static const std::map<prompt_id, prompt_entry_t> entries = [] {
@@ -757,6 +764,7 @@ inline const std::map<prompt_id, prompt_entry_t> &prompt_catalog()
 	return entries;
 }
 
+// Select the requested localized text from the prompt catalog.
 inline const char *prompt_text(prompt_id id, bool chinese)
 {
 	const prompt_entry_t &entry = prompt_catalog().at(id);
@@ -779,6 +787,7 @@ inline std::string prompt_with_value(
 	return text;
 }
 
+// Compose the coding-agent system prompt for the granted capabilities.
 inline std::string coding_system_prompt(bool allow_file_content,
     bool remember_session, size_t max_tool_calls, bool chinese)
 {

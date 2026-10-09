@@ -7,6 +7,7 @@ namespace webcool
 namespace ai
 {
 
+// Extract a provider-reported output-token ceiling from an error.
 inline long long provider_max_output_tokens_from_error(const std::string &error)
 {
 	const char *markers[] = { "valid range of max_tokens is [1, ",
@@ -32,6 +33,7 @@ inline long long provider_max_output_tokens_from_error(const std::string &error)
 	return 0;
 }
 
+// Attach a learned provider output ceiling to the failure diagnostic.
 inline void annotate_output_token_limit(std::string &error,
     const std::string &incomplete_reason, long long effective_max_output_tokens)
 {

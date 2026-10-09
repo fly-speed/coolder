@@ -10,6 +10,7 @@ namespace ai
 namespace windows_browser_runtime
 {
 
+// Return the directory containing the current executable.
 inline std::wstring application_directory()
 {
 	std::vector<wchar_t> path(32768, L'\0');
@@ -22,6 +23,7 @@ inline std::wstring application_directory()
 	return slash == std::wstring::npos ? L"" : executable.substr(0, slash);
 }
 
+// Check whether the configured file can be opened for reading.
 inline bool readable_file(const std::wstring &path)
 {
 	const DWORD attributes = GetFileAttributesW(path.c_str());
@@ -72,6 +74,8 @@ inline bool matching_file(const std::wstring &pattern)
 	return found;
 }
 
+// Check that the bundled browser runtime is usable; explain failure in
+// reason.
 inline bool available(const std::wstring &directory, std::string &reason)
 {
 	reason.clear();
@@ -101,6 +105,7 @@ inline bool available(const std::wstring &directory, std::string &reason)
 	return false;
 }
 
+// Resolve the Node executable bundled with the browser runtime.
 inline std::string bundled_node(const std::wstring &directory)
 {
 	if (directory.empty())

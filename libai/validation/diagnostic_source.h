@@ -6,6 +6,7 @@ namespace webcool
 {
 namespace ai
 {
+// Select a source path only when diagnostic evidence identifies it uniquely.
 inline std::string unique_diagnostic_source(
     const std::string &basename, const std::vector<std::string> &paths)
 {
@@ -21,6 +22,7 @@ inline std::string unique_diagnostic_source(
 	}
 	return found;
 }
+// Collect bounded candidate source paths mentioned by diagnostics.
 inline std::vector<std::string> diagnostic_source_files(
     const agent_workspace_t &workspace)
 {

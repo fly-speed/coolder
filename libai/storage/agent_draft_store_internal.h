@@ -41,15 +41,26 @@ namespace draft_store_detail
 // One budget spans recursive traversal; per-file budgets would never yield
 // when a large tree consists of many small files.
 class draft_io_budget_t {
+	// Start of the current cooperative scheduling time slice.
 	std::chrono::steady_clock::time_point slice_ =
 	    std::chrono::steady_clock::now();
+	// Timestamp of the most recent progress log emission.
 	std::chrono::steady_clock::time_point reported_ = slice_;
 
 public:
+	// entries: Number of filesystem work checkpoints visited.
+	// yields: Number of times the operation yielded execution.
 	size_t entries = 0, yields = 0;
+	// work_ms: Maximum uninterrupted work slice in milliseconds before
+	// yielding.
+	// rest_ms: Cooperative delay in milliseconds after each work slice.
 	int work_ms = 5, rest_ms = 10;
+	// Run identifier associated with this operation's accounting.
 	std::string run;
+	// Current processing phase reported to progress observers.
 	const char *phase = NULL;
+	// Account for bounded filesystem work and yield when the time slice
+	// expires.
 	void checkpoint()
 	{
 		++entries;
@@ -73,7 +84,9 @@ public:
 		slice_ = std::chrono::steady_clock::now();
 	}
 };
+// Records phase timing and owns its cooperative I/O budget.
 class draft_phase_t {
+	// Read the current thread's CPU time in milliseconds when supported.
 	static long long thread_cpu_ms()
 	{
 #if defined(CLOCK_THREAD_CPUTIME_ID) && !defined(_WIN32)
@@ -84,15 +97,22 @@ class draft_phase_t {
 #endif
 		return -1;
 	}
+	// Run identifier associated with this operation's accounting.
 	std::string run_;
+	// Name of the phase currently being measured.
 	const char *phase_;
+	// Start timestamp used for elapsed-time accounting.
 	std::chrono::steady_clock::time_point start_ =
 	    std::chrono::steady_clock::now();
+	// Thread CPU time captured at the start of the operation.
 	long long cpu_start_ = thread_cpu_ms();
 
 public:
+	// Whether the operation completed successfully.
 	bool ok = false;
+	// Budget tracker used to bound work and yield cooperatively.
 	draft_io_budget_t budget;
+	// Initialize draft phase state from the supplied arguments.
 	draft_phase_t(const std::string &run, const char *phase)
 	        : run_(run)
 	        , phase_(phase)
@@ -107,6 +127,7 @@ public:
 		    "AI component=agent.draft event=phase_started run_id=%s phase=%s",
 		    run_.c_str(), phase_);
 	}
+	// Record the final phase outcome and its resource accounting.
 	~draft_phase_t()
 	{
 		const auto elapsed =
@@ -124,20 +145,26 @@ public:
 
 using ::webcool::ai::file_ops::join_path;
 
+// Validate the expected run identifier syntax.
 bool valid_run_id(const std::string &value);
 
+// Create a private directory with the required storage protections.
 bool create_private_directory(const std::string &path, std::string &err);
 
+// Remove a private tree while honoring its cooperative I/O budget.
 bool remove_tree(const std::string &path, std::string &err,
     draft_io_budget_t *budget = NULL);
 
+// Rename a private directory using the platform-compatible operation.
 bool rename_directory(const std::string &from, const std::string &to);
 
+// Copy permitted source files into the private draft workspace.
 bool copy_build_tree(agent_workspace_t &source, const std::string &source_dir,
     agent_workspace_t &draft, const std::string &draft_dir,
     size_t &skipped_files, long long &dependency_bytes, std::string &err,
     draft_io_budget_t &budget, const std::vector<std::string> &excluded = {});
 
+// Apply validated proposals to the private draft tree.
 bool apply_changes(agent_workspace_t &draft, const agent_draft_store_t &store,
     const std::vector<agent_change_proposal_t> &changes, std::string &err);
 
@@ -146,6 +173,7 @@ bool apply_changes(agent_workspace_t &draft, const agent_draft_store_t &store,
 std::string write_manifest(const agent_draft_store_t &store,
     const std::vector<agent_change_proposal_t> &changes);
 
+// Read path-to-digest entries from the saved draft manifest.
 bool parse_write_manifest(
     const std::string &text, std::map<std::string, std::string> &entries);
 
@@ -161,23 +189,33 @@ bool update_verified_writes(const agent_draft_store_t &store,
     const std::vector<agent_change_proposal_t> &changes, size_t skipped,
     bool &attempted, std::string &err);
 
+// Test the component-boundary containment relation for dependency paths.
 bool dep_inside(const std::string &parent, const std::string &path);
+// Collect bounded artifact files and directories under the declared
+// dependency.
 bool dependency_files(agent_workspace_t &workspace, const std::string &path,
     std::vector<std::string> &files, size_t depth, draft_io_budget_t &budget,
     std::string &err, std::vector<std::string> &directories);
+// Create missing parent directories inside the private dependency tree.
 bool dependency_parents(
     const std::string &root, const std::string &path, std::string &err);
 #ifndef _WIN32
 // Cross-process ownership also coalesces requests from multiple fibers. Never
 // block the event loop in flock: wait cooperatively, with a deadline/cancel.
 struct dependency_build_lock_t {
+	// Owned file descriptor, with a negative value indicating no open
+	// file.
 	int fd = -1;
+	// Whether execution had to wait for an admission slot.
 	bool waited = false;
+	// Release the dependency build lock and close its descriptor.
 	~dependency_build_lock_t()
 	{
 		if (fd >= 0)
 			close(fd);
 	}
+	// Acquire the dependency-cache build lock while allowing
+	// cancellation.
 	bool acquire(const std::string &path,
 	    const std::function<bool()> &cancelled, std::string &err)
 	{
@@ -216,8 +254,11 @@ struct dependency_build_lock_t {
 		return true;
 	}
 };
+// Scope-owned staging directory for preparing dependency artifacts.
 struct dependency_temporary_t {
+	// Path of the file or resource associated with this record.
 	std::string path;
+	// Remove the owned staging directory when preparation leaves scope.
 	~dependency_temporary_t()
 	{
 		if (!path.empty()) {
@@ -225,6 +266,7 @@ struct dependency_temporary_t {
 			remove_tree(path, ignored);
 		}
 	}
+	// Create a unique staging directory owned by this cleanup guard.
 	bool create(const std::string &parent, std::string &err)
 	{
 		std::string pattern = parent + "/.build-XXXXXX";
@@ -240,6 +282,7 @@ struct dependency_temporary_t {
 		return true;
 	}
 };
+// Copy declared build artifacts into the private dependency cache.
 bool copy_dependency_artifacts(const std::string &source_root,
     const std::string &base, const std::vector<std::string> &artifacts,
     const std::string &target, draft_io_budget_t &budget,
@@ -248,11 +291,20 @@ bool copy_dependency_artifacts(const std::string &source_root,
 // libfoo.so.1). Flatten only aliases that resolve to regular files inside the
 // install prefix. The cache never inherits an escaping or directory symlink.
 struct installed_artifact_copy_t {
+	// source_root: Root of the source tree used for copying.
+	// target_root: Root of the destination tree used for copying.
 	std::string source_root, target_root;
+	// Budget tracker used to bound work and yield cooperatively.
 	draft_io_budget_t &budget;
+	// Borrowed callback checked to stop artifact copying on cancellation.
 	const std::function<bool()> &cancelled;
+	// files: Number of files accounted for by this operation.
+	// directories: Number of directories accounted for by this operation.
 	size_t files = 0, directories = 0;
+	// Number of bytes accounted for by this operation.
 	long long bytes = 0;
+	// Initialize installed artifact copy state from the supplied
+	// arguments.
 	installed_artifact_copy_t(const std::string &input,
 	    const std::string &output, draft_io_budget_t &io,
 	    const std::function<bool()> &stop)
@@ -262,9 +314,13 @@ struct installed_artifact_copy_t {
 	        , cancelled(stop)
 	{
 	}
+	// Copy one installed artifact while checking type, containment and
+	// size limits.
 	bool copy(const std::string &relative, size_t depth, std::string &err);
 };
 
+// Copy one installed artifact while checking type, containment and size
+// limits.
 inline bool installed_artifact_copy_t::copy(
     const std::string &relative, size_t depth, std::string &err)
 {
@@ -348,7 +404,9 @@ inline bool installed_artifact_copy_t::copy(
 	return false;
 }
 
+// Fingerprint the configured build executable for dependency cache keys.
 std::string dependency_tool_identity(const std::string &path);
+// Build or reuse a private cached dependency from its declared source inputs.
 bool prepare_source_dependency(const std::string &user_root,
     const std::string &base, const std::string &metadata,
     const prebuilt_dependency_t &dep, const std::string &platform,
@@ -356,11 +414,13 @@ bool prepare_source_dependency(const std::string &user_root,
     const std::function<bool()> &cancelled, std::string &err);
 #endif
 
+// Resolve declared dependencies into verified read-only cache mounts.
 bool prepare_dependencies(const std::string &user_root,
     const std::string &project, const std::string &metadata,
     const std::vector<prebuilt_dependency_t> &deps,
     std::map<std::string, std::string> &mounts, draft_io_budget_t &budget,
     std::string &err, const std::function<bool()> &should_cancel);
+// Install the verified read-only dependency links in the private draft.
 bool dependency_links(
     const std::string &root, const std::map<std::string, std::string> &mounts);
 

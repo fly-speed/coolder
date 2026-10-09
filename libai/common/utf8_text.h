@@ -5,6 +5,7 @@ namespace webcool
 {
 namespace ai
 {
+// Return the encoded sequence length indicated by a UTF-8 lead byte.
 inline size_t utf8_sequence_size(const std::string &text, size_t pos)
 {
 	const unsigned char first = static_cast<unsigned char>(text[pos]);
@@ -32,6 +33,7 @@ inline size_t utf8_sequence_size(const std::string &text, size_t pos)
 	return 0;
 }
 
+// Validate complete UTF-8 sequences without accepting malformed bytes.
 inline std::string valid_utf8(const std::string &text)
 {
 	std::string out;
@@ -49,6 +51,7 @@ inline std::string valid_utf8(const std::string &text)
 	return out;
 }
 
+// Return a byte-bounded prefix without cutting a UTF-8 character.
 inline std::string utf8_prefix(const std::string &text, size_t limit)
 {
 	const std::string clean = valid_utf8(text);

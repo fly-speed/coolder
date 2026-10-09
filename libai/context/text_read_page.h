@@ -5,13 +5,20 @@ namespace webcool
 {
 namespace ai
 {
+// One bounded source page with continuation and content identity metadata.
 struct text_read_page_t {
+	// Text payload associated with this operation.
 	std::string content;
+	// Byte offset identifying the start of a retained source page.
 	size_t offset = 0;
+	// Byte offset at which the next source page should begin.
 	size_t next_offset = 0;
+	// Total byte length of the complete source content.
 	size_t total_bytes = 0;
+	// Whether this page reaches the end of the source content.
 	bool eof = false;
 };
+// Read a bounded source page and provide its continuation metadata.
 inline bool read_text_page(const std::string &content, const std::string &query,
     text_read_page_t &page, std::string &error, size_t chunk_bytes = 8192,
     size_t file_limit_bytes = 1024 * 1024,

@@ -153,8 +153,11 @@ enum class prompt_id {
 	count
 };
 
+// Chinese and English wording associated with one prompt identifier.
 struct prompt_entry_t {
+	// Chinese wording for this prompt entry.
 	const char *zh;
+	// English wording for this prompt entry.
 	const char *en;
 };
 

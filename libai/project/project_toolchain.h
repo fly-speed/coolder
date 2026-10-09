@@ -10,15 +10,19 @@ namespace webcool
 namespace ai
 {
 
+// Discovered languages and fixed commands permitted for a project.
 struct project_toolchain_t {
 	// Informational languages may include disabled runtimes such as Python/JS.
 	std::vector<std::string> detected_languages;
 	// Independent of whether a project has created the optional test script yet.
 	bool functional_acceptance_enabled = false;
+	// Whether browser-based functional acceptance is enabled.
 	bool browser_acceptance_enabled = false;
+	// Explanation for unavailable browser debugging or acceptance.
 	std::string browser_unavailable_reason;
 	// Only commands safe to present for explicit confirmation are listed here.
 	std::vector<sandbox_command_t> commands;
+	// Tool identifiers unavailable under current discovery or policy.
 	std::vector<std::string> unavailable_tools;
 };
 
@@ -35,6 +39,7 @@ std::string discover_language_executable(
 
 // Startup and project discovery use the same local capability check.
 bool browser_debug_available(std::string &reason);
+// Check whether policy and runtime configuration enable browser debugging.
 bool browser_debug_enabled(std::string &reason);
 
 // Read-only manifest detector and fixed command policy factory. It never runs
@@ -42,14 +47,20 @@ bool browser_debug_enabled(std::string &reason);
 // administrator configuration and trusted server startup environment paths.
 class project_toolchain_catalog_t {
 public:
+	// Initialize project toolchain catalog state from the supplied
+	// arguments.
 	explicit project_toolchain_catalog_t(const std::string &user_root);
 
+	// Discover fixed commands and language capabilities for the selected
+	// project.
 	bool discover(const std::string &project_path,
 	    project_toolchain_t &result, std::string &err) const;
+	// Inspect the project for a safe Git repository marker.
 	bool is_git_repository(const std::string &project_path, bool &result,
 	    std::string &err) const;
 
 private:
+	// Filesystem root belonging to the authenticated user.
 	std::string user_root_;
 };
 

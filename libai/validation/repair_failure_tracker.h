@@ -50,20 +50,49 @@ inline std::set<std::string> repair_failure_signatures(
 	tests.insert(assertions.begin(), assertions.end());
 	return tests;
 }
+// Compares validation failures across drafts to detect stalled repairs.
 class repair_failure_tracker_t {
+	// command_: Command identifier associated with this validation
+	// observation.
+	// draft_: Fingerprint or identity of the draft under observation.
 	std::string command_, draft_;
+	// failures_: Normalized failure signatures for this observation.
+	// added_: Failure signatures introduced by the latest validation
+	// result.
 	std::set<std::string> failures_, added_;
+	// Whether the latest validation introduced a regression.
 	bool regressed_ = false;
+	// Whether failures alternate between previously observed drafts.
 	bool alternating_ = false;
+	// One validation outcome associated with a command and draft
+	// fingerprint.
 	struct observation {
+		// command: Command identifier associated with this validation
+		// observation.
+		// draft: Fingerprint or identity of the draft under
+		// observation.
 		std::string command, draft;
+		// Normalized failure signatures for this observation.
 		std::set<std::string> failures;
 	};
+	// Bounded history used to compare earlier validation observations.
 	std::deque<observation> history_;
+	// Failure signatures supporting the alternating-repair diagnosis.
 	std::set<std::string> alternating_evidence_;
+	// persisting_: Failure signatures shared with the preceding
+	// observation.
+	// newly_reported_: Failure signatures first reported by the latest
+	// observation.
+	// no_longer_reported_: Earlier failures absent from the latest
+	// validation report.
+	// returned_: Previously absent failures that appeared again in the
+	// latest observation.
 	std::set<std::string> persisting_, newly_reported_, no_longer_reported_,
 	    returned_;
+	// Whether the same tests continue failing across repair attempts.
 	bool stalled_tests_ = false;
+	// Select the failure signatures used to compare successive repair
+	// outcomes.
 	static std::set<std::string> comparable(
 	    const std::set<std::string> &all)
 	{
@@ -75,13 +104,18 @@ class repair_failure_tracker_t {
 		}
 		return assertions.empty() ? all : assertions;
 	}
+	// Failure count retained from the preceding observation.
 	size_t previous_count_ = 0;
 
+	// Collect earlier command failures supporting an oscillating-repair
+	// diagnosis.
 	void collect_alternating_evidence(const std::string &command);
+	// Record that a previously observed failure has appeared again.
 	void mark_returned_failure(
 	    const std::string &command, const std::string &failure);
 
 public:
+	// Reset accumulated entries and counters for reuse.
 	void clear()
 	{
 		command_.clear();
@@ -99,54 +133,72 @@ public:
 		returned_.clear();
 		stalled_tests_ = false;
 	}
+	// Report whether the same tests remain failing across repair
+	// attempts.
 	bool stalled_tests() const
 	{
 		return stalled_tests_;
 	}
+	// Return failure signatures present in consecutive validation
+	// reports.
 	const std::set<std::string> &persisting() const
 	{
 		return persisting_;
 	}
+	// Return signatures introduced by the latest validation report.
 	const std::set<std::string> &newly_reported() const
 	{
 		return newly_reported_;
 	}
+	// Return earlier signatures absent from the latest validation report.
 	const std::set<std::string> &no_longer_reported() const
 	{
 		return no_longer_reported_;
 	}
+	// Return signatures that reappeared after an intervening observation.
 	const std::set<std::string> &returned_failures() const
 	{
 		return returned_;
 	}
+	// Report whether validation outcomes alternate between earlier
+	// drafts.
 	bool alternating() const
 	{
 		return alternating_;
 	}
+	// Return the evidence used to identify alternating failures.
 	const std::set<std::string> &alternating_evidence() const
 	{
 		return alternating_evidence_;
 	}
+	// Report whether the latest validation introduced a regression.
 	bool regressed() const
 	{
 		return regressed_;
 	}
+	// Return the number of failures in the preceding observation.
 	size_t previous_count() const
 	{
 		return previous_count_;
 	}
+	// Return the number of failures in the current observation.
 	size_t current_count() const
 	{
 		return comparable(failures_).size();
 	}
+	// Return the signatures added by the latest validation result.
 	const std::set<std::string> &added_failures() const
 	{
 		return added_;
 	}
+	// Compare failures for this command and draft, including regression
+	// and cycle evidence.
 	bool observe(const std::string &command, const std::string &draft,
 	    const std::set<std::string> &failures, bool reused);
 };
 
+// Collect earlier command failures supporting an oscillating-repair
+// diagnosis.
 inline void repair_failure_tracker_t::collect_alternating_evidence(
     const std::string &command)
 {
@@ -158,6 +210,7 @@ inline void repair_failure_tracker_t::collect_alternating_evidence(
 	}
 }
 
+// Record that a previously observed failure has appeared again.
 inline void repair_failure_tracker_t::mark_returned_failure(
     const std::string &command, const std::string &failure)
 {
@@ -170,6 +223,8 @@ inline void repair_failure_tracker_t::mark_returned_failure(
 	}
 }
 
+// Compare failures for this command and draft, including regression and cycle
+// evidence.
 inline bool repair_failure_tracker_t::observe(const std::string &command,
     const std::string &draft, const std::set<std::string> &failures,
     bool reused)

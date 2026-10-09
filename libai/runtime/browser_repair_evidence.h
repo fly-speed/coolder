@@ -11,7 +11,9 @@ namespace ai
 // A reversible computed-style change is hypothesis evidence, not visual acceptance.
 class browser_repair_evidence_t {
 public:
+	// Whether this capability is enabled by its configuration.
 	bool enabled = false;
+	// Detect an explicit user request for browser debugging.
 	static bool requests_debug(std::string prompt)
 	{
 		const auto text = normalize(prompt);
@@ -93,6 +95,8 @@ public:
 		*report_count = occurrences;
 		return forced || occurrences >= threshold;
 	}
+	// Check whether the current request and prior reports require browser
+	// evidence.
 	static bool applies(const std::string &prompt,
 	    std::vector<std::string> previous_requests = {},
 	    unsigned long threshold = 3)
@@ -100,10 +104,14 @@ public:
 		previous_requests.push_back(prompt);
 		return applies_history(previous_requests, threshold);
 	}
+	// Report whether browser evidence is needed before attempting an
+	// edit.
 	bool needs_initial_observation() const
 	{
 		return enabled && !overview;
 	}
+	// Associate later browser observations with the selected bridge
+	// session.
 	void bind(const std::string &id)
 	{
 		if (session == id)
@@ -119,6 +127,8 @@ public:
 		overlay_selector.clear();
 		experiment_description.clear();
 	}
+	// Update browser evidence from an observation, interaction, patch or
+	// undo result.
 	void observe(const std::string &name, const std::string &query,
 	    const std::string &data, const std::string &patch_id,
 	    const std::string &undo_id, bool ok);
@@ -132,14 +142,18 @@ public:
 		baseline.clear();
 		selector.clear();
 	}
+	// Record the intended browser experiment for subsequent evidence
+	// checks.
 	void describe_experiment(const std::string &description)
 	{
 		experiment_description = description;
 	}
+	// Return the target identified for the current browser experiment.
 	const std::string &experiment_target() const
 	{
 		return overlay_selector;
 	}
+	// Describe the browser overlay evidence still needed for this repair.
 	std::string overlay_guidance() const
 	{
 		if (!overlay_selector.empty())
@@ -151,18 +165,25 @@ public:
 			       "A style change alone is not visual acceptance; compare the symptom before/after if screenshots are available, otherwise explicitly state visual verification is pending. ";
 		return "";
 	}
+	// Return the browser session currently bound to the evidence tracker.
 	const std::string &session_id() const
 	{
 		return session;
 	}
+	// Return the patch identifier currently awaiting browser
+	// verification.
 	const std::string &active_patch() const
 	{
 		return patch;
 	}
+	// Check whether the collected browser evidence permits source
+	// changes.
 	bool permits_edits() const
 	{
 		return !enabled || (!session.empty() && ready);
 	}
+	// Describe the next observation or verification step required by the
+	// tracker.
 	std::string guidance() const
 	{
 		if (!enabled)
@@ -186,6 +207,7 @@ public:
 	}
 
 private:
+	// Normalize the supplied value for consistent lookup or comparison.
 	static std::string normalize(std::string text)
 	{
 		std::string out;
@@ -198,6 +220,7 @@ private:
 		}
 		return out;
 	}
+	// Recognize wording that reports a visual browser symptom.
 	static bool visual(const std::string &text)
 	{
 		return contains(text,
@@ -207,7 +230,9 @@ private:
 		        "whiteoverlay", "whitebottom", "clipped", "cutoff",
 		        "cut-off", "layout", "rendering", "overflow" });
 	}
+	// Find a supported browser name mentioned in the request text.
 	static std::string browser(std::string text);
+	// Extract the reported UI region from the request text.
 	static std::string region(const std::string &text)
 	{
 		if (contains(text, { "底部", "下面", "下方", "bottom" }))
@@ -220,6 +245,7 @@ private:
 			return "";
 		return "left";
 	}
+	// Classify the kind of browser symptom described by the user.
 	static std::string symptom_kind(const std::string &text)
 	{
 		if (contains(text,
@@ -232,6 +258,8 @@ private:
 			return "";
 		return "misaligned";
 	}
+	// Recognize a follow-up report referring to an earlier browser
+	// problem.
 	static bool followup(std::string text)
 	{
 		if (visual(text))
@@ -252,6 +280,8 @@ private:
 		}
 		return text.empty();
 	}
+	// Check whether the text contains any of the supplied symptom
+	// markers.
 	static bool contains(
 	    const std::string &s, std::initializer_list<const char *> words)
 	{
@@ -262,11 +292,29 @@ private:
 		}
 		return false;
 	}
+	// session: Conversation or provider session associated with this
+	// operation.
+	// baseline: Initial browser observation used to compare a reversible
+	// experiment.
+	// selector: DOM selector identifying the target of browser evidence.
+	// patch: Identifier of the temporary browser patch awaiting
+	// verification or undo.
+	// overlay_selector: Selector used to identify the reported browser
+	// overlay.
+	// experiment_description: Description of the browser interaction
+	// being verified.
 	std::string session, baseline, selector, patch, overlay_selector,
 	    experiment_description;
+	// overview: Whether the required page overview has been observed.
+	// changed: Whether this operation changed the tracked content.
+	// undone: Whether this operation has been rolled back.
+	// ready: Whether the experiment and undo produced consistent
+	// verification evidence.
 	bool overview = false, changed = false, undone = false, ready = false;
 };
 
+// Update browser evidence from an observation, interaction, patch or undo
+// result.
 inline void browser_repair_evidence_t::observe(const std::string &name,
     const std::string &query, const std::string &data,
     const std::string &patch_id, const std::string &undo_id, bool ok)
@@ -322,6 +370,7 @@ inline void browser_repair_evidence_t::observe(const std::string &name,
 	}
 }
 
+// Find a supported browser name mentioned in the request text.
 inline std::string browser_repair_evidence_t::browser(std::string text)
 {
 	for (char &c : text) {

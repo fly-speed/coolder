@@ -7,11 +7,15 @@ namespace action
 {
 namespace agent_detail
 {
+// Return the storage path used for absolute project.
 bool absolute_project_path(const std::string &path);
+// Authorize the requested project location scope for this HTTP request.
 bool project_location_allowed(
     request_t &req, const std::string &scope, std::string &err);
+// Log an agent action failure and send its JSON error response.
 void ai_agent_json_error(response_t &res, int status, const char *message,
     bool keep_alive, const char *file, int line, const char *function);
+// Resolve the authenticated user root or send the appropriate HTTP error.
 bool current_user_root(request_t &req, response_t &res, std::string &user_root,
     std::string *username_out = NULL);
 }

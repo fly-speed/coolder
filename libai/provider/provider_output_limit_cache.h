@@ -10,6 +10,7 @@ namespace webcool
 {
 namespace ai
 {
+// Return the private file used for learned provider output ceilings.
 inline std::string output_limit_cache_path(
     const std::string &directory, const std::string &identity)
 {
@@ -26,6 +27,7 @@ inline std::string output_limit_cache_path(
 	}
 	return directory + "/output-limit-" + name + ".v1";
 }
+// Load provider output limits learned from earlier rejected requests.
 inline long long load_output_limit_cache(const std::string &path, long long now)
 {
 	if (path.empty())

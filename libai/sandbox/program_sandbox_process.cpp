@@ -22,6 +22,8 @@ static void kill_sandbox_descendants(pid_t root, unsigned depth = 0)
 	}
 }
 #endif
+// Both streams consume the same byte budget, preventing stderr from bypassing
+// the output cap while preserving separate buffers for diagnostics.
 static void drain_sandbox_pipes(struct pollfd *descriptors,
     nfds_t descriptor_count, int *stdout_pipe, int *stderr_pipe,
     sandbox_result_t &result, size_t &output_bytes,

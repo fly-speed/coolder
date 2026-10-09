@@ -63,6 +63,7 @@ typedef intptr_t ssize_t;
 #define pclose _pclose
 #define popen _popen
 
+// Provide the Windows UTF-8 compatibility implementation of utf8 to wide.
 inline bool webcool_utf8_to_wide(const char *text, std::wstring &out)
 {
 	out.clear();
@@ -86,6 +87,7 @@ inline bool webcool_utf8_to_wide(const char *text, std::wstring &out)
 	return true;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of wide to utf8.
 inline bool webcool_wide_to_utf8(const wchar_t *text, std::string &out)
 {
 	out.clear();
@@ -109,12 +111,16 @@ inline bool webcool_wide_to_utf8(const wchar_t *text, std::string &out)
 	return true;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of is windows
+// extended path.
 inline bool webcool_is_windows_extended_path(const std::wstring &path)
 {
 	return path.compare(0, 4, L"\\\\?\\") == 0 ||
 	    path.compare(0, 4, L"\\??\\") == 0;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of is windows drive
+// absolute.
 inline bool webcool_is_windows_drive_absolute(const std::wstring &path)
 {
 	return path.size() >= 3 &&
@@ -123,6 +129,8 @@ inline bool webcool_is_windows_drive_absolute(const std::wstring &path)
 	    path[1] == L':' && (path[2] == L'\\' || path[2] == L'/');
 }
 
+// Provide the Windows UTF-8 compatibility implementation of utf8 path to
+// wide.
 inline bool webcool_utf8_path_to_wide(const char *path, std::wstring &out)
 {
 	if (!webcool_utf8_to_wide(path, out)) {
@@ -168,6 +176,8 @@ inline bool webcool_utf8_path_to_wide(const char *path, std::wstring &out)
 	return true;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of strip extended
+// path prefix.
 inline void webcool_strip_extended_path_prefix(std::wstring &path)
 {
 	const std::wstring unc_prefix = L"\\\\?\\UNC\\";
@@ -186,6 +196,7 @@ inline void webcool_strip_extended_path_prefix(std::wstring &path)
 	}
 }
 
+// Provide the Windows UTF-8 compatibility implementation of mkdir.
 inline int webcool_mkdir(const char *path, int)
 {
 	std::wstring wpath;
@@ -193,6 +204,7 @@ inline int webcool_mkdir(const char *path, int)
 	                                                -1;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of rmdir.
 inline int webcool_rmdir(const char *path)
 {
 	std::wstring wpath;
@@ -200,6 +212,7 @@ inline int webcool_rmdir(const char *path)
 	                                                -1;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of unlink.
 inline int webcool_unlink(const char *path)
 {
 	std::wstring wpath;
@@ -208,6 +221,7 @@ inline int webcool_unlink(const char *path)
 	    -1;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of rename.
 inline int webcool_rename(const char *old_path, const char *new_path)
 {
 	std::wstring wold_path;
@@ -236,6 +250,7 @@ inline int webcool_rename(const char *old_path, const char *new_path)
 	return -1;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of fopen.
 inline FILE *webcool_fopen(const char *path, const char *mode)
 {
 	std::wstring wpath;
@@ -246,6 +261,7 @@ inline FILE *webcool_fopen(const char *path, const char *mode)
 	return NULL;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of stat.
 inline int webcool_stat(const char *path, struct stat *st)
 {
 	std::wstring wpath;
@@ -299,6 +315,7 @@ inline int webcool_stat(const char *path, struct stat *st)
 	return 0;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of access.
 inline int webcool_access(const char *path, int mode)
 {
 	std::wstring wpath;
@@ -307,6 +324,7 @@ inline int webcool_access(const char *path, int mode)
 	    -1;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of chmod.
 inline int webcool_chmod(const char *path, int mode)
 {
 	std::wstring wpath;
@@ -315,6 +333,8 @@ inline int webcool_chmod(const char *path, int mode)
 	    -1;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of set errno from
+// windows error.
 inline void webcool_set_errno_from_windows_error(DWORD err)
 {
 	if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) {
@@ -333,6 +353,7 @@ inline void webcool_set_errno_from_windows_error(DWORD err)
 	}
 }
 
+// Provide the Windows UTF-8 compatibility implementation of copy file.
 inline bool webcool_copy_file(
     const char *source, const char *dest, bool overwrite)
 {
@@ -350,6 +371,7 @@ inline bool webcool_copy_file(
 	return false;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of make dirs utf8.
 inline bool webcool_make_dirs_utf8(const char *path, int mode)
 {
 	if (path == NULL || *path == '\0') {
@@ -421,6 +443,7 @@ inline bool webcool_make_dirs_utf8(const char *path, int mode)
 #define WEXITSTATUS(status) (status)
 #endif
 
+// Terminate the target process through the Windows compatibility API.
 inline int kill(pid_t pid, int)
 {
 	HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, (DWORD)pid);
@@ -436,6 +459,7 @@ inline int kill(pid_t pid, int)
 	return -1;
 }
 
+// Set an environment variable, respecting the overwrite flag.
 inline int setenv(const char *name, const char *value, int overwrite)
 {
 	if (!(!overwrite && getenv(name) != NULL))
@@ -443,11 +467,13 @@ inline int setenv(const char *name, const char *value, int overwrite)
 	return 0;
 }
 
+// Return the compatibility user identifier used on Windows.
 inline uid_t getuid()
 {
 	return 0;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of realpath.
 inline char *webcool_realpath(const char *path, char *resolved)
 {
 	if (path == NULL || resolved == NULL) {
@@ -478,29 +504,39 @@ inline char *webcool_realpath(const char *path, char *resolved)
 }
 #define realpath webcool_realpath
 
+// Report unsupported symbolic-link reads through the compatibility API.
 inline int readlink(const char *, char *, size_t)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
+// Report unsupported symbolic-link creation through the compatibility API.
 inline int symlink(const char *, const char *)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
+// Single directory entry exposed by the Windows compatibility layer.
 struct dirent {
+	// UTF-8 entry name returned by the directory iterator.
 	char d_name[MAX_PATH];
 };
 
+// Windows directory enumeration state implementing the POSIX-style interface.
 struct DIR {
+	// Native operating-system handle owned by this adapter.
 	HANDLE handle;
+	// Native find-result metadata for the current directory entry.
 	WIN32_FIND_DATAW data;
+	// Current item returned by the directory enumeration adapter.
 	struct dirent entry;
+	// Whether enumeration is still returning its initial entry.
 	bool first;
 };
 
+// Provide the Windows UTF-8 compatibility implementation of dir pattern.
 inline std::wstring webcool_dir_pattern(const char *path)
 {
 	std::string text = path && *path ? path : ".";
@@ -517,6 +553,7 @@ inline std::wstring webcool_dir_pattern(const char *path)
 	return pattern;
 }
 
+// Open a Windows directory enumeration using a UTF-8 path.
 inline DIR *opendir(const char *path)
 {
 	DIR *dir = new DIR;
@@ -541,6 +578,7 @@ inline DIR *opendir(const char *path)
 	return NULL;
 }
 
+// Return the next UTF-8 directory entry or null at the end.
 inline struct dirent *readdir(DIR *dir)
 {
 	if (dir == NULL) {
@@ -563,6 +601,7 @@ inline struct dirent *readdir(DIR *dir)
 	return &dir->entry;
 }
 
+// Close directory enumeration and release its allocated state.
 inline int closedir(DIR *dir)
 {
 	if (dir == NULL) {
@@ -574,9 +613,12 @@ inline int closedir(DIR *dir)
 	return rc;
 }
 
+// Argument value returned by the Windows getopt compatibility routine.
 static char *webcool_optarg = NULL;
+// Index of the next argument examined by the getopt compatibility routine.
 static int webcool_optind = 1;
 
+// Provide the Windows UTF-8 compatibility implementation of getopt.
 inline int webcool_getopt(int argc, char *const argv[], const char *optstring)
 {
 	static const char *next = NULL;
@@ -646,6 +688,7 @@ inline std::string webcool_windows_home_path()
 	return home && *home ? home : ".";
 }
 
+// Provide the Windows UTF-8 compatibility implementation of shell open.
 inline bool webcool_shell_open(const std::string &target, std::string &err)
 {
 	std::wstring wtarget;
@@ -661,6 +704,7 @@ inline bool webcool_shell_open(const std::string &target, std::string &err)
 	return false;
 }
 
+// Provide the Windows UTF-8 compatibility implementation of shell open trash.
 inline bool webcool_shell_open_trash(std::string &err)
 {
 	return webcool_shell_open("shell:RecycleBinFolder", err);

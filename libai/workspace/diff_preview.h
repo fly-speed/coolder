@@ -9,11 +9,18 @@ namespace ai
 // Shared edit script, counts and context visibility. Callers own file labels,
 // operation-specific summaries and their distinct truncation policies.
 struct line_diff_preview_t {
+	// old_lines: Number of lines represented from the original text.
+	// new_lines: Number of lines represented from the revised text.
 	std::vector<std::string> old_lines, new_lines;
+	// Ordered filesystem operations belonging to this change set.
 	std::vector<line_diff_op_t> operations;
+	// Whether this result or message should be displayed.
 	std::vector<bool> visible;
+	// removed_lines: Number of source lines removed by the proposed edit.
+	// added_lines: Number of source lines added by the proposed edit.
 	size_t removed_lines = 0, added_lines = 0;
 
+	// Split text into the line sequence used by the diff algorithm.
 	static void split_lines(
 	    const std::string &content, std::vector<std::string> &lines)
 	{
@@ -32,6 +39,7 @@ struct line_diff_preview_t {
 			begin = end + 1;
 		}
 	}
+	// Initialize line diff preview state from the supplied arguments.
 	line_diff_preview_t(
 	    const std::string &original, const std::string &proposed)
 	{
@@ -52,6 +60,7 @@ struct line_diff_preview_t {
 				visible[j] = true;
 		}
 	}
+	// Append one insertion, deletion or context line to a diff preview.
 	void append_line(
 	    std::ostringstream &out, const line_diff_op_t &op) const
 	{

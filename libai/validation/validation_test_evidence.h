@@ -4,12 +4,14 @@ namespace webcool
 {
 namespace ai
 {
+// Identify fixed command IDs representing test execution.
 inline bool is_test_command(const std::string &id)
 {
 	return id == "functional.acceptance" || id == "cpp.ctest" ||
 	    id == "c.ctest" ||
 	    (id.size() >= 5 && id.compare(id.size() - 5, 5, ".test") == 0);
 }
+// Recognize validation output indicating that no tests were executed.
 inline bool reports_no_tests(const std::string &output)
 {
 	return output.find("No tests were found") != std::string::npos ||

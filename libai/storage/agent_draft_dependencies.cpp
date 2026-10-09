@@ -153,6 +153,8 @@ std::string dependency_tool_identity(const std::string &path)
 	    std::to_string(mt.tv_nsec) + ":" + std::to_string(ct.tv_sec) + ":" +
 	    std::to_string(ct.tv_nsec);
 }
+// Cache identity includes the declared build inputs and tool identity so a
+// different configuration cannot silently reuse incompatible artifacts.
 static std::string source_dependency_identity(const std::string &system,
     const std::string &platform, const std::string &source_digest,
     const prebuilt_dependency_t &dep, const sandbox_command_t &configure,
@@ -531,6 +533,8 @@ bool prepare_source_dependency(const std::string &user_root,
 #endif
 
 #ifndef _WIN32
+// Resolve every declared artifact through workspace containment checks before
+// traversing it; the resulting list drives the bounded private-cache copy.
 static bool collect_prebuilt_artifacts(agent_workspace_t &source,
     const std::string &user_root, const std::string &base,
     const prebuilt_dependency_t &dep, std::vector<std::string> &files,

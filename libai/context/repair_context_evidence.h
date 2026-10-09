@@ -50,6 +50,7 @@ inline bool contains_source_evidence(const std::string &evidence,
 	return false;
 }
 
+// Check whether the request already contains the required source version.
 inline bool request_has_source(const completion_request_t &request,
     const std::string &path, const std::string &content)
 {
