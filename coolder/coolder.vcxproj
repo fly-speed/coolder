@@ -86,6 +86,7 @@
     <ClCompile Include="server\ai_policy.cpp" />
     <ClCompile Include="server\attachments.cpp" />
     <ClCompile Include="server\auth.cpp" />
+    <ClCompile Include="server\project_sharing.cpp" />
     <ClCompile Include="server\host.cpp" />
     <ClCompile Include="action\ai\ai_agent_actions.cpp" />
     <ClCompile Include="action\ai\ai_agent_common.cpp" />
@@ -99,6 +100,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="server\attachments.h" />
     <ClInclude Include="server\auth.h" />
+    <ClInclude Include="server\project_sharing.h" />
     <ClInclude Include="server\host.h" />
     <ClInclude Include="action\action_util.h" />
     <ClInclude Include="action\actions.h" />

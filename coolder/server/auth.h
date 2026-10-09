@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include <string>
+#include <vector>
 
 namespace coolder
 {
@@ -26,6 +27,8 @@ void accounts_init();
 bool current_account(const request_t &, account_t &);
 // Dispatch authentication and account-preference HTTP endpoints.
 bool auth_route(request_t &, response_t &, const std::string &method);
+// Return account identities without password metadata.
+std::vector<account_t> project_accounts();
 // Return the workspace directory assigned to the authenticated account.
 std::string account_workspace(const account_t &);
 // Return the preferences path owned by the named account.

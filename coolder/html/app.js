@@ -92,7 +92,31 @@ async function request(path, body) {
   return data;
 }
 
-const api = (path, body) => request(apiRoot + path, body);
+function projectFileRequest(operation, path, body, project = state.project) {
+  const relative = path === project.project_path ? '' : path.slice(project.project_path.length + 1);
+  if (path !== project.project_path && !path.startsWith(project.project_path + '/'))
+    throw new Error(t('文件不属于当前项目'));
+  const identity = { owner_id: project.owner_id, project_id: project.id };
+  const url = '/api/v1/collaborate/' + operation;
+  return body === undefined
+    ? request(url + '?' + new URLSearchParams({ ...identity, path: relative }))
+    : request(url, { ...body, ...identity, path: relative });
+}
+
+async function api(path, body) {
+  if (state.project?.owner_id && /^\/workspace\/(read|list)\?/.test(path)) {
+    const project = state.project;
+    const [operation, query] = path.slice('/workspace/'.length).split('?');
+    const data = await projectFileRequest(operation, new URLSearchParams(query).get('path'), undefined, project);
+    const fullPath = relative => relative ? project.project_path + '/' + relative : project.project_path;
+    if (data.entries) data.entries.forEach(entry => { entry.path = fullPath(entry.path); });
+    if (data.path !== undefined) data.path = fullPath(data.path);
+    return data;
+  }
+  if (state.project?.shared && /^\/(runs|sessions|sandbox|projects\/(plan|tasks|workflow|index)|workspace\/(patch|change-set))/.test(path))
+    throw new Error(t('共享项目的 AI 会话由项目拥有者管理'));
+  return request(apiRoot + path, body);
+}
 
 function button(text, fn) {
   const e = node('button', text);
@@ -399,7 +423,7 @@ async function providers() {
 }
 
 async function projects() {
-  const data = await api('/projects');
+  const data = await request('/api/v1/collaborate/projects');
   state.projects = (data.projects || []).map(p => ({
     ...p,
     id: p.project_id,
@@ -409,7 +433,8 @@ async function projects() {
   for (const p of state.projects) {
     const b = button(p.title || p.project_path, () => selectProject(p));
     b.append(node('small', p.project_path));
-    if (state.project && state.project.id === p.id) b.classList.add('active');
+    b.append(node('small', () => `${p.owner} · ${t(p.permission === 'owner' ? '拥有者' : p.permission === 'write' ? '读写' : '只读')}`));
+    if (state.project && state.project.id === p.id && state.project.owner_id === p.owner_id) b.classList.add('active');
     $('projects').append(b);
   }
   if (!state.projects.length)
@@ -421,6 +446,9 @@ async function selectProject(p) {
   clearComposerAttachments();
   resetRun();
   state.project = p;
+  fileTree.root = null;
+  $('project-settings').disabled = false;
+  for (const id of ['send', 'plan', 'history']) $(id).disabled = !!p.shared;
   state.session = '';
   state.file = null;
   clearCodeViewer();
@@ -431,12 +459,13 @@ async function selectProject(p) {
   plainText($('project-path'), p.project_path);
   $('project-title').title = p.project_path;
   $('messages').replaceChildren();
-  message('assistant', t('项目已就绪。你希望实现什么？'));
+  message('assistant', p.shared ? t('共享项目：可浏览文件，具有读写权限时可编辑保存。AI 会话由项目拥有者管理。') : t('项目已就绪。你希望实现什么？'));
   await Promise.all([sessions(), files(p.project_path), projects()]);
 }
 
 async function sessions() {
   if (!state.project) return;
+  if (state.project.shared) { $('sessions').replaceChildren(); return; }
   const projectId = state.project.id;
   const epoch = state.epoch;
   const data = await api('/sessions?project_id=' + encodeURIComponent(projectId));
@@ -494,7 +523,7 @@ async function openTreeFile(entry, pinned = false) {
   selectBodyTab('source');
   showCodeFile(data);
   renderSourceFileTabs();
-  $('edit-file').disabled = data.truncated;
+  $('edit-file').disabled = data.truncated || state.project?.permission === 'read';
   for (const item of $('files').querySelectorAll('[role="treeitem"]'))
     item.setAttribute('aria-selected', String(item.dataset.path === entry.path));
 }
@@ -1325,107 +1354,151 @@ for (const name of ['files', 'changes', 'tools'])
     }
   };
 
-$('history').onclick = task(async () => {
-  const data = await api('/runs');
-  uiText($('detail-title'), () => t('运行记录'));
-  $('detail-content').replaceChildren();
-  for (const r of data.runs || []) {
-    if (
-      state.project &&
-      r.path !== state.project.project_path &&
-      r.project_path !== state.project.project_path
-    )
-      continue;
-    $('detail-content').append(
-      button(`${r.status} · ${r.run_id || r.id}`, async () => {
-        $('detail-dialog').close();
-        resetRun();
-        state.run = r.run_id || r.id;
-        await poll(state.epoch);
-      })
-    );
+function projectDetail(title, subtitle, action, project = state.project) {
+  uiText($('detail-title'), () => t(title));
+  uiText($('detail-subtitle'), () => t(subtitle));
+  const icon = $(action).querySelector('svg');
+  $('detail-icon').replaceChildren(...(icon ? [icon.cloneNode(true)] : []));
+  $('detail-dialog').querySelector('.dialog-notice')?.remove();
+  const content = $('detail-content');
+  content.replaceChildren();
+  if (project) {
+    const context = node('div', undefined, 'project-dialog-context');
+    context.append(node('strong', project.title || project.project_path), node('small', project.project_path));
+    content.append(context);
   }
+  return content;
+}
+
+function detailSection(title) {
+  const section = node('section', undefined, 'project-dialog-section');
+  section.append(node('h3', () => t(title)));
+  return section;
+}
+
+function detailField(title, control) {
+  const label = node('label', undefined, 'project-dialog-field');
+  label.append(node('span', () => t(title)), control);
+  return label;
+}
+
+const projectStatusLabels = {
+  pending: '待开始', running: '进行中', in_progress: '进行中',
+  completed: '已完成', failed: '失败', blocked: '已阻塞', cancelled: '已取消', paused: '已暂停'
+};
+
+$('history').onclick = task(async () => {
+  const project = state.project;
+  const data = await api('/runs');
+  if (state.project !== project) return;
+  const content = projectDetail('运行记录', '查看项目的执行状态与历史结果', 'history', project);
+  const list = node('div', undefined, 'project-run-list');
+  for (const r of data.runs || []) {
+    if (project && r.path !== project.project_path && r.project_path !== project.project_path) continue;
+    const row = button('', async () => {
+      $('detail-dialog').close();
+      resetRun();
+      state.run = r.run_id || r.id;
+      await poll(state.epoch);
+    });
+    row.className = 'project-run-row';
+    const info = node('span', undefined, 'project-run-info');
+    info.append(node('strong', r.model || r.agent_id || r.run_id || r.id));
+    const timestamp = r.started_at ? new Date(Number(r.started_at) * 1000) : null;
+    info.append(node('small', timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp.toLocaleString() : r.run_id || r.id));
+    const status = node('span', () => t(projectStatusLabels[r.status] || r.status), 'project-role');
+    status.dataset.status = r.status;
+    row.title = r.run_id || r.id;
+    row.append(info, status, node('span', '›', 'project-run-arrow'));
+    list.append(row);
+  }
+  if (!list.children.length) list.append(node('p', () => t('暂无运行记录'), 'project-dialog-empty'));
+  content.append(list);
   $('detail-dialog').showModal();
 });
 
 $('plan').onclick = task(async () => {
   if (!state.project) throw new Error(t('请先选择项目'));
-  const data = await api('/projects?id=' + encodeURIComponent(state.project.id));
+  const project = state.project;
+  const data = await api('/projects?id=' + encodeURIComponent(project.id));
+  if (state.project !== project) return;
   const p = data.project || data;
-  uiText($('detail-title'), () => t('项目计划'));
-  const content = $('detail-content');
-  content.replaceChildren();
+  const content = projectDetail('项目计划', '设定项目目标，规划任务与进度', 'plan', project);
+  const planning = detailSection('项目目标');
   const goal = node('textarea');
   goal.value = p.goal || '';
   goal.rows = 4;
   goal.setAttribute('aria-label', t('项目目标'));
-  content.append(
-    node('h3', () => t('项目目标')),
-    goal
-  );
   const scale = node('select');
-  for (const [value, label] of [
-    ['quick', () => t('小型项目')],
-    ['standard', () => t('中型项目')],
-    ['large', () => t('大型项目')]
-  ]) {
-    const o = node('option', label);
-    o.value = value;
-    scale.append(o);
+  for (const [value, label] of [['quick', '小型项目'], ['standard', '中型项目'], ['large', '大型项目']]) {
+    const option = node('option', () => t(label));
+    option.value = value;
+    scale.append(option);
   }
-  content.append(scale);
-  content.append(
-    button(
-      () => t('生成并保存任务计划'),
-      async () => {
-        const proposal = await api('/projects/plan/propose', {
-          project_id: state.project.id,
-          goal: goal.value,
-          scale: scale.value
-        });
-        await api('/projects/plan', {
-          project_id: state.project.id,
-          plan_version: p.plan_version,
-          goal: proposal.goal,
-          modules: proposal.modules,
-          tasks: proposal.tasks
-        });
-        await projects();
-        $('detail-dialog').close();
-        $('plan').click();
-      }
-    )
-  );
-  for (const t of p.tasks || []) {
-    const row = node('div', undefined, 'tool');
-    row.append(node('strong', t.title));
-    const status = node('select');
-    for (const value of ['pending', 'in_progress', 'completed', 'blocked']) {
-      const o = node('option', value);
-      o.value = value;
-      status.append(o);
-    }
-    status.value = t.status;
-    status.onchange = task(async () => {
-      await api('/projects/tasks/status', {
-        project_id: state.project.id,
-        task_id: t.id,
-        status: status.value,
-        plan_version: p.plan_version
+  const actions = node('div', undefined, 'project-plan-actions');
+  const generate = button(() => t('生成并保存任务计划'), async () => {
+    generate.disabled = true;
+    try {
+      const proposal = await api('/projects/plan/propose', { project_id: project.id, goal: goal.value, scale: scale.value });
+      await api('/projects/plan', {
+        project_id: project.id, plan_version: p.plan_version,
+        goal: proposal.goal, modules: proposal.modules, tasks: proposal.tasks
       });
+      await projects();
       $('detail-dialog').close();
       $('plan').click();
+    } finally { generate.disabled = false; }
+  });
+  generate.className = 'primary';
+  actions.append(detailField('项目规模', scale), generate);
+  planning.append(goal, actions);
+  const tasks = detailSection('任务进度');
+  const completed = (p.tasks || []).filter(item => item.status === 'completed').length;
+  const progress = node('progress');
+  progress.max = Math.max(1, (p.tasks || []).length);
+  progress.value = completed;
+  progress.setAttribute('aria-label', t('任务进度'));
+  const progressRow = node('div', undefined, 'project-plan-progress');
+  progressRow.append(progress, node('small', `${completed} / ${(p.tasks || []).length}`));
+  tasks.append(progressRow);
+  for (const item of p.tasks || []) {
+    const row = node('div', undefined, 'project-task-row');
+    row.append(node('strong', item.title));
+    const status = node('select');
+    status.setAttribute('aria-label', item.title + ' · ' + t('任务进度'));
+    for (const value of ['pending', 'in_progress', 'completed', 'blocked', 'failed']) {
+      const option = node('option', () => t(projectStatusLabels[value]));
+      option.value = value;
+      status.append(option);
+    }
+    status.value = item.status;
+    status.onchange = task(async () => {
+      status.disabled = true;
+      try {
+        await api('/projects/tasks/status', { project_id: project.id, task_id: item.id, status: status.value, plan_version: p.plan_version });
+        $('detail-dialog').close();
+        $('plan').click();
+      } catch (error) { status.value = item.status; throw error; }
+      finally { status.disabled = false; }
     });
     row.append(status);
-    content.append(row);
+    tasks.append(row);
   }
+  if (!(p.tasks || []).length) tasks.append(node('p', () => t('暂无任务，填写项目目标后生成计划'), 'project-dialog-empty'));
+  content.append(planning, tasks);
   $('detail-dialog').showModal();
 });
 
 $('export-session').onclick = task(async () => {
   if (!state.session) throw new Error(t('请先选择一个已有会话'));
+  const project = state.project;
   const saved = await api('/sessions/save', { session_id: state.session });
-  notice(t('会话已导出：') + saved.path);
+  if (state.project !== project) return;
+  const content = projectDetail('导出会话', '会话已保存到项目目录', 'export-session', project);
+  const result = detailSection('导出位置');
+  result.append(node('code', saved.path, 'project-export-path'));
+  content.append(result);
+  $('detail-dialog').showModal();
   await files();
 });
 
@@ -1635,3 +1708,116 @@ $('login-dialog').addEventListener('cancel', e => e.preventDefault());
   }).observe(layout);
   render();
 })();
+
+
+$('project-settings').onclick = task(async () => {
+  const project = state.project;
+  if (!project) return;
+  const identity = { owner_id: project.owner_id, project_id: project.id };
+  const endpoint = '/api/v1/collaborate/settings';
+  const data = await request(endpoint + '?' + new URLSearchParams(identity));
+  if (state.project !== project) return;
+  project.permission = data.permission;
+  $('edit-file').disabled = !state.file || state.file.truncated || data.permission === 'read';
+  const content = projectDetail('项目设置', '管理项目成员与访问权限', 'project-settings', project);
+  const members = detailSection('项目成员');
+  const labels = { owner: '拥有者', read: '只读', write: '读写' };
+  const update = async (username, permission) => {
+    await request(endpoint, { ...identity, username, permission });
+    notice(t('项目成员已更新'));
+    $('project-settings').click();
+  };
+  for (const member of data.members) {
+    const row = node('div', undefined, 'project-member');
+    const avatar = node('span', member.username.slice(0, 1).toUpperCase(), 'project-member-avatar');
+    avatar.setAttribute('aria-hidden', 'true');
+    const identity = node('div', undefined, 'project-member-identity');
+    identity.append(node('strong', member.username), node('small', () => t(labels[member.permission])));
+    row.append(avatar, identity);
+    if (data.permission === 'owner' && member.permission !== 'owner') {
+      const permission = node('select');
+      permission.setAttribute('aria-label', member.username + ' ' + t('权限'));
+      for (const value of ['read', 'write']) {
+        const option = node('option', () => t(labels[value]));
+        option.value = value;
+        permission.append(option);
+      }
+      permission.value = member.permission;
+      const controls = node('div', undefined, 'project-member-controls');
+      const remove = button(() => t('移除成员'), () => update(member.username, 'remove'));
+      remove.className = 'project-member-remove';
+      controls.append(permission, button(() => t('保存权限'), () => update(member.username, permission.value)), remove);
+      row.append(controls);
+    } else {
+      row.append(node('span', () => t(labels[member.permission]), 'project-role'));
+    }
+    members.append(row);
+  }
+  content.append(members);
+  if (data.permission === 'owner') {
+    const form = node('form', undefined, 'project-invite-form');
+    const username = node('select');
+    username.required = true;
+    username.size = 5;
+    username.className = 'project-user-list';
+    username.setAttribute('aria-label', t('选择用户'));
+    const search = node('input');
+    search.type = 'search';
+    search.placeholder = t('搜索用户名');
+    search.setAttribute('aria-label', t('搜索用户名'));
+    search.autocomplete = 'off';
+    const picker = node('div', undefined, 'project-user-picker');
+    picker.append(detailField('搜索用户名', search), detailField('选择用户', username));
+    const permission = node('select');
+    permission.setAttribute('aria-label', t('权限'));
+    for (const value of ['read', 'write']) {
+      const option = node('option', () => t(labels[value]));
+      option.value = value;
+      permission.append(option);
+    }
+    const submit = node('button', () => t('添加参与者'));
+    submit.type = 'submit';
+    submit.className = 'primary';
+    const controls = node('div', undefined, 'project-invite-controls');
+    controls.append(detailField('权限', permission), submit);
+    form.append(picker, controls);
+    const renderUsers = () => {
+      const selected = username.value;
+      const query = search.value.trim().toLocaleLowerCase();
+      username.replaceChildren();
+      const prompt = node('option', () => t('请选择用户'));
+      prompt.value = '';
+      prompt.disabled = true;
+      username.append(prompt);
+      const users = (data.users || []).filter(user => user.username.toLocaleLowerCase().includes(query));
+      for (const user of users) {
+        const reason = user.permission === 'owner' ? '拥有者' : !user.enabled ? '已停用' : user.permission ? '已加入项目' : '';
+        const option = node('option', () => reason ? `${user.username} · ${t(reason)}` : user.username);
+        option.value = user.username;
+        option.disabled = !!reason;
+        username.append(option);
+      }
+      if (!users.length) {
+        const empty = node('option', () => t('没有匹配的用户'));
+        empty.disabled = true;
+        empty.value = '';
+        username.append(empty);
+      }
+      const preserved = Array.from(username.options).some(option => option.value === selected && !option.disabled);
+      username.value = preserved ? selected : '';
+      submit.disabled = !username.value;
+    };
+    search.oninput = renderUsers;
+    username.onchange = () => { submit.disabled = !username.value; };
+    renderUsers();
+    form.onsubmit = task(async () => {
+      submit.disabled = true;
+      try { await update(username.value.trim(), permission.value); }
+      finally { submit.disabled = !username.value; }
+    });
+    const invite = detailSection('添加参与者');
+    invite.append(node('p', () => t('选择用户并设置权限。已加入项目或已停用的用户不可重复添加。'), 'project-dialog-hint'), form);
+    content.append(invite);
+  }
+  $('detail-dialog').showModal();
+});

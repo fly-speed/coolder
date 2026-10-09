@@ -176,7 +176,7 @@ function invalidateCodePatch(e) {
   uiText($('code-status'), () => t('修改后请先预览差异，再确认保存。'));
 }
 $('edit-file').onclick = task(async () => {
-  if (!state.file || state.file.truncated || codeEditors.editing?.saving) return;
+  if (!state.file || state.file.truncated || state.project?.permission === 'read' || codeEditors.editing?.saving) return;
   if (codeEditors.editing?.file.path === state.file.path) {
     selectBodyTab('source');
     requestAnimationFrame(() => codeEditors.editing?.editor?.layout());
@@ -185,7 +185,7 @@ $('edit-file').onclick = task(async () => {
   if (codeDirty() && !confirm(t('存在未保存的修改，确定关闭？'))) return;
   disposeCodeEditing();
   const file = state.file;
-  const e = { file, original: file.content, patch: '', saving: false };
+  const e = { file, project: state.project, original: file.content, patch: '', saving: false };
   codeEditors.editing = e;
   pinSourceFile(file.path);
   $('code-inline-toolbar').hidden = false;
@@ -249,7 +249,11 @@ $('code-preview').onclick = task(async () => {
   const version = (e.previewVersion || 0) + 1;
   e.previewVersion = version;
   invalidateCodePatch(e);
-  const result = await api('/workspace/patch/preview', { path: e.file.path, content });
+  const collaborative = !!e.project?.owner_id;
+  const latest = collaborative ? await projectFileRequest('read', e.file.path, undefined, e.project) : null;
+  const result = collaborative
+    ? { original_sha256: latest.sha256, patch_id: latest.sha256 }
+    : await api('/workspace/patch/preview', { path: e.file.path, content });
   const hash = [
     ...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(e.original)))
   ]
@@ -258,6 +262,7 @@ $('code-preview').onclick = task(async () => {
   if (codeEditors.editing !== e || version !== e.previewVersion || content !== codeValue(e)) return;
   if (result.original_sha256 !== hash)
     throw new Error(t('文件已被其他任务修改，请重新打开后编辑。'));
+  e.pendingContent = content;
   e.patch = result.patch_id;
   state.reviewFile = 'manual:' + e.file.path;
   renderReviewFileTabs();
@@ -304,7 +309,11 @@ $('code-save').onclick = task(async () => {
   e.editor?.updateOptions({ readOnly: true });
   $('code-fallback').readOnly = true;
   try {
-    await api('/workspace/patch/apply', { patch_id: e.patch });
+    if (e.project?.owner_id) {
+      await projectFileRequest('save', e.file.path, { sha256: e.patch, content: e.pendingContent }, e.project);
+    } else {
+      await api('/workspace/patch/apply', { patch_id: e.patch });
+    }
     if (codeEditors.editing !== e) return;
     const updated = await api('/workspace/read?path=' + encodeURIComponent(e.file.path));
     if (codeEditors.editing !== e) return;

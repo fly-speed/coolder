@@ -167,7 +167,7 @@ bool agent_workspace_t::register_project_root(const std::string &user_root,
 	}
 	for (std::map<std::string, std::string>::const_iterator it =
 	         roots.begin();
-	     it != roots.end(); ++it) {
+	    it != roots.end(); ++it) {
 		out << hex_encode(it->first) << '\t' << hex_encode(it->second)
 		    << '\n';
 	}
@@ -193,14 +193,14 @@ bool agent_workspace_t::register_project_root(const std::string &user_root,
 
 bool agent_workspace_t::resolve_project_root(const std::string &user_root,
     const std::string &logical_path, std::string &absolute_root,
-    std::string &err)
+    std::string &err, bool allow_external_roots)
 {
 	std::string logical;
 	if (!normalize_path(logical_path, logical, true, err))
 		return false;
 	std::string mapped_logical;
 	std::string mapped_physical;
-	{
+	if (allow_external_roots) {
 		std::lock_guard<std::mutex> guard(
 		    g_project_root_registry_mutex);
 		std::map<std::string, std::string> roots;
@@ -208,7 +208,7 @@ bool agent_workspace_t::resolve_project_root(const std::string &user_root,
 			return false;
 		for (std::map<std::string, std::string>::const_iterator it =
 		         roots.begin();
-		     it != roots.end(); ++it) {
+		    it != roots.end(); ++it) {
 			if (!(path_has_prefix(logical, it->first) &&
 			        it->first.size() > mapped_logical.size()))
 				continue;
@@ -270,7 +270,7 @@ bool agent_workspace_t::unregister_project_root(const std::string &user_root,
 	}
 	for (std::map<std::string, std::string>::const_iterator it =
 	         roots.begin();
-	     it != roots.end(); ++it) {
+	    it != roots.end(); ++it) {
 		out << hex_encode(it->first) << '\t' << hex_encode(it->second)
 		    << '\n';
 	}

@@ -25,6 +25,9 @@
     <ClCompile Include="server\attachments.cpp">
       <Filter>server</Filter>
     </ClCompile>
+    <ClCompile Include="server\project_sharing.cpp">
+      <Filter>server</Filter>
+    </ClCompile>
     <ClCompile Include="server\auth.cpp">
       <Filter>server</Filter>
     </ClCompile>
@@ -56,6 +59,9 @@
   <ItemGroup>
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="server\attachments.h">
+      <Filter>server</Filter>
+    </ClInclude>
+    <ClInclude Include="server\project_sharing.h">
       <Filter>server</Filter>
     </ClInclude>
     <ClInclude Include="server\auth.h">

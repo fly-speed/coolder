@@ -83,8 +83,9 @@ public:
 	    const std::function<void()> &checkpoint, std::string &err,
 	    const std::vector<std::string> &excluded = {}) const;
 #endif
-	// Initialize agent workspace state from the supplied arguments.
-	explicit agent_workspace_t(const std::string &user_root);
+	// Initialize workspace state; disable external roots for a confined project.
+	explicit agent_workspace_t(
+	    const std::string &user_root, bool allow_external_roots = true);
 	// Read and validate the project's declared dependency specifications.
 	bool prebuilt_dependencies(const std::string &directory,
 	    std::vector<prebuilt_dependency_t> &dependencies,
@@ -167,10 +168,11 @@ public:
 	// Remove a previously registered external project-root mapping.
 	static bool unregister_project_root(const std::string &user_root,
 	    const std::string &logical_path, std::string &err);
-	// Resolve a logical project to its authorized filesystem root.
+	// Resolve a logical project to its authorized filesystem root. Disable
+	// external roots when the base is a project rather than trusted account state.
 	static bool resolve_project_root(const std::string &user_root,
 	    const std::string &logical_path, std::string &absolute_root,
-	    std::string &err);
+	    std::string &err, bool allow_external_roots = true);
 	// Shared projects deliberately keep their complete AI state in the shared
 	// source tree. Local-disk projects use a private per-user state root; personal
 	// projects keep their historical in-project state.
@@ -191,6 +193,8 @@ private:
 	    std::string &absolute, std::string &err) const;
 	// Filesystem root belonging to the authenticated user.
 	std::string user_root_;
+	// Whether the root contains a trusted account-level external mount registry.
+	bool allow_external_roots_;
 	// Server-approved dependency mounts consulted by read operations.
 	std::map<std::string, std::string> readonly_mounts_;
 };

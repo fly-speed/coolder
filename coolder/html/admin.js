@@ -182,6 +182,7 @@ function clearWorkspace() {
   hideAdminWindow();
   resetRun();
   state.project = null;
+  $('project-settings').disabled = true;
   state.projects = [];
   state.providers = [];
   state.session = '';

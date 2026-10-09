@@ -134,8 +134,10 @@ path_component_state_t inspect_path_components(
 } // namespace workspace_detail
 using namespace workspace_detail;
 
-agent_workspace_t::agent_workspace_t(const std::string &user_root)
+agent_workspace_t::agent_workspace_t(
+    const std::string &user_root, bool allow_external_roots)
         : user_root_(user_root)
+        , allow_external_roots_(allow_external_roots)
 {
 }
 
@@ -251,7 +253,8 @@ bool agent_workspace_t::path_is_sensitive(const std::string &normalized_path)
 bool agent_workspace_t::resolve_existing(
     const std::string &relative, std::string &absolute, std::string &err) const
 {
-	return resolve_project_root(user_root_, relative, absolute, err);
+	return resolve_project_root(
+	    user_root_, relative, absolute, err, allow_external_roots_);
 }
 
 }

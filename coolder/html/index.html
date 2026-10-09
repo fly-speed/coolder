@@ -245,9 +245,18 @@
               项目操作
             </summary>
             <div class="body-project-actions">
-              <button id="plan"><span data-i18n="项目计划">项目计划</span></button>
-              <button id="history"><span data-i18n="运行记录">运行记录</span></button>
-              <button id="export-session"><span data-i18n="导出会话">导出会话</span></button>
+              <button id="project-settings" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h4m4 0h8M4 17h8m4 0h4"/><circle cx="10" cy="7" r="2"/><circle cx="14" cy="17" r="2"/></svg>
+                <span data-i18n="项目设置">项目设置</span></button>
+              <button id="plan">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg>
+                <span data-i18n="项目计划">项目计划</span></button>
+              <button id="history">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11a9 9 0 1 1 2.6 7.4M3 4v7h7M12 7v5l3 2"/></svg>
+                <span data-i18n="运行记录">运行记录</span></button>
+              <button id="export-session">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/></svg>
+                <span data-i18n="导出会话">导出会话</span></button>
             </div>
           </details>
           <div class="body-window-controls">
@@ -1542,9 +1551,12 @@
         <button id="project-directory-select" type="button" class="primary" disabled><span data-i18n="选择当前目录">选择当前目录</span></button>
       </div>
     </dialog>
-    <dialog id="detail-dialog">
+    <dialog id="detail-dialog" aria-labelledby="detail-title" aria-describedby="detail-subtitle">
       <div class="dialog-title">
-        <h2 id="detail-title"></h2>
+        <div class="project-dialog-heading">
+          <div id="detail-icon" class="project-dialog-icon" aria-hidden="true"></div>
+          <div><h2 id="detail-title"></h2><p id="detail-subtitle"></p></div>
+        </div>
         <button
           data-close
           type="button"

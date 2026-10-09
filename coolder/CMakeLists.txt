@@ -20,7 +20,7 @@ set(LIBAI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libai"
 add_subdirectory("${LIBAI_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/libai")
 
 file(GLOB COOLDER_ACTIONS CONFIGURE_DEPENDS action/ai/*.cpp)
-add_executable(coolder main.cpp server/host.cpp server/attachments.cpp server/auth.cpp server/ai_policy.cpp ${COOLDER_ACTIONS})
+add_executable(coolder main.cpp server/host.cpp server/attachments.cpp server/auth.cpp server/project_sharing.cpp server/ai_policy.cpp ${COOLDER_ACTIONS})
 target_include_directories(coolder PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(coolder PRIVATE libai::ai)
 target_precompile_headers(coolder PRIVATE stdafx.h)
@@ -57,6 +57,10 @@ install(DIRECTORY html/ DESTINATION share/coolder/html)
 enable_testing()
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+	add_test(NAME coolder_project_sharing
+		COMMAND "${Python3_EXECUTABLE}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/tests/project_sharing_test.py"
+			"$<TARGET_FILE:coolder>")
 	add_test(NAME coolder_accounts
 		COMMAND "${Python3_EXECUTABLE}"
 			"${CMAKE_CURRENT_SOURCE_DIR}/tests/accounts_test.py"

@@ -270,6 +270,21 @@ bool current_account(const request_t &req, account_t &out)
 	return current_locked(req, out);
 }
 
+std::vector<account_t> project_accounts()
+{
+	std::lock_guard<webcool::mutex> guard(accounts_mutex);
+	std::vector<account_t> result;
+	for (const auto &entry : accounts) {
+		account_t identity;
+		identity.id = entry.second.id;
+		identity.username = entry.second.username;
+		identity.admin = entry.second.admin;
+		identity.enabled = entry.second.enabled;
+		result.push_back(identity);
+	}
+	return result;
+}
+
 std::string account_workspace(const account_t &a)
 {
 	// The initial administrator inherits the existing installation's workspace.

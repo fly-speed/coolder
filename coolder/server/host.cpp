@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "host.h"
 #include "auth.h"
+#include "project_sharing.h"
 #include "attachments.h"
 #include "libai/agent/ai_admin_policy.h"
 #include "action/action_util.h"
@@ -180,6 +181,14 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 		} catch (const std::exception &) {
 			return reply(res, 500,
 			    "{\"error\":\"attachment operation failed\"}");
+		}
+	}
+	if (path.compare(0, 20, "/api/v1/collaborate/") == 0) {
+		try {
+			return project_sharing_route(req, res, method, account);
+		} catch (const std::exception &) {
+			return reply(res, 500,
+			    "{\"error\":\"project sharing operation failed\"}");
 		}
 	}
 	using handler = bool (*)(request_t &, response_t &);
