@@ -451,8 +451,10 @@
             <div class="toolbar source-toolbar">
               <h3 id="file-title"><span data-i18n="文件预览">文件预览</span></h3>
               <span id="code-mode" class="muted" role="status" data-i18n="只读">只读</span>
+              <button id="html-preview-open" type="button" hidden data-i18n="网页预览">网页预览</button>
               <button id="edit-file" disabled><span data-i18n="编辑文件">编辑文件</span></button>
               <div id="code-inline-toolbar" class="code-toolbar" hidden>
+                <button id="code-vim" type="button" aria-pressed="false" disabled>Vim</button>
                 <button id="code-find" type="button" data-i18n="查找替换">查找替换</button>
                 <button id="code-wrap" type="button" aria-pressed="false" data-i18n="自动换行">
                   自动换行
@@ -464,6 +466,7 @@
               </div>
             </div>
             <div id="code-viewer" hidden></div>
+            <div id="code-vim-status" class="code-vim-status" hidden></div>
             <textarea
               id="code-fallback"
               aria-label="文件内容"
@@ -1573,6 +1576,35 @@
         </button>
       </div>
       <div id="detail-content"></div>
+    </dialog>
+    <button id="html-preview-restore" hidden title="还原窗口" data-i18n-title="还原窗口"><span data-i18n="还原窗口">还原窗口</span> · <span id="html-preview-restore-name"></span></button>
+    <dialog id="html-preview-dialog" aria-labelledby="html-preview-title">
+      <div class="dialog-title">
+        <h2 id="html-preview-title" data-i18n="网页预览">网页预览</h2>
+        <p class="muted html-preview-note" data-i18n="预览当前编辑内容；仅加载项目内资源，不连接后端服务。">预览当前编辑内容；仅加载项目内资源，不连接后端服务。</p>
+        <p id="html-preview-status" role="status" aria-live="polite"></p>
+        <div class="actions">
+          <button id="html-preview-refresh" class="icon-button" type="button" title="刷新预览" aria-label="刷新预览" data-i18n-title="刷新预览" data-i18n-aria-label="刷新预览">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7" /></svg>
+          </button>
+          <button id="html-preview-minimize" class="icon-button" type="button" title="最小化" aria-label="最小化" data-i18n-title="最小化" data-i18n-aria-label="最小化">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14" /></svg>
+          </button>
+          <button id="html-preview-maximize" class="icon-button" type="button" aria-pressed="false" title="最大化" aria-label="最大化" data-i18n-title="最大化" data-i18n-aria-label="最大化">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect class="icon-default" x="4" y="4" width="16" height="16" rx="1" />
+              <path class="icon-active" d="M8 8V4h12v12h-4M4 8h12v12H4Z" />
+            </svg>
+          </button>
+          <button id="html-preview-fullscreen" class="icon-button" type="button" aria-pressed="false" title="全屏" aria-label="全屏" data-i18n-title="全屏" data-i18n-aria-label="全屏">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="icon-default" d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" /><path class="icon-active" d="M3 8h5V3M21 8h-5V3M8 21v-5H3M16 21v-5h5" /></svg>
+          </button>
+          <button class="icon-button" type="button" data-close title="关闭" aria-label="关闭" data-i18n-title="关闭" data-i18n-aria-label="关闭">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+      </div>
+      <iframe id="html-preview-frame" title="网页预览" data-i18n-title="网页预览" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
     </dialog>
   </body>
 </html>

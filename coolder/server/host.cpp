@@ -13,6 +13,7 @@
 #include <sstream>
 #include <map>
 #include <filesystem>
+#include <openssl/rand.h>
 
 namespace coolder
 {
@@ -36,10 +37,20 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 {
 	res.setHeader("X-Content-Type-Options", "nosniff");
 	res.setHeader("Cache-Control", "no-store");
-	res.setHeader("Content-Security-Policy",
-	    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+	unsigned char nonce_bytes[16];
+	if (RAND_bytes(nonce_bytes, sizeof(nonce_bytes)) != 1)
+		return reply(res, 500, "secure random unavailable", "text/plain");
+	std::string preview_nonce;
+	const char *hex = "0123456789abcdef";
+	for (unsigned char value : nonce_bytes) {
+		preview_nonce += hex[value >> 4];
+		preview_nonce += hex[value & 15];
+	}
+	const std::string csp = "default-src 'self'; script-src 'self' 'nonce-" +
+	    preview_nonce + "'; style-src 'self' 'unsafe-inline'; "
 	    "worker-src 'self'; font-src 'self' data:; connect-src 'self'; "
-	    "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'");
+	    "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'";
+	res.setHeader("Content-Security-Policy", csp.c_str());
 	const char *host = req.getHeader("Host");
 	const char *origin = req.getHeader("Origin");
 	if (!host || authority != host) {
@@ -62,7 +73,8 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 	// Monaco's own scripts, CSS, fonts and workers are served only from its vendor
 	// tree.
 	if (method == "GET" &&
-	    path.compare(0, 22, "/vendor/monaco-editor/") == 0) {
+	    (path.compare(0, 22, "/vendor/monaco-editor/") == 0 ||
+	     path.compare(0, 19, "/vendor/monaco-vim/") == 0)) {
 		const std::filesystem::path relative(path.substr(1));
 		std::filesystem::path filename(html_dir);
 		for (const auto &component : relative) {
@@ -138,7 +150,14 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 		}
 		std::ostringstream content;
 		content << file.rdbuf();
-		return reply(res, 200, content.str(),
+		std::string page = content.str();
+		if (path == "/") {
+			const auto head = page.find("</head>");
+			if (head != std::string::npos)
+				page.insert(head, "<meta name=\"preview-script-nonce\" content=\"" +
+				    preview_nonce + "\">\n");
+		}
+		return reply(res, 200, page,
 		    path == "/" ? "text/html; charset=utf-8" :
 		        (path == "/coolder.js" || path == "/app.js" ||
 		            path == "/admin.js" || path == "/i18n.js" ||

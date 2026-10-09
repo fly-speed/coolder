@@ -107,6 +107,9 @@ public:
 	bool read(const std::string &relative_file, std::string &content,
 	    bool &truncated, std::string &err,
 	    bool log_binary_rejection = true) const;
+	// Read a bounded asset for authenticated browser previews, including binary data.
+	bool read_preview_asset(const std::string &path, std::string &content,
+	    std::string &err) const;
 	// Search readable workspace text and report when result limits are
 	// reached.
 	bool search(const std::string &relative_dir, const std::string &needle,

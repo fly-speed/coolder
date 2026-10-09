@@ -244,6 +244,27 @@ bool files(request_t &req, response_t &res, acl::json *body,
 		root.add_text("sha256",
 		    agent_workspace_t::content_sha256(content).c_str());
 		root.add_bool("truncated", truncated);
+	} else if (operation == "preview-asset") {
+		const auto dot = normalized.rfind('.');
+		std::string ext = dot == std::string::npos ? "" : normalized.substr(dot);
+		std::transform(ext.begin(), ext.end(), ext.begin(),
+		    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		const std::map<std::string, std::string> types = {
+			{ ".png", "image/png" }, { ".jpg", "image/jpeg" },
+			{ ".jpeg", "image/jpeg" }, { ".gif", "image/gif" },
+			{ ".webp", "image/webp" }, { ".svg", "image/svg+xml" },
+			{ ".ico", "image/x-icon" }, { ".woff", "font/woff" },
+			{ ".woff2", "font/woff2" }, { ".ttf", "font/ttf" }
+		};
+		const auto type = types.find(ext);
+		if (type == types.end()) return error(res, 400, "unsupported preview asset");
+		std::string content;
+		if (!workspace.read_preview_asset(normalized, content, err))
+			return error(res, 400, err);
+		acl::string encoded;
+		encoded.base64_encode(content.data(), content.size());
+		root.add_text("mime", type->second.c_str());
+		root.add_text("base64", encoded.c_str());
 	} else if (writing) {
 		if (!(*body)["content"] || !(*body)["content"]->get_string())
 			return error(res, 400, "content must be a string");

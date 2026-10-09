@@ -137,6 +137,7 @@ function disposeCodeEditing() {
   const e = codeEditors.editing;
   codeEditors.editing = null;
   if (e) {
+    e.vim?.dispose();
     e.change?.dispose();
     e.diff?.dispose();
     e.originalModel?.dispose();
@@ -149,6 +150,8 @@ function disposeCodeEditing() {
     ariaLabel: t('文件预览')
   });
   $('code-inline-toolbar').hidden = true;
+  $('code-vim-status').hidden = true;
+  $('code-vim').setAttribute('aria-pressed', 'false');
   $('code-fallback').hidden = true;
   $('edit-file').hidden = false;
   uiText($('code-mode'), () => t('只读'));
@@ -198,6 +201,7 @@ $('edit-file').onclick = task(async () => {
   $('code-fallback').value = file.content;
   $('code-preview').disabled = false;
   $('code-find').disabled = true;
+  $('code-vim').disabled = true;
   invalidateCodePatch(e);
   selectBodyTab('source');
   try {
@@ -233,6 +237,7 @@ $('edit-file').onclick = task(async () => {
     }
     $('code-fallback').hidden = true;
     $('code-find').disabled = false;
+    $('code-vim').disabled = false;
     codeTheme();
     e.editor.focus();
   } catch (error) {
@@ -461,6 +466,7 @@ function anySourceDirty() {
 }
 function disposeSourceFile(item) {
   const e = item.editing;
+  e?.vim?.dispose();
   e?.change?.dispose();
   e?.diff?.dispose();
   e?.originalModel?.dispose();
@@ -633,6 +639,9 @@ function fileTab(bar, path, active, choose, close, suffix = '', key = path) {
   return tab;
 }
 function renderSourceFileTabs() {
+  const markdown = state.file && CoolderMarkdown.isMarkdownName(state.file.path);
+  $('html-preview-open').hidden = !state.file || !(markdown || /\.html?$/i.test(state.file.path));
+  uiText($('html-preview-open'), () => t(markdown ? 'Markdown 预览' : '网页预览'));
   const bar = $('source-file-tabs');
   bar.replaceChildren();
   for (const [path, item] of sourceFiles) {

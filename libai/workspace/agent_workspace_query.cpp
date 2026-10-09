@@ -304,6 +304,31 @@ bool agent_workspace_t::read(const std::string &relative_file,
 	return false;
 }
 
+bool agent_workspace_t::read_preview_asset(const std::string &path,
+    std::string &content, std::string &err) const
+{
+	std::string relative, absolute;
+	if (!normalize_path(path, relative, false, err) ||
+	    !resolve_existing(relative, absolute, err))
+		return false;
+	struct stat st;
+	if (lstat(absolute.c_str(), &st) != 0 || is_link_like(absolute) ||
+	    !S_ISREG(st.st_mode) || st.st_size > 2 * 1024 * 1024) {
+		err = "preview asset must be a regular file of at most 2 MiB";
+		return false;
+	}
+	std::ifstream in(absolute, std::ios::binary);
+	if (!in) { err = "cannot read preview asset"; return false; }
+	content.resize(2 * 1024 * 1024 + 1);
+	in.read(&content[0], content.size());
+	content.resize(static_cast<size_t>(in.gcount()));
+	if (in.bad() || content.size() > 2 * 1024 * 1024) {
+		err = "preview asset read failed or exceeds 2 MiB";
+		return false;
+	}
+	return true;
+}
+
 bool agent_workspace_t::search(const std::string &relative_dir,
     const std::string &needle, std::vector<workspace_match_t> &matches,
     bool &truncated, std::string &err) const

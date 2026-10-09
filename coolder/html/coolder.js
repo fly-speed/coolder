@@ -1966,6 +1966,312 @@ $('preferences-form').onsubmit = task(async () => {
 
 
 ;
+// ---- markdown-preview.js ----
+// Adapted from aicool/webcool/html/js/markdown-preview.js.
+(function () {
+  function mdEscapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function isMarkdownName(name) {
+    return /\.(md|markdown|mdown|mkdn)$/i.test(String(name || ''));
+  }
+
+  function isSafeUrl(url) {
+    const text = String(url || '').trim();
+    return !/[\u0000-\u001f\u007f]/.test(text) &&
+      (!/^[a-z][a-z0-9+.-]*:/i.test(text) || /^(https?:|mailto:|tel:)/i.test(text));
+  }
+
+  function escapeUrl(url) {
+    const text = String(url || '').trim();
+    return isSafeUrl(text) ? mdEscapeHtml(text) : '#';
+  }
+
+  function slugify(text, used) {
+    let slug = String(text || '')
+      .toLowerCase()
+      .replace(/<[^>]*>/g, '')
+      .replace(/&[a-z0-9#]+;/gi, '')
+      .replace(/[^\w\u4e00-\u9fa5\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!slug) {
+      slug = 'section';
+    }
+    const count = used[slug] || 0;
+    used[slug] = count + 1;
+    return count ? slug + '-' + count : slug;
+  }
+
+  function inlineMarkdown(text) {
+    const tokens = [];
+    function store(html) {
+      const token = '\u0000INLINE' + tokens.length + '\u0000';
+      tokens.push(html);
+      return token;
+    }
+    let value = String(text || '').replace(/\u0000/g, '');
+    value = value.replace(/`([^`]+)`/g, function (_, body) {
+      return store('<code>' + mdEscapeHtml(body) + '</code>');
+    });
+    value = value.replace(/<\/?[A-Za-z][^>]*>/g, function (tag) {
+      return allowedHTMLTags.has(htmlTagName(tag)) ? store(sanitizeRawHTML(tag)) : tag;
+    });
+    value = value.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function (_, alt, url, title) {
+      return store('<img src="' + escapeUrl(url) + '" alt="' + mdEscapeHtml(alt) + '"' + (title ? ' title="' + mdEscapeHtml(title) + '"' : '') + '>');
+    });
+    value = value.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function (_, label, url, title) {
+      const externalAttrs = url.charAt(0) === '#' ? '' : ' target="_blank" rel="noopener noreferrer"';
+      return store('<a href="' + escapeUrl(url) + '"' + externalAttrs +
+        (title ? ' title="' + mdEscapeHtml(title) + '"' : '') + '>' + mdEscapeHtml(label).replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>').replace(/(\*|_)([^*_]+?)\1/g, '<em>$2</em>') + '</a>');
+    });
+    value = mdEscapeHtml(value);
+    value = value.replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>');
+    value = value.replace(/(\*|_)([^*_]+?)\1/g, '<em>$2</em>');
+    value = value.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    for (let pass = 0; pass <= tokens.length && /\u0000INLINE\d+\u0000/.test(value); pass += 1) {
+      value = value.replace(/\u0000INLINE(\d+)\u0000/g, function (_, index) {
+        return tokens[Number(index)] || '';
+      });
+    }
+    return value;
+  }
+
+  function parseTable(lines, index) {
+    if (index + 1 >= lines.length) {
+      return null;
+    }
+    const head = lines[index];
+    const divider = lines[index + 1];
+    if (head.indexOf('|') < 0 || !/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(divider)) {
+      return null;
+    }
+    function cells(line) {
+      return String(line || '').trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (cell) {
+        return cell.trim();
+      });
+    }
+    const headers = cells(head);
+    const aligns = cells(divider).map(function (cell) {
+      const left = /^:/.test(cell);
+      const right = /:$/.test(cell);
+      return left && right ? 'center' : (right ? 'right' : (left ? 'left' : ''));
+    });
+    let rowIndex = index + 2;
+    const rows = [];
+    while (rowIndex < lines.length && lines[rowIndex].indexOf('|') >= 0 && String(lines[rowIndex]).trim()) {
+      rows.push(cells(lines[rowIndex]));
+      rowIndex += 1;
+    }
+    let html = '<table><thead><tr>';
+    headers.forEach(function (cell, cellIndex) {
+      html += '<th' + (aligns[cellIndex] ? ' style="text-align:' + aligns[cellIndex] + '"' : '') + '>' + inlineMarkdown(cell) + '</th>';
+    });
+    html += '</tr></thead>';
+    if (rows.length) {
+      html += '<tbody>';
+      rows.forEach(function (row) {
+        html += '<tr>';
+        headers.forEach(function (_, cellIndex) {
+          html += '<td' + (aligns[cellIndex] ? ' style="text-align:' + aligns[cellIndex] + '"' : '') + '>' + inlineMarkdown(row[cellIndex] || '') + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody>';
+    }
+    html += '</table>';
+    return { html: html, nextIndex: rowIndex };
+  }
+
+  const allowedHTMLTags = new Set([
+    'a', 'b', 'i', 's', 'u', 'hr', 'br', 'caption', 'code', 'del', 'details', 'div', 'em', 'img', 'kbd',
+    'li', 'ol', 'p', 'pre', 'span', 'strong', 'sub', 'summary', 'sup', 'table',
+    'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul'
+  ]);
+
+  const htmlBlockTags = new Set([
+    'div', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'details', 'summary'
+  ]);
+
+  function htmlTagName(line) {
+    const match = String(line || '').trim().match(/^<\/?\s*([A-Za-z][A-Za-z0-9-]*)\b/);
+    return match ? match[1].toLowerCase() : '';
+  }
+
+  function isHTMLBlockStart(line) {
+    const tag = htmlTagName(line);
+    return tag && allowedHTMLTags.has(tag);
+  }
+
+  function matchesClosingTag(line, tag) {
+    return new RegExp('<\\/\\s*' + tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*>', 'i')
+      .test(String(line || ''));
+  }
+
+  // Render embedded HTML as text. Markdown previews never execute document code.
+  function sanitizeRawHTML(html) { return mdEscapeHtml(html); }
+
+  function parseHTMLBlock(lines, index) {
+    if (index >= lines.length || !isHTMLBlockStart(lines[index])) {
+      return null;
+    }
+    const rootTag = htmlTagName(lines[index]);
+    const body = [];
+    let rowIndex = index;
+
+    if (rootTag && htmlBlockTags.has(rootTag)) {
+      while (rowIndex < lines.length) {
+        const line = lines[rowIndex];
+        body.push(line);
+        rowIndex += 1;
+        if (matchesClosingTag(line, rootTag)) {
+          break;
+        }
+      }
+    } else {
+      while (rowIndex < lines.length) {
+        const line = lines[rowIndex];
+        if (!isHTMLBlockStart(line) && String(line || '').trim()) {
+          break;
+        }
+        body.push(line);
+        rowIndex += 1;
+        if (!String(line || '').trim()) {
+          break;
+        }
+      }
+    }
+
+    return { html: sanitizeRawHTML(body.join('\n')), nextIndex: rowIndex };
+  }
+
+  function renderMarkdown(markdown) {
+    const lines = String(markdown == null ? '' : markdown).replace(/\r\n?/g, '\n').split('\n');
+    const usedSlugs = Object.create(null);
+    const html = [];
+    let i = 0;
+
+    function collectParagraph() {
+      const parts = [];
+      const start = i;
+      while (i < lines.length && String(lines[i]).trim()) {
+        if (/^\s*(```|~~~)/.test(lines[i]) || /^\s{0,3}(#{1,6})\s+/.test(lines[i]) || /^\s*[-*_]{3,}\s*$/.test(lines[i]) || /^\s*>/.test(lines[i]) || isHTMLBlockStart(lines[i]) || /^\s*([-+*]|\d+\.)\s+/.test(lines[i])) {
+          break;
+        }
+        parts.push(lines[i]);
+        i += 1;
+      }
+      if (parts.length) {
+        html.push('<p>' + inlineMarkdown(parts.join(' ')) + '</p>');
+      } else if (i === start && i < lines.length) {
+        i += 1;
+      }
+    }
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = String(line || '').trim();
+      if (!trimmed) {
+        i += 1;
+        continue;
+      }
+
+      const fence = line.match(/^\s*(```|~~~)\s*(.*?)\s*$/);
+      if (fence) {
+        const marker = fence[1];
+        const lang = fence[2] || '';
+        i += 1;
+        const body = [];
+        while (i < lines.length && !new RegExp('^\\s*' + marker + '\\s*$').test(lines[i])) {
+          body.push(lines[i]);
+          i += 1;
+        }
+        if (i < lines.length) {
+          i += 1;
+        }
+        html.push('<pre><code' + (lang ? ' class="language-' + mdEscapeHtml(lang) + '"' : '') + '>' + mdEscapeHtml(body.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+      if (heading) {
+        const level = heading[1].length;
+        const body = inlineMarkdown(heading[2]);
+        html.push('<h' + level + ' id="' + mdEscapeHtml(slugify(heading[2], usedSlugs)) + '">' + body + '</h' + level + '>');
+        i += 1;
+        continue;
+      }
+
+      if (/^\s*[-*_]{3,}\s*$/.test(line)) {
+        html.push('<hr>');
+        i += 1;
+        continue;
+      }
+
+      if (/^\s*>/.test(line)) {
+        const parts = [];
+        while (i < lines.length && /^\s*>/.test(lines[i])) {
+          parts.push(lines[i].replace(/^\s*>\s?/, ''));
+          i += 1;
+        }
+        html.push('<blockquote>' + renderMarkdown(parts.join('\n')) + '</blockquote>');
+        continue;
+      }
+
+      const htmlBlock = parseHTMLBlock(lines, i);
+      if (htmlBlock) {
+        html.push(htmlBlock.html);
+        i = htmlBlock.nextIndex;
+        continue;
+      }
+
+      const table = parseTable(lines, i);
+      if (table) {
+        html.push(table.html);
+        i = table.nextIndex;
+        continue;
+      }
+
+      const list = line.match(/^(\s*)([-+*]|\d+\.)\s+(.*)$/);
+      if (list) {
+        const ordered = /\d+\./.test(list[2]);
+        const tag = ordered ? 'ol' : 'ul';
+        html.push('<' + tag + '>');
+        while (i < lines.length) {
+          const item = lines[i].match(/^(\s*)([-+*]|\d+\.)\s+(.*)$/);
+          if (!item || (/\d+\./.test(item[2]) !== ordered)) {
+            break;
+          }
+          const task = item[3].match(/^\[([ xX])\]\s+(.*)$/);
+          if (task) {
+            html.push('<li class="task-list-item"><input type="checkbox" disabled' + (task[1].toLowerCase() === 'x' ? ' checked' : '') + '> ' + inlineMarkdown(task[2]) + '</li>');
+          } else {
+            html.push('<li>' + inlineMarkdown(item[3]) + '</li>');
+          }
+          i += 1;
+        }
+        html.push('</' + tag + '>');
+        continue;
+      }
+
+      collectParagraph();
+    }
+
+    return html.join('\n') || '<p class="markdown-empty">空文档</p>';
+  }
+
+  window.CoolderMarkdown = { isMarkdownName, render: renderMarkdown };
+}());
+
+
+;
 // ---- code-editor.js ----
 'use strict';
 
@@ -2106,6 +2412,7 @@ function disposeCodeEditing() {
   const e = codeEditors.editing;
   codeEditors.editing = null;
   if (e) {
+    e.vim?.dispose();
     e.change?.dispose();
     e.diff?.dispose();
     e.originalModel?.dispose();
@@ -2118,6 +2425,8 @@ function disposeCodeEditing() {
     ariaLabel: t('文件预览')
   });
   $('code-inline-toolbar').hidden = true;
+  $('code-vim-status').hidden = true;
+  $('code-vim').setAttribute('aria-pressed', 'false');
   $('code-fallback').hidden = true;
   $('edit-file').hidden = false;
   uiText($('code-mode'), () => t('只读'));
@@ -2167,6 +2476,7 @@ $('edit-file').onclick = task(async () => {
   $('code-fallback').value = file.content;
   $('code-preview').disabled = false;
   $('code-find').disabled = true;
+  $('code-vim').disabled = true;
   invalidateCodePatch(e);
   selectBodyTab('source');
   try {
@@ -2202,6 +2512,7 @@ $('edit-file').onclick = task(async () => {
     }
     $('code-fallback').hidden = true;
     $('code-find').disabled = false;
+    $('code-vim').disabled = false;
     codeTheme();
     e.editor.focus();
   } catch (error) {
@@ -2430,6 +2741,7 @@ function anySourceDirty() {
 }
 function disposeSourceFile(item) {
   const e = item.editing;
+  e?.vim?.dispose();
   e?.change?.dispose();
   e?.diff?.dispose();
   e?.originalModel?.dispose();
@@ -2602,6 +2914,9 @@ function fileTab(bar, path, active, choose, close, suffix = '', key = path) {
   return tab;
 }
 function renderSourceFileTabs() {
+  const markdown = state.file && CoolderMarkdown.isMarkdownName(state.file.path);
+  $('html-preview-open').hidden = !state.file || !(markdown || /\.html?$/i.test(state.file.path));
+  uiText($('html-preview-open'), () => t(markdown ? 'Markdown 预览' : '网页预览'));
   const bar = $('source-file-tabs');
   bar.replaceChildren();
   for (const [path, item] of sourceFiles) {
@@ -2678,6 +2993,359 @@ function renderReviewFileTabs(snapshot = state.snapshot || { changes: [] }) {
   $('changes-pane').hidden = !!isManual;
   requestAnimationFrame(() => codeEditors.editing?.diff?.layout());
 }
+
+
+;
+// ---- vim-editor.js ----
+'use strict';
+let vimRuntime;
+function loadVimEditor() {
+  if (vimRuntime) return vimRuntime;
+  vimRuntime = loadMonaco().then(() => new Promise((resolve, reject) => {
+    window.require.config({ paths: { 'coolder-monaco-vim': '/vendor/monaco-vim/monaco-vim.umd' } });
+    window.require(['coolder-monaco-vim'], runtime => {
+      if (!runtime?.initVimMode) { reject(new Error('Vim editor unavailable')); return; }
+      const active = cm => codeEditors.editing?.editor === cm.editor;
+      runtime.VimMode.Vim.defineEx('write', 'w', cm => {
+        if (active(cm) && !codeEditors.editing.saving) $('code-preview').click();
+      });
+      runtime.VimMode.Vim.defineEx('quit', 'q', cm => {
+        if (active(cm)) closeCodeEditing();
+      });
+      resolve(runtime);
+    }, reject);
+  })).catch(error => { vimRuntime = null; throw error; });
+  return vimRuntime;
+}
+// Source panels are cloned for each file tab; keep the handler on their parent.
+$('source-pane').addEventListener('click', event => {
+  if (!event.target.closest('#code-vim')) return;
+  return task(async event => {
+  const button = event.target.closest('#code-vim');
+  if (!button) return;
+  const editing = codeEditors.editing;
+  if (!editing?.editor || editing.saving) return;
+  const panel = button.closest('#source-file-panel');
+  const status = panel.querySelector('#code-vim-status');
+  button.disabled = true;
+  try {
+    if (editing.vim) {
+      editing.vim.dispose();
+      editing.vim = null;
+      status.hidden = true;
+      button.setAttribute('aria-pressed', 'false');
+    } else {
+      const runtime = await loadVimEditor();
+      if (codeEditors.editing !== editing || !panel.isConnected) return;
+      status.hidden = false;
+      editing.vim = runtime.initVimMode(editing.editor, status);
+      button.setAttribute('aria-pressed', 'true');
+    }
+    editing.editor.layout();
+    editing.editor.focus();
+  } finally { button.disabled = false; }
+  })(event);
+});
+
+
+;
+// ---- html-preview.js ----
+'use strict';
+
+const htmlPreview = { version: 0, file: null, project: null, links: [] };
+function clearHtmlPreview() {
+  ++htmlPreview.version;
+  htmlPreview.links = [];
+  $('html-preview-frame').removeAttribute('srcdoc');
+}
+function previewResourcePath(reference, source, root) {
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(reference))
+    throw new Error(reference);
+  const relative = source.slice(root.length + 1);
+  const url = new URL(reference, 'https://preview.invalid/' + relative);
+  const path = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+  if (!path || path.split('/').some(part => part === '..' || part === '.') || path.includes('\\'))
+    throw new Error(reference);
+  return root + '/' + path;
+}
+async function replacePreviewAsync(text, pattern, replace) {
+  const matches = [...text.matchAll(pattern)];
+  for (let i = matches.length - 1; i >= 0; --i) {
+    const m = matches[i];
+    text = text.slice(0, m.index) + await replace(m) + text.slice(m.index + m[0].length);
+  }
+  return text;
+}
+async function refreshHtmlPreview() {
+  clearHtmlPreview();
+  const version = htmlPreview.version, warnings = new Set();
+  const file = htmlPreview.file, project = htmlPreview.project;
+  const markdown = CoolderMarkdown.isMarkdownName(file.path);
+  const nonce = document.querySelector('meta[name="preview-script-nonce"]').content;
+  uiText($('html-preview-status'), () => t('正在准备预览…'));
+  const cache = new Map();
+  let bytes = 0;
+  function bounded(value) {
+    bytes += value.length;
+    if (bytes > 16 * 1024 * 1024) throw new Error('Preview exceeds 16 MiB');
+    return value;
+  }
+  async function read(path, binary = false) {
+    const key = (binary ? 'asset:' : 'text:') + path;
+    if (!cache.has(key)) {
+      if (cache.size >= 128) throw new Error('Preview exceeds 128 resources');
+      cache.set(key, (async () => {
+        if (!binary) {
+          const item = sourceFiles.get(path);
+          const editing = state.file?.path === path ? codeEditors.editing : item?.editing;
+          if (editing) return bounded(editing.model ? editing.model.getValue() :
+            (state.file?.path === path ? $('code-fallback').value : item.source.querySelector('#code-fallback').value));
+          const data = await projectFileRequest('read', path, undefined, project);
+          if (data.truncated) throw new Error(path + ' (truncated)');
+          return bounded(data.content);
+        }
+        const data = await projectFileRequest('preview-asset', path, undefined, project);
+        return bounded('data:' + data.mime + ';base64,' + data.base64);
+      })());
+    }
+    return cache.get(key);
+  }
+  async function asset(reference, source) {
+    if (/^data:(?:image|font)\//i.test(reference)) return reference;
+    if (reference.startsWith('#')) return reference;
+    try { return await read(previewResourcePath(reference, source, project.project_path), true); }
+    catch { warnings.add(reference); return 'data:,'; }
+  }
+  async function css(text, source, chain = []) {
+    if (chain.includes(source) || chain.length >= 8) throw new Error(source);
+    text = await replacePreviewAsync(text, /@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?\s*([^;]*);/gi, async m => {
+      try {
+        const path = previewResourcePath(m[1], source, project.project_path);
+        const imported = await css(await read(path), path, [...chain, source]);
+        return m[2].trim() ? '@media ' + m[2] + '{' + imported + '}' : imported;
+      } catch { warnings.add(m[1]); return ''; }
+    });
+    return replacePreviewAsync(text, /url\(\s*(["']?)([^"')]+)\1\s*\)/gi,
+      async m => 'url("' + await asset(m[2].trim(), source) + '")');
+  }
+  try {
+    const source = await read(file.path);
+    const doc = new DOMParser().parseFromString(markdown ? CoolderMarkdown.render(source) : source, 'text/html');
+    if (markdown) {
+      const style = doc.createElement('style');
+      style.textContent = `
+        :root { color-scheme: light; }
+        body { max-width: 920px; margin: 0 auto; padding: 28px; color: #243247; background: white;
+          font: 16px/1.7 system-ui, sans-serif; overflow-wrap: anywhere; }
+        h1,h2,h3,h4,h5,h6 { line-height: 1.3; margin: 1.4em 0 .6em; }
+        h1,h2 { border-bottom: 1px solid #dce2eb; padding-bottom: .3em; }
+        a { color: #315bc0; } img { max-width: 100%; height: auto; }
+        pre { padding: 16px; background: #f3f5f8; overflow-x: auto; border-radius: 8px; }
+        code { font-family: ui-monospace, monospace; background: #f3f5f8; padding: .15em .3em; }
+        pre code { padding: 0; } blockquote { margin-left: 0; padding-left: 16px; border-left: 4px solid #c5cfdf; color: #536581; }
+        table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+        th,td { border: 1px solid #c5cfdf; padding: 8px 12px; } th { background: #f3f5f8; }
+        .task-list-item { list-style: none; } hr { border: 0; border-top: 1px solid #dce2eb; }
+      `;
+      doc.head.append(style);
+    }
+    doc.querySelectorAll('base, meta[http-equiv], iframe, object, embed').forEach(e => e.remove());
+    const eventBindings = [];
+    for (const el of doc.querySelectorAll('*')) {
+      el.removeAttribute('data-coolder-preview-event');
+      for (const attribute of [...el.attributes]) {
+        if (!markdown && /^on[a-z]+$/i.test(attribute.name)) {
+          const id = el.getAttribute('data-coolder-preview-event') || String(eventBindings.length);
+          el.setAttribute('data-coolder-preview-event', id);
+          eventBindings.push({ id, name: attribute.name.toLowerCase(), code: attribute.value });
+        }
+        if (/^on/i.test(attribute.name) || ['srcset', 'integrity', 'crossorigin', 'nonce', 'ping', 'action', 'formaction'].includes(attribute.name))
+          el.removeAttribute(attribute.name);
+      }
+      if (el.hasAttribute('style')) el.setAttribute('style', await css(el.getAttribute('style'), file.path));
+    }
+    for (const link of doc.querySelectorAll('link')) {
+      if (link.rel === 'stylesheet') {
+        try {
+          const path = previewResourcePath(link.getAttribute('href'), file.path, project.project_path);
+          const style = doc.createElement('style');
+          style.textContent = await css(await read(path), path);
+          if (link.media) style.media = link.media;
+          link.replaceWith(style);
+        } catch { warnings.add(link.getAttribute('href')); link.remove(); }
+      } else link.remove();
+    }
+    for (const style of doc.querySelectorAll('style'))
+      style.textContent = await css(style.textContent, file.path);
+    for (const img of doc.querySelectorAll('img[src], input[type="image"][src]'))
+      img.setAttribute('src', await asset(img.getAttribute('src'), file.path));
+    const links = [];
+    for (const el of doc.querySelectorAll('[data-coolder-preview-link]'))
+      el.removeAttribute('data-coolder-preview-link');
+    for (const el of doc.querySelectorAll('a[href], area[href]')) {
+      const href = el.getAttribute('href');
+      if (href.startsWith('#')) continue;
+      try {
+        const path = previewResourcePath(href, file.path, project.project_path);
+        if (markdown || !/\.html?$/i.test(path)) throw new Error(href);
+        const fragment = new URL(href, 'https://preview.invalid/').hash;
+        el.setAttribute('data-coolder-preview-link', String(links.length));
+        el.removeAttribute('target');
+        links.push({ path, fragment });
+      } catch { el.removeAttribute('href'); }
+    }
+    if (!markdown) {
+      const bridge = doc.createElement('script');
+      bridge.textContent = `
+        document.addEventListener('click', function(event) {
+          if (event.defaultPrevented || event.button !== 0) return;
+          const link = event.target.closest('a, area');
+          if (!link) return;
+          const index = link.getAttribute('data-coolder-preview-link');
+          if (index !== null) {
+            event.preventDefault();
+            parent.postMessage({ type: 'coolder-preview-link', version: ${version}, index: Number(index) }, '*');
+          }
+        });
+        window.addEventListener('DOMContentLoaded', function() {
+          const fragment = ${JSON.stringify(file.fragment || '')};
+          if (fragment) {
+            try { document.getElementById(decodeURIComponent(fragment.slice(1)))?.scrollIntoView(); } catch (_) {}
+          }
+        });
+      `;
+      doc.body.append(bridge);
+    }
+    for (const binding of eventBindings) {
+      const script = doc.createElement('script');
+      script.textContent = '(function () { const element = document.querySelector(' +
+        JSON.stringify('[data-coolder-preview-event="' + binding.id + '"]') +
+        '); if (element) element[' + JSON.stringify(binding.name) +
+        '] = function (event) {\n' + binding.code + '\n}; })();';
+      doc.body.append(script);
+    }
+    for (const script of doc.querySelectorAll('script')) {
+      if (markdown) { script.remove(); continue; }
+      if (script.type && !['text/javascript', 'application/javascript'].includes(script.type)) {
+        if (script.type === 'module') { warnings.add('JavaScript modules'); script.remove(); }
+        continue;
+      }
+      try {
+        const content = script.hasAttribute('src')
+          ? await read(previewResourcePath(script.getAttribute('src'), file.path, project.project_path))
+          : script.textContent;
+        const encoded = btoa(Array.from(new TextEncoder().encode(content), b => String.fromCharCode(b)).join(''));
+        script.textContent = '';
+        script.setAttribute('nonce', nonce);
+        script.setAttribute('src', 'data:text/javascript;base64,' + encoded);
+      } catch { warnings.add(script.getAttribute('src')); script.remove(); }
+    }
+    const policy = doc.createElement('meta');
+    policy.httpEquiv = 'Content-Security-Policy';
+    policy.content = "default-src 'none'; script-src 'nonce-" + nonce + "'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'";
+    doc.head.prepend(policy);
+    if (version !== htmlPreview.version) return;
+    htmlPreview.links = links;
+    $('html-preview-frame').setAttribute('sandbox', markdown ? '' : 'allow-scripts');
+    $('html-preview-frame').srcdoc = '<!doctype html>\n' + doc.documentElement.outerHTML;
+    uiText($('html-preview-status'), () => warnings.size
+      ? t('部分资源无法预览：') + [...warnings].join(', ') : file.path);
+  } catch (error) {
+    if (version === htmlPreview.version) plainText($('html-preview-status'), error.message);
+  }
+}
+// File panels are cloned when tabs open; delegate to their stable parent.
+$('source-pane').addEventListener('click', event => {
+  if (!event.target.closest('#html-preview-open')) return;
+  htmlPreview.minimized = false;
+  $('html-preview-restore').hidden = true;
+  htmlPreview.file = state.file;
+  htmlPreview.project = state.project;
+  const markdown = CoolderMarkdown.isMarkdownName(state.file.path);
+  uiText($('html-preview-title'), () => t(markdown ? 'Markdown 预览' : '网页预览'));
+  $('html-preview-frame').removeAttribute('data-i18n-title');
+  $('html-preview-frame').title = t(markdown ? 'Markdown 预览' : '网页预览');
+  $('html-preview-dialog').showModal();
+  refreshHtmlPreview();
+});
+$('html-preview-refresh').onclick = refreshHtmlPreview;
+
+
+function setHtmlPreviewMaximized(maximized) {
+  $('html-preview-dialog').classList.toggle('maximized', maximized);
+  $('html-preview-maximize').setAttribute('aria-pressed', String(maximized));
+  const button = $('html-preview-maximize');
+  const label = maximized ? '还原' : '最大化';
+  for (const attr of ['title', 'aria-label']) {
+    button.setAttribute('data-i18n-' + attr, label);
+    button.setAttribute(attr, t(label));
+  }
+}
+$('html-preview-maximize').onclick = () => {
+  setHtmlPreviewMaximized(!$('html-preview-dialog').classList.contains('maximized'));
+};
+$('html-preview-dialog').addEventListener('close', () => {
+  if (htmlPreview.minimized) return;
+  clearHtmlPreview();
+  setHtmlPreviewMaximized(false);
+  exitHtmlPreviewFullscreen();
+});
+
+$('html-preview-dialog').querySelector('.dialog-title').addEventListener('dblclick', event => {
+  if (!event.target.closest('button')) $('html-preview-maximize').click();
+});
+
+window.addEventListener('message', event => {
+  if (event.source !== $('html-preview-frame').contentWindow || !$('html-preview-dialog').open) return;
+  const data = event.data;
+  if (!data || data.type !== 'coolder-preview-link' || data.version !== htmlPreview.version || !Number.isInteger(data.index)) return;
+  const target = htmlPreview.links[data.index];
+  if (!target) return;
+  htmlPreview.file = target;
+  refreshHtmlPreview();
+});
+
+function renderHtmlPreviewFullscreen() {
+  const full = Boolean(htmlPreview.fullscreen && document.fullscreenElement);
+  if (!document.fullscreenElement) htmlPreview.fullscreen = false;
+  $('html-preview-dialog').classList.toggle('preview-fullscreen', full);
+  const button = $('html-preview-fullscreen');
+  button.setAttribute('aria-pressed', String(full));
+  for (const attr of ['title', 'aria-label']) {
+    const label = full ? '退出全屏' : '全屏';
+    button.setAttribute('data-i18n-' + attr, label);
+    button.setAttribute(attr, t(label));
+  }
+}
+async function exitHtmlPreviewFullscreen() {
+  if (htmlPreview.fullscreen && document.fullscreenElement) await document.exitFullscreen();
+  htmlPreview.fullscreen = false;
+  renderHtmlPreviewFullscreen();
+}
+$('html-preview-fullscreen').onclick = task(async () => {
+  if (htmlPreview.fullscreen) return exitHtmlPreviewFullscreen();
+  if (!document.fullscreenEnabled || !document.documentElement.requestFullscreen)
+    throw new Error(t('当前浏览器不支持全屏，请使用最大化。'));
+  // Dialog elements cannot request fullscreen themselves.
+  htmlPreview.fullscreen = true;
+  try { await document.documentElement.requestFullscreen(); }
+  catch (error) { htmlPreview.fullscreen = false; throw error; }
+  renderHtmlPreviewFullscreen();
+});
+document.addEventListener('fullscreenchange', renderHtmlPreviewFullscreen);
+$('html-preview-minimize').onclick = task(async () => {
+  await exitHtmlPreviewFullscreen();
+  htmlPreview.minimized = true;
+  $('html-preview-restore-name').textContent = htmlPreview.file.path;
+  $('html-preview-restore').hidden = false;
+  $('html-preview-dialog').close();
+  $('html-preview-restore').focus();
+});
+$('html-preview-restore').onclick = () => {
+  htmlPreview.minimized = false;
+  $('html-preview-restore').hidden = true;
+  $('html-preview-dialog').showModal();
+};
 
 
 ;

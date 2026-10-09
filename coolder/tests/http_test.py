@@ -224,6 +224,12 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
             auth=False,
         )
         assert 'HttpOnly' in h['Set-Cookie'] and 'SameSite=Strict' in h['Set-Cookie']
+        preview_page, preview_headers = call('/', auth=False)
+        nonce = re.search(rb'name="preview-script-nonce" content="([a-f0-9]+)"', preview_page).group(1).decode()
+        assert "'nonce-" + nonce + "'" in preview_headers['Content-Security-Policy']
+        assert b'id="html-preview-open"' in preview_page
+        assert b'id="html-preview-dialog"' in preview_page
+        assert b'sandbox="allow-scripts"' in preview_page
         call('/api/health')
         call('/api/health', status=403, headers={'Host': 'attacker.invalid'})
         call(
