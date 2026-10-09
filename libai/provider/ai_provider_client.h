@@ -90,7 +90,7 @@ struct completion_tool_call_t {
 	std::string target_path;
 	std::string content;
 	bool content_present =
-		false; // Explicit JSON string, including an intentional empty deletion.
+	    false; // Explicit JSON string, including an intentional empty deletion.
 };
 
 // A completed native assistant/tool exchange. Chat-style providers require
@@ -220,8 +220,8 @@ public:
 	// and automatic reasoning retries. Agent runtimes use this hook to archive
 	// the exact JSON body in the selected project. API keys are HTTP headers and
 	// are therefore never present in payload.
-	virtual bool on_request_payload(const std::string &payload,
-					std::string &err)
+	virtual bool on_request_payload(
+	    const std::string &payload, std::string &err)
 	{
 		(void)payload;
 		(void)err;
@@ -233,8 +233,8 @@ public:
 	{
 		return false;
 	}
-	virtual void
-	on_stream_progress(const provider_stream_progress_t &progress)
+	virtual void on_stream_progress(
+	    const provider_stream_progress_t &progress)
 	{
 		(void)progress;
 	}
@@ -249,8 +249,8 @@ public:
 	// Background Responses expose their durable ID before generation finishes.
 	// Observers can checkpoint it immediately so a service restart can retrieve
 	// the same response instead of issuing a duplicate billable request.
-	virtual bool on_response_state(const std::string &response_id,
-				       const std::string &status)
+	virtual bool on_response_state(
+	    const std::string &response_id, const std::string &status)
 	{
 		(void)response_id;
 		(void)status;
@@ -268,77 +268,64 @@ public:
 	// API.  Callers use this capability check to replay function_call and
 	// function_call_output items instead of sending previous_response_id.
 	static bool configure_response_state(provider_config_t &provider,
-					     const std::string &mode,
-					     std::string &err);
+	    const std::string &mode, std::string &err);
 	static bool responses_are_stateless(const provider_config_t &provider);
-	static bool
-	supports_reasoning_effort(const provider_config_t &provider);
+	static bool supports_reasoning_effort(
+	    const provider_config_t &provider);
 	static bool test_connection(const provider_config_t &provider,
-				    const std::string &api_key,
-				    provider_test_result_t &result,
-				    std::string &err);
+	    const std::string &api_key, provider_test_result_t &result,
+	    std::string &err);
 	// Probe a provider's non-generation account endpoint when one is known.
 	// This deliberately never sends a chat/completion request, avoiding token
 	// charges and preserving scarce model RPM for the actual coding task.
 	static bool probe_usage_limits(const provider_config_t &provider,
-				       const std::string &api_key,
-				       provider_usage_probe_t &result,
-				       std::string &err);
+	    const std::string &api_key, provider_usage_probe_t &result,
+	    std::string &err);
 	static bool complete(const provider_config_t &provider,
-			     const std::string &api_key,
-			     const completion_request_t &input,
-			     completion_result_t &result, std::string &err,
-			     completion_stream_observer_t *observer = NULL);
+	    const std::string &api_key, const completion_request_t &input,
+	    completion_result_t &result, std::string &err,
+	    completion_stream_observer_t *observer = NULL);
 	// Responses lifecycle primitives used by durable long-running coding tasks.
 	// The methods reject non-Responses providers and never expose credentials in
 	// diagnostics. retrieve_response waits only for one HTTP operation; callers
 	// remain responsible for bounded, cancellable polling.
 	static bool retrieve_response(const provider_config_t &provider,
-				      const std::string &api_key,
-				      const std::string &response_id,
-				      completion_result_t &result,
-				      std::string &err);
+	    const std::string &api_key, const std::string &response_id,
+	    completion_result_t &result, std::string &err);
 	static bool cancel_response(const provider_config_t &provider,
-				    const std::string &api_key,
-				    const std::string &response_id,
-				    completion_result_t &result,
-				    std::string &err);
-	static bool compact_response(
-		const provider_config_t &provider, const std::string &api_key,
-		const std::string &previous_response_id,
-		const std::string &instructions, std::string &compaction_id,
-		std::string &compacted_output_json, long long &input_tokens,
-		long long &output_tokens, std::string &err);
+	    const std::string &api_key, const std::string &response_id,
+	    completion_result_t &result, std::string &err);
+	static bool compact_response(const provider_config_t &provider,
+	    const std::string &api_key, const std::string &previous_response_id,
+	    const std::string &instructions, std::string &compaction_id,
+	    std::string &compacted_output_json, long long &input_tokens,
+	    long long &output_tokens, std::string &err);
 
 	// Parses a provider response without network access. Kept public so the
 	// protocol adapters can be regression-tested with recorded minimal fixtures.
 	static bool parse_completion_response(const provider_config_t &provider,
-					      const std::string &body,
-					      completion_result_t &result,
-					      std::string &err);
+	    const std::string &body, completion_result_t &result,
+	    std::string &err);
 	// Offline SSE/NDJSON parser used by regression tests and replay diagnostics.
-	static bool
-	parse_stream_response(const provider_config_t &provider,
-			      const std::string &body,
-			      completion_result_t &result, std::string &err,
-			      completion_stream_observer_t *observer = NULL);
+	static bool parse_stream_response(const provider_config_t &provider,
+	    const std::string &body, completion_result_t &result,
+	    std::string &err, completion_stream_observer_t *observer = NULL);
 	// Offline request-shape regression hook. The returned JSON can contain
 	// prompts and image bytes and therefore must never be logged by callers.
-	static bool
-	serialize_completion_request(const provider_config_t &provider,
-				     const completion_request_t &input,
-				     bool stream, std::string &payload);
+	static bool serialize_completion_request(
+	    const provider_config_t &provider,
+	    const completion_request_t &input, bool stream,
+	    std::string &payload);
 	// Convert a non-2xx provider response into a bounded, UI-safe diagnostic.
 	// Only common error fields are extracted from JSON; the raw provider body is
 	// deliberately never returned because it may contain sensitive information.
-	static std::string
-	describe_http_error(int status, const std::string &body,
-			    const std::string &request_id = "",
-			    const std::string &retry_after = "",
-			    const std::string &reset_requests = "",
-			    const std::string &reset_tokens = "");
-	static const char *
-	error_category_name(provider_error_category_t category);
+	static std::string describe_http_error(int status,
+	    const std::string &body, const std::string &request_id = "",
+	    const std::string &retry_after = "",
+	    const std::string &reset_requests = "",
+	    const std::string &reset_tokens = "");
+	static const char *error_category_name(
+	    provider_error_category_t category);
 };
 
 } // namespace ai

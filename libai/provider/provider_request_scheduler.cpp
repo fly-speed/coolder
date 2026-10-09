@@ -36,14 +36,14 @@ std::map<std::string, provider_queue_state_t> g_provider_queues;
 long long monotonic_ms()
 {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
-		       std::chrono::steady_clock::now().time_since_epoch())
-		.count();
+	    std::chrono::steady_clock::now().time_since_epoch())
+	    .count();
 }
 
 void erase_waiter(provider_queue_state_t &state, unsigned long long ticket)
 {
 	for (std::deque<unsigned long long>::iterator it =
-		     state.waiters.begin();
+	         state.waiters.begin();
 	     it != state.waiters.end(); ++it) {
 		if (*it != ticket)
 			continue;
@@ -55,10 +55,8 @@ void erase_waiter(provider_queue_state_t &state, unsigned long long ticket)
 } // namespace
 
 bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
-					   provider_request_cancel_fn cancelled,
-					   void *cancel_context,
-					   provider_request_permit_t &permit,
-					   std::string &err)
+    provider_request_cancel_fn cancelled, void *cancel_context,
+    provider_request_permit_t &permit, std::string &err)
 {
 	permit = provider_request_permit_t();
 	if (opaque_key.empty()) {
@@ -68,7 +66,7 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 	unsigned long long ticket = 0;
 	{
 		std::lock_guard<webcool::mutex> guard(
-			g_provider_scheduler_mutex);
+		    g_provider_scheduler_mutex);
 		provider_queue_state_t &state = g_provider_queues[opaque_key];
 		ticket = state.next_ticket++;
 		state.waiters.push_back(ticket);
@@ -77,9 +75,9 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 	for (;;) {
 		if (cancelled != NULL && cancelled(cancel_context)) {
 			std::lock_guard<webcool::mutex> guard(
-				g_provider_scheduler_mutex);
+			    g_provider_scheduler_mutex);
 			std::map<std::string, provider_queue_state_t>::iterator
-				found = g_provider_queues.find(opaque_key);
+			    found = g_provider_queues.find(opaque_key);
 			if (found != g_provider_queues.end())
 				erase_waiter(found->second, ticket);
 			err = "AI provider scheduling wait cancelled";
@@ -88,15 +86,14 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 		unsigned long wait_ms = 25;
 		{
 			std::lock_guard<webcool::mutex> guard(
-				g_provider_scheduler_mutex);
+			    g_provider_scheduler_mutex);
 			provider_queue_state_t &state =
-				g_provider_queues[opaque_key];
+			    g_provider_queues[opaque_key];
 			const long long now = monotonic_ms();
 			const bool first = !state.waiters.empty() &&
-					   state.waiters.front() == ticket;
-			const bool below_limit =
-				state.learned_limit == 0 ||
-				state.in_flight < state.learned_limit;
+			    state.waiters.front() == ticket;
+			const bool below_limit = state.learned_limit == 0 ||
+			    state.in_flight < state.learned_limit;
 			if (first && below_limit &&
 			    now >= state.cooldown_until_ms) {
 				state.waiters.pop_front();
@@ -108,9 +105,8 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 			}
 			if (state.cooldown_until_ms > now) {
 				wait_ms = static_cast<unsigned long>(
-					std::min<long long>(
-						250,
-						state.cooldown_until_ms - now));
+				    std::min<long long>(
+				        250, state.cooldown_until_ms - now));
 			}
 		}
 		// Provider calls execute in ACL fibers. A short cooperative delay keeps
@@ -120,8 +116,7 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 }
 
 void provider_request_scheduler_t::finish(provider_request_permit_t &permit,
-					  int http_status, bool retryable,
-					  unsigned long retry_after_seconds)
+    int http_status, bool retryable, unsigned long retry_after_seconds)
 {
 	if (!permit.active || permit.key.empty())
 		return;
@@ -135,16 +130,15 @@ void provider_request_scheduler_t::finish(provider_request_permit_t &permit,
 		// concurrent pressure by one (never below one) and share Retry-After with
 		// every waiting user of the same account.
 		state.learned_limit =
-			observed_in_flight > 1 ? observed_in_flight - 1 : 1;
+		    observed_in_flight > 1 ? observed_in_flight - 1 : 1;
 		state.successful_since_limit = 0;
 		const unsigned long bounded_seconds =
-			std::max(1UL, std::min(60UL, retry_after_seconds));
-		state.cooldown_until_ms = std::max(
-			state.cooldown_until_ms,
-			monotonic_ms() +
-				static_cast<long long>(bounded_seconds) * 1000);
+		    std::max(1UL, std::min(60UL, retry_after_seconds));
+		state.cooldown_until_ms = std::max(state.cooldown_until_ms,
+		    monotonic_ms() +
+		        static_cast<long long>(bounded_seconds) * 1000);
 	} else if (http_status >= 200 && http_status < 300 &&
-		   state.learned_limit > 0) {
+	    state.learned_limit > 0) {
 		// Recover cautiously after sustained success. Four successful windows
 		// remove the learned cap entirely; a later 429 will immediately relearn it.
 		++state.successful_since_limit;
@@ -159,20 +153,20 @@ void provider_request_scheduler_t::finish(provider_request_permit_t &permit,
 	permit.key.clear();
 }
 
-provider_request_scheduler_snapshot_t
-provider_request_scheduler_t::inspect(const std::string &opaque_key)
+provider_request_scheduler_snapshot_t provider_request_scheduler_t::inspect(
+    const std::string &opaque_key)
 {
 	provider_request_scheduler_snapshot_t snapshot;
 	std::lock_guard<webcool::mutex> guard(g_provider_scheduler_mutex);
 	const std::map<std::string, provider_queue_state_t>::const_iterator
-		found = g_provider_queues.find(opaque_key);
+	    found = g_provider_queues.find(opaque_key);
 	if (found == g_provider_queues.end())
 		return snapshot;
 	snapshot.in_flight = found->second.in_flight;
 	snapshot.waiting = found->second.waiters.size();
 	snapshot.learned_concurrency_limit = found->second.learned_limit;
 	snapshot.cooldown_remaining_ms = std::max<long long>(
-		0, found->second.cooldown_until_ms - monotonic_ms());
+	    0, found->second.cooldown_until_ms - monotonic_ms());
 	return snapshot;
 }
 

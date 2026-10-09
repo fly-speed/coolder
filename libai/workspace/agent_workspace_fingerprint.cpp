@@ -20,11 +20,10 @@ std::string fingerprint_stat(const struct stat &value)
 	const auto mt = value.st_mtim, ct = value.st_ctim;
 #endif
 	return std::to_string(value.st_dev) + ":" +
-	       std::to_string(value.st_ino) + ":" +
-	       std::to_string(value.st_mode) + ":" +
-	       std::to_string(value.st_size) + ":" + std::to_string(mt.tv_sec) +
-	       ":" + std::to_string(mt.tv_nsec) + ":" +
-	       std::to_string(ct.tv_sec) + ":" + std::to_string(ct.tv_nsec);
+	    std::to_string(value.st_ino) + ":" + std::to_string(value.st_mode) +
+	    ":" + std::to_string(value.st_size) + ":" +
+	    std::to_string(mt.tv_sec) + ":" + std::to_string(mt.tv_nsec) + ":" +
+	    std::to_string(ct.tv_sec) + ":" + std::to_string(ct.tv_nsec);
 }
 
 thread_local std::map<std::string, fingerprint_record_t> fingerprint_cache;
@@ -43,8 +42,7 @@ struct fingerprint_scan_t {
 	std::vector<std::string> included_paths;
 	fingerprint_budget_t budget;
 	bool file(int parent, const std::string &name,
-		  const struct stat &expected, std::string &digest,
-		  std::string &err)
+	    const struct stat &expected, std::string &digest, std::string &err)
 	{
 		if (expected.st_size > 512LL * 1024 * 1024) {
 			err = "fingerprint file size limit";
@@ -62,9 +60,8 @@ struct fingerprint_scan_t {
 			digest = found->second.digest;
 			return true;
 		}
-		fingerprint_fd_t input(
-			openat(parent, name.c_str(),
-			       O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC));
+		fingerprint_fd_t input(openat(parent, name.c_str(),
+		    O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC));
 		struct stat before, after;
 		if (input.fd < 0 || fstat(input.fd, &before) != 0 ||
 		    !S_ISREG(before.st_mode) ||
@@ -84,7 +81,7 @@ struct fingerprint_scan_t {
 		while (ok) {
 			budget.checkpoint();
 			const ssize_t count =
-				::read(input.fd, buffer, sizeof(buffer));
+			    ::read(input.fd, buffer, sizeof(buffer));
 			if (count < 0 && errno == EINTR)
 				continue;
 			if (count < 0) {
@@ -95,21 +92,20 @@ struct fingerprint_scan_t {
 				break;
 			if (total < 8192 &&
 			    memchr(buffer, 0,
-				   std::min<size_t>(
-					   static_cast<size_t>(count),
-					   8192 - static_cast<size_t>(total))))
+			        std::min<size_t>(static_cast<size_t>(count),
+			            8192 - static_cast<size_t>(total))))
 				binary_prefix = true;
 			total += count;
 			ok = total <= expected.st_size &&
-			     EVP_DigestUpdate(context, buffer,
-					      static_cast<size_t>(count)) == 1;
+			    EVP_DigestUpdate(context, buffer,
+			        static_cast<size_t>(count)) == 1;
 		}
 		unsigned char hash[EVP_MAX_MD_SIZE];
 		unsigned int length = 0;
 		ok = ok && total == expected.st_size &&
-		     fstat(input.fd, &after) == 0 &&
-		     fingerprint_stat(after) == identity &&
-		     EVP_DigestFinal_ex(context, hash, &length) == 1;
+		    fstat(input.fd, &after) == 0 &&
+		    fingerprint_stat(after) == identity &&
+		    EVP_DigestFinal_ex(context, hash, &length) == 1;
 		EVP_MD_CTX_free(context);
 		if (!ok) {
 			err = "workspace file changed during fingerprint";
@@ -121,139 +117,144 @@ struct fingerprint_scan_t {
 			digest += hex[hash[i] >> 4];
 			digest += hex[hash[i] & 15];
 		}
-		if (precise) {
-			if (cache.size() >= 32768)
-				cache.clear();
-			auto &record = cache[identity];
-			record.digest = digest;
-			record.binary_prefix = binary_prefix;
-		}
+		if (!precise)
+			return true;
+		if (cache.size() >= 32768)
+			cache.clear();
+		auto &record = cache[identity];
+		record.digest = digest;
+		record.binary_prefix = binary_prefix;
+
 		return true;
 	}
 	bool directory(int fd, const std::string &relative, size_t depth,
-		       std::string &err)
-	{
-		if (++directories > 16384 || depth > 128) {
-			err = "fingerprint directory limit";
-			return false;
+	    std::string &err);
+};
+
+static bool included_fingerprint_path(
+    const std::vector<std::string> &included_paths, const std::string &path)
+{
+	bool selected = false;
+	for (const auto &included : included_paths) {
+		if (!(dependency_contains(included, path) ||
+		        dependency_contains(path, included)))
+			continue;
+
+		selected = true;
+		break;
+	}
+
+	return selected;
+}
+
+inline bool fingerprint_scan_t::directory(
+    int fd, const std::string &relative, size_t depth, std::string &err)
+{
+	if (++directories > 16384 || depth > 128) {
+		err = "fingerprint directory limit";
+		return false;
+	}
+	struct stat before, after;
+	if (fstat(fd, &before) != 0)
+		return false;
+	DIR *stream = fdopendir(dup(fd));
+	if (!stream) {
+		err = "cannot enumerate fingerprint directory";
+		return false;
+	}
+	std::vector<std::string> names;
+	bool complete = true;
+	while (true) {
+		errno = 0;
+		dirent *entry = readdir(stream);
+		if (!entry) {
+			complete = errno == 0;
+			break;
 		}
-		struct stat before, after;
-		if (fstat(fd, &before) != 0)
-			return false;
-		DIR *stream = fdopendir(dup(fd));
-		if (!stream) {
-			err = "cannot enumerate fingerprint directory";
-			return false;
-		}
-		std::vector<std::string> names;
-		bool complete = true;
-		while (true) {
-			errno = 0;
-			dirent *entry = readdir(stream);
-			if (!entry) {
-				complete = errno == 0;
-				break;
-			}
-			const std::string name = entry->d_name;
-			if (name == "." || name == ".." ||
-			    (relative.empty() && name == ".webcool-build"))
+		const std::string name = entry->d_name;
+		if (name == "." || name == ".." ||
+		    (relative.empty() && name == ".webcool-build"))
+			continue;
+		const std::string path =
+		    relative.empty() ? name : relative + "/" + name;
+		const std::string logical =
+		    logical_root.empty() ? path : logical_root + "/" + path;
+		if (agent_workspace_t::path_is_sensitive(logical) ||
+		    !dependency_selected(dependencies, path))
+			continue;
+		if (!included_paths.empty()) {
+			const bool selected =
+			    included_fingerprint_path(included_paths, path);
+			if (!selected)
 				continue;
-			const std::string path =
-				relative.empty() ? name : relative + "/" + name;
-			const std::string logical =
-				logical_root.empty() ?
-					path :
-					logical_root + "/" + path;
-			if (agent_workspace_t::path_is_sensitive(logical) ||
-			    !dependency_selected(dependencies, path))
-				continue;
-			if (!included_paths.empty()) {
-				bool selected = false;
-				for (const auto &included : included_paths)
-					if (dependency_contains(included,
-								path) ||
-					    dependency_contains(path,
-								included)) {
-						selected = true;
-						break;
-					}
-				if (!selected)
-					continue;
-			}
-			names.push_back(name);
-			budget.checkpoint();
-			if (names.size() >= 2000) {
-				complete = false;
-				break;
-			}
 		}
-		closedir(stream);
-		if (!complete) {
-			err = "fingerprint directory incomplete or exceeds limit";
+		names.push_back(name);
+		budget.checkpoint();
+		if (!(names.size() >= 2000))
+			continue;
+		complete = false;
+		break;
+	}
+	closedir(stream);
+	if (!complete) {
+		err = "fingerprint directory incomplete or exceeds limit";
+		return false;
+	}
+	std::sort(names.begin(), names.end());
+	for (const auto &name : names) {
+		budget.checkpoint();
+		struct stat st;
+		if (fstatat(fd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
+			err = "workspace entry changed during fingerprint";
 			return false;
 		}
-		std::sort(names.begin(), names.end());
-		for (const auto &name : names) {
-			budget.checkpoint();
-			struct stat st;
-			if (fstatat(fd, name.c_str(), &st,
-				    AT_SYMLINK_NOFOLLOW) != 0) {
-				err = "workspace entry changed during fingerprint";
+		if (S_ISLNK(st.st_mode))
+			continue;
+		const std::string path =
+		    relative.empty() ? name : relative + "/" + name;
+		evidence += std::to_string(path.size()) + ":" + path + ":" +
+		    std::to_string(
+		        !included_paths.empty() && S_ISDIR(st.st_mode) ?
+		            0 :
+		            st.st_mode & 0777) +
+		    "\n";
+		if (S_ISDIR(st.st_mode)) {
+			fingerprint_fd_t child(openat(fd, name.c_str(),
+			    O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
+			if (!(child.fd < 0 ||
+			        !directory(child.fd, path, depth + 1, err)))
+				continue;
+			return false;
+		} else {
+			bytes += st.st_size;
+			if (!S_ISREG(st.st_mode) ||
+			    ++files >
+			        (included_paths.empty() ? 100000 : 20000) ||
+			    bytes > (included_paths.empty() ? 4LL : 2LL) *
+			            1024 * 1024 * 1024) {
+				err = "fingerprint file limit or unsafe entry";
 				return false;
 			}
-			if (S_ISLNK(st.st_mode))
-				continue;
-			const std::string path =
-				relative.empty() ? name : relative + "/" + name;
-			evidence +=
-				std::to_string(path.size()) + ":" + path + ":" +
-				std::to_string(
-					!included_paths.empty() &&
-							S_ISDIR(st.st_mode) ?
-						0 :
-						st.st_mode & 0777) +
-				"\n";
-			if (S_ISDIR(st.st_mode)) {
-				fingerprint_fd_t child(
-					openat(fd, name.c_str(),
-					       O_RDONLY | O_DIRECTORY |
-						       O_NOFOLLOW | O_CLOEXEC));
-				if (child.fd < 0 ||
-				    !directory(child.fd, path, depth + 1, err))
-					return false;
-			} else {
-				bytes += st.st_size;
-				if (!S_ISREG(st.st_mode) ||
-				    ++files > (included_paths.empty() ?
-						       100000 :
-						       20000) ||
-				    bytes > (included_paths.empty() ? 4LL :
-								      2LL) *
-						    1024 * 1024 * 1024) {
-					err = "fingerprint file limit or unsafe entry";
-					return false;
-				}
-				std::string hash;
-				if (!file(fd, name, st, hash, err))
-					return false;
-				evidence += hash + "\n";
-			}
+			std::string hash;
+			if (!file(fd, name, st, hash, err))
+				return false;
+			evidence += hash + "\n";
 		}
-		if (fstat(fd, &after) != 0 ||
-		    fingerprint_stat(before) != fingerprint_stat(after)) {
-			err = "workspace directory changed during fingerprint";
-			return false;
-		}
-		return true;
 	}
-};
+	if (!(fstat(fd, &after) != 0 ||
+	        fingerprint_stat(before) != fingerprint_stat(after)))
+		return true;
+	err = "workspace directory changed during fingerprint";
+	return false;
+}
+
 #endif
 
 } // namespace
 
-bool agent_workspace_t::tree_sha256(
-	const std::string &directory, std::string &digest, std::string &err,
-	const std::vector<std::string> &included_paths) const
+bool agent_workspace_t::tree_sha256(const std::string &directory,
+    std::string &digest, std::string &err,
+    const std::vector<std::string> &included_paths) const
 {
 	digest.clear();
 #ifndef _WIN32
@@ -261,9 +262,8 @@ bool agent_workspace_t::tree_sha256(
 	if (!normalize_path(directory, normalized, true, err) ||
 	    !resolve_existing(normalized, absolute, err))
 		return false;
-	fingerprint_fd_t root(open(absolute.c_str(), O_RDONLY | O_DIRECTORY |
-							     O_NOFOLLOW |
-							     O_CLOEXEC));
+	fingerprint_fd_t root(open(
+	    absolute.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
 	if (root.fd < 0) {
 		err = "cannot open fingerprint root";
 		return false;
@@ -295,15 +295,14 @@ bool agent_workspace_t::tree_sha256(
 			return false;
 		for (const auto &entry : entries) {
 			budget.checkpoint();
-			const std::string relative =
-				directory.empty() ?
-					entry.path :
-					entry.path.substr(directory.size() + 1);
+			const std::string relative = directory.empty() ?
+			    entry.path :
+			    entry.path.substr(directory.size() + 1);
 			// Private build output is disposable, never part of the source baseline.
 			if (relative == ".webcool-build")
 				continue;
 			evidence += std::to_string(relative.size()) + ":" +
-				    relative + "\n";
+			    relative + "\n";
 			if (entry.directory) {
 				directories.push_back(entry.path);
 				continue;
@@ -326,7 +325,7 @@ bool agent_workspace_t::tree_sha256(
 }
 
 bool agent_workspace_t::file_sha256(const std::string &relative_file,
-				    std::string &digest, std::string &err) const
+    std::string &digest, std::string &err) const
 {
 	digest.clear();
 	std::string absolute;
@@ -348,16 +347,16 @@ bool agent_workspace_t::file_sha256(const std::string &relative_file,
 		const auto mt = value.st_mtim, ct = value.st_ctim;
 #endif
 		return std::to_string(value.st_dev) + ":" +
-		       std::to_string(value.st_ino) + ":" +
-		       std::to_string(value.st_size) + ":" +
-		       std::to_string(mt.tv_sec) + ":" +
-		       std::to_string(mt.tv_nsec) + ":" +
-		       std::to_string(ct.tv_sec) + ":" +
-		       std::to_string(ct.tv_nsec);
+		    std::to_string(value.st_ino) + ":" +
+		    std::to_string(value.st_size) + ":" +
+		    std::to_string(mt.tv_sec) + ":" +
+		    std::to_string(mt.tv_nsec) + ":" +
+		    std::to_string(ct.tv_sec) + ":" +
+		    std::to_string(ct.tv_nsec);
 	};
 	static thread_local std::map<std::string,
-				     std::pair<std::string, std::string>>
-		cached;
+	    std::pair<std::string, std::string>>
+	    cached;
 	const std::string identity = stamp(st);
 	const auto found = cached.find(absolute);
 	if (found != cached.end() && found->second.first == identity) {
@@ -385,13 +384,13 @@ bool agent_workspace_t::file_sha256(const std::string &relative_file,
 		const std::streamsize count = input.gcount();
 		bytes += count;
 		ok = bytes <= 512LL * 1024 * 1024 &&
-		     EVP_DigestUpdate(context, buffer,
-				      static_cast<size_t>(count)) == 1;
+		    EVP_DigestUpdate(
+		        context, buffer, static_cast<size_t>(count)) == 1;
 	}
 	unsigned char hash[EVP_MAX_MD_SIZE];
 	unsigned int length = 0;
 	ok = ok && input.eof() && bytes == st.st_size &&
-	     EVP_DigestFinal_ex(context, hash, &length) == 1;
+	    EVP_DigestFinal_ex(context, hash, &length) == 1;
 	EVP_MD_CTX_free(context);
 	if (!ok) {
 		err = "workspace fingerprint read failed or file changed";

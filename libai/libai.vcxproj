@@ -472,4 +472,27 @@
     <ClInclude Include="workspace\workspace_patch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <ClCompile Include="project\project_toolchain_build.cpp" />
+    <ClInclude Include="project\project_toolchain_internal.h" />
+    <ClCompile Include="project\project_toolchain_languages.cpp" />
+    <ClInclude Include="prompt\prompt_types.h" />
+    <ClCompile Include="provider\ai_provider_records.cpp" />
+    <ClCompile Include="provider\ai_provider_secrets.cpp" />
+    <ClCompile Include="provider\ai_provider_service.cpp" />
+    <ClInclude Include="provider\ai_provider_store_internal.h" />
+    <ClInclude Include="provider\ai_provider_transport_internal.h" />
+    <ClCompile Include="provider\ai_provider_transport_stream.cpp" />
+    <ClCompile Include="runtime\ai_agent_events.cpp" />
+    <ClCompile Include="runtime\ai_agent_results.cpp" />
+    <ClCompile Include="runtime\ai_agent_validation.cpp" />
+    <ClInclude Include="sandbox\program_sandbox_internal.h" />
+    <ClCompile Include="sandbox\program_sandbox_process.cpp" />
+    <ClCompile Include="storage\agent_draft_dependencies.cpp" />
+    <ClCompile Include="storage\agent_draft_files.cpp" />
+    <ClInclude Include="storage\agent_draft_store_internal.h" />
+    <ClCompile Include="workspace\workspace_change_journal.cpp" />
+    <ClCompile Include="workspace\workspace_change_records.cpp" />
+    <ClInclude Include="workspace\workspace_change_set_internal.h" />
+  </ItemGroup>
 </Project>

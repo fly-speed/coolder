@@ -26,60 +26,59 @@ std::map<std::string, long long> g_provider_output_limits;
 std::string provider_output_limit_key(const provider_config_t &provider)
 {
 	return provider.output_limit_cache_directory + "\n" + provider.id +
-	       "\n" + provider.protocol + "\n" + provider.base_url + "\n" +
-	       provider.model + "\n" + provider.openai_organization + "\n" +
-	       provider.openai_project;
+	    "\n" + provider.protocol + "\n" + provider.base_url + "\n" +
+	    provider.model + "\n" + provider.openai_organization + "\n" +
+	    provider.openai_project;
 }
 
-long long effective_provider_output_limit(const provider_config_t &provider,
-					  long long requested)
+long long effective_provider_output_limit(
+    const provider_config_t &provider, long long requested)
 {
 	std::lock_guard<webcool::mutex> guard(g_provider_output_limit_mutex);
 	const std::string key = provider_output_limit_key(provider);
 	auto found = g_provider_output_limits.find(key);
-	if (found == g_provider_output_limits.end()) {
-		const long long saved = load_output_limit_cache(
-			output_limit_cache_path(
-				provider.output_limit_cache_directory, key),
-			std::time(NULL));
-		found = g_provider_output_limits
-				.insert(std::make_pair(key, saved))
-				.first;
-	}
+	if (!(found == g_provider_output_limits.end()))
+		return found->second > 0 ? std::min(requested, found->second) :
+		                           requested;
+	const long long saved = load_output_limit_cache(
+	    output_limit_cache_path(provider.output_limit_cache_directory, key),
+	    std::time(NULL));
+	found =
+	    g_provider_output_limits.insert(std::make_pair(key, saved)).first;
+
 	return found->second > 0 ? std::min(requested, found->second) :
-				   requested;
+	                           requested;
 }
 
-void remember_provider_output_limit(const provider_config_t &provider,
-				    long long limit)
+void remember_provider_output_limit(
+    const provider_config_t &provider, long long limit)
 {
 	std::lock_guard<webcool::mutex> guard(g_provider_output_limit_mutex);
 	long long &saved =
-		g_provider_output_limits[provider_output_limit_key(provider)];
+	    g_provider_output_limits[provider_output_limit_key(provider)];
 	if (saved == 0 || limit < saved)
 		saved = limit;
 	if (!save_output_limit_cache(
-		    output_limit_cache_path(
-			    provider.output_limit_cache_directory,
-			    provider_output_limit_key(provider)),
-		    saved, std::time(NULL)))
+	        output_limit_cache_path(provider.output_limit_cache_directory,
+	            provider_output_limit_key(provider)),
+	        saved, std::time(NULL)))
 		ai_log_error("provider.client", "save-output-limit",
-			     "Cannot persist learned output limit");
+		    "Cannot persist learned output limit");
 }
 
 bool ends_with(const std::string &value, const std::string &suffix)
 {
 	return value.size() >= suffix.size() &&
-	       value.compare(value.size() - suffix.size(), suffix.size(),
-			     suffix) == 0;
+	    value.compare(
+	        value.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 std::string lowercase_ascii(std::string value)
 {
 	for (size_t i = 0; i < value.size(); ++i) {
-		if (value[i] >= 'A' && value[i] <= 'Z') {
-			value[i] = static_cast<char>(value[i] - 'A' + 'a');
-		}
+		if (!(value[i] >= 'A' && value[i] <= 'Z'))
+			continue;
+		value[i] = static_cast<char>(value[i] - 'A' + 'a');
 	}
 	return value;
 }
@@ -89,19 +88,19 @@ bool kimi_model_is(const provider_config_t &provider, const char *prefix)
 	const std::string model = lowercase_ascii(provider.model);
 	const std::string expected(prefix == NULL ? "" : prefix);
 	return !expected.empty() &&
-	       model.compare(0, expected.size(), expected) == 0;
+	    model.compare(0, expected.size(), expected) == 0;
 }
 
 bool kimi_model_always_thinks(const provider_config_t &provider)
 {
 	return kimi_model_is(provider, "kimi-k2.7-code") ||
-	       kimi_model_is(provider, "kimi-k3");
+	    kimi_model_is(provider, "kimi-k3");
 }
 
 bool model_name_contains(const provider_config_t &provider, const char *needle)
 {
 	return lowercase_ascii(provider.model).find(needle ? needle : "") !=
-	       std::string::npos;
+	    std::string::npos;
 }
 
 bool deepseek_responses_endpoint(const provider_config_t &provider)
@@ -116,8 +115,8 @@ bool deepseek_responses_endpoint(const provider_config_t &provider)
 	// Match the official host (with an optional path such as /v1), but avoid
 	// classifying unrelated hosts whose query/path merely mentions DeepSeek.
 	return base.find("://api.deepseek.com") != std::string::npos ||
-	       base.compare(0, strlen("api.deepseek.com"),
-			    "api.deepseek.com") == 0;
+	    base.compare(0, strlen("api.deepseek.com"), "api.deepseek.com") ==
+	    0;
 }
 
 bool kimi_responses_endpoint(const provider_config_t &provider)
@@ -133,7 +132,7 @@ bool kimi_responses_endpoint(const provider_config_t &provider)
 		host.erase(0, scheme + 3);
 	host = host.substr(0, host.find_first_of(":/?#"));
 	return host == "api.kimi.com" || host == "api.moonshot.cn" ||
-	       host == "api.moonshot.ai";
+	    host == "api.moonshot.ai";
 }
 
 bool qwen_responses_endpoint(const provider_config_t &provider)
@@ -160,14 +159,14 @@ bool qwen_responses_endpoint(const provider_config_t &provider)
 	host = host.substr(0, host.find_first_of(":/?#"));
 	const std::string maas_suffix = ".maas.aliyuncs.com";
 	return host == "dashscope.aliyuncs.com" ||
-	       host == "dashscope-intl.aliyuncs.com" ||
-	       (host.size() > maas_suffix.size() &&
-		host.compare(host.size() - maas_suffix.size(),
-			     maas_suffix.size(), maas_suffix) == 0);
+	    host == "dashscope-intl.aliyuncs.com" ||
+	    (host.size() > maas_suffix.size() &&
+	        host.compare(host.size() - maas_suffix.size(),
+	            maas_suffix.size(), maas_suffix) == 0);
 }
 
-std::string responses_reasoning_effort(const provider_config_t &provider,
-				       const std::string &requested)
+std::string responses_reasoning_effort(
+    const provider_config_t &provider, const std::string &requested)
 {
 	if (requested.empty())
 		return requested;
@@ -182,14 +181,15 @@ std::string responses_reasoning_effort(const provider_config_t &provider,
 	    model_name_contains(provider, "gpt-5.2-codex") ||
 	    model_name_contains(provider, "gpt-5.1-codex") ||
 	    (model_name_contains(provider, "gpt-5-codex") &&
-	     !model_name_contains(provider, "gpt-5.6")))
+	        !model_name_contains(provider, "gpt-5.6")))
 		return "low";
 	if (provider.responses_min_reasoning_effort == "none")
 		return "none";
 	if (qwen_responses_endpoint(provider))
 		return "none";
-	if (model_name_contains(provider, "deepseek"))
-		return "none";
+	if (!model_name_contains(provider, "deepseek"))
+		return model_name_contains(provider, "gpt-5.6") ? "none" : "";
+	return "none";
 	// Unknown official/compatible deployments are safer when the optional field
 	// is omitted: the model applies its supported default instead of rejecting the
 	// entire recovery request.
@@ -204,8 +204,8 @@ bool is_openai_reasoning_protocol(const provider_config_t &provider)
 	// after the stream has positively shown a reasoning-only, length-truncated
 	// response, which is stronger evidence than any model-name convention.
 	return provider.protocol == "openai_responses" ||
-	       provider.protocol == "openai_chat" ||
-	       provider.protocol == "openai_compatible";
+	    provider.protocol == "openai_chat" ||
+	    provider.protocol == "openai_compatible";
 }
 
 bool reasoning_budget_exhausted(const std::string &err)
@@ -214,9 +214,9 @@ bool reasoning_budget_exhausted(const std::string &err)
 	// Responses endpoints terminate with incomplete_details.reason. Treat both
 	// wire representations as the same recoverable output-budget condition.
 	return err.find("used the entire output-token budget for reasoning") !=
-		       std::string::npos ||
-	       err.find("response incomplete: max_output_tokens") !=
-		       std::string::npos;
+	    std::string::npos ||
+	    err.find("response incomplete: max_output_tokens") !=
+	    std::string::npos;
 }
 
 std::string trim_slashes(std::string value)
@@ -231,14 +231,14 @@ std::string test_url(const provider_config_t &provider)
 	const std::string base = trim_slashes(provider.base_url);
 	if (provider.protocol == "ollama") {
 		return ends_with(base, "/api") ? base + "/tags" :
-						 base + "/api/tags";
+		                                 base + "/api/tags";
 	}
-	if (provider.protocol == "gemini_native") {
-		return (ends_with(base, "/v1beta") || ends_with(base, "/v1")) ?
-			       base + "/models?pageSize=1" :
-			       base + "/v1beta/models?pageSize=1";
-	}
-	return ends_with(base, "/v1") ? base + "/models" : base + "/v1/models";
+	if (!(provider.protocol == "gemini_native"))
+		return ends_with(base, "/v1") ? base + "/models" :
+		                                base + "/v1/models";
+	return (ends_with(base, "/v1beta") || ends_with(base, "/v1")) ?
+	    base + "/models?pageSize=1" :
+	    base + "/v1beta/models?pageSize=1";
 }
 
 std::string kimi_balance_url(const provider_config_t &provider)
@@ -248,10 +248,10 @@ std::string kimi_balance_url(const provider_config_t &provider)
 	// include /coding/v1; the account API lives at the host-level /v1 path.
 	const size_t scheme = base.find("://");
 	const size_t path = scheme == std::string::npos ?
-				    std::string::npos :
-				    base.find('/', scheme + 3);
+	    std::string::npos :
+	    base.find('/', scheme + 3);
 	const std::string origin =
-		path == std::string::npos ? base : base.substr(0, path);
+	    path == std::string::npos ? base : base.substr(0, path);
 	return origin + "/v1/users/me/balance";
 }
 
@@ -279,44 +279,43 @@ std::string completion_url(const provider_config_t &provider, bool stream)
 	const std::string base = trim_slashes(provider.base_url);
 	if (provider.protocol == "ollama") {
 		return ends_with(base, "/api") ? base + "/chat" :
-						 base + "/api/chat";
+		                                 base + "/api/chat";
 	}
 	if (provider.protocol == "gemini_native") {
 		const std::string prefix =
-			(ends_with(base, "/v1beta") || ends_with(base, "/v1")) ?
-				base :
-				base + "/v1beta";
+		    (ends_with(base, "/v1beta") || ends_with(base, "/v1")) ?
+		    base :
+		    base + "/v1beta";
 		return prefix + "/models/" +
-		       percent_encode_path(provider.model) +
-		       (stream ? ":streamGenerateContent?alt=sse" :
-				 ":generateContent");
+		    percent_encode_path(provider.model) +
+		    (stream ? ":streamGenerateContent?alt=sse" :
+		              ":generateContent");
 	}
 	if (provider.protocol == "anthropic_messages") {
 		return ends_with(base, "/v1") ? base + "/messages" :
-						base + "/v1/messages";
+		                                base + "/v1/messages";
 	}
-	if (provider.protocol == "openai_responses") {
-		return ends_with(base, "/v1") ? base + "/responses" :
-						base + "/v1/responses";
-	}
-	return ends_with(base, "/v1") ? base + "/chat/completions" :
-					base + "/v1/chat/completions";
+	if (!(provider.protocol == "openai_responses"))
+		return ends_with(base, "/v1") ? base + "/chat/completions" :
+		                                base + "/v1/chat/completions";
+	return ends_with(base, "/v1") ? base + "/responses" :
+	                                base + "/v1/responses";
 }
 
 std::string responses_item_url(const provider_config_t &provider,
-			       const std::string &response_id, bool cancel)
+    const std::string &response_id, bool cancel)
 {
 	const std::string base = trim_slashes(provider.base_url);
 	const std::string prefix = ends_with(base, "/v1") ? base : base + "/v1";
 	return prefix + "/responses/" + percent_encode_path(response_id) +
-	       (cancel ? "/cancel" : "");
+	    (cancel ? "/cancel" : "");
 }
 
 std::string responses_compact_url(const provider_config_t &provider)
 {
 	const std::string base = trim_slashes(provider.base_url);
 	return (ends_with(base, "/v1") ? base : base + "/v1") +
-	       "/responses/compact";
+	    "/responses/compact";
 }
 
 std::string node_text(acl::json_node *node)

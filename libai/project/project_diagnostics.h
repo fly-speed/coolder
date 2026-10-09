@@ -22,9 +22,8 @@ struct project_diagnostic_t {
 // already bounded by the sandbox broker; this layer additionally caps count and
 // message length and drops absolute paths outside `absolute_project_root`.
 void parse_project_diagnostics(const std::string &source,
-			       const std::string &absolute_project_root,
-			       const std::string &project_path,
-			       std::vector<project_diagnostic_t> &diagnostics);
+    const std::string &absolute_project_root, const std::string &project_path,
+    std::vector<project_diagnostic_t> &diagnostics);
 
 } // namespace ai
 } // namespace webcool

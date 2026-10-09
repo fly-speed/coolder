@@ -31,12 +31,11 @@ struct agent_checkpoint_t {
 class agent_checkpoint_store_t {
 public:
 	agent_checkpoint_store_t(const std::string &upload_root,
-				 const std::string &user_root,
-				 const std::string &username);
+	    const std::string &user_root, const std::string &username);
 
 	bool save(const agent_checkpoint_t &checkpoint, std::string &err) const;
 	bool load(const std::string &run_id, agent_checkpoint_t &checkpoint,
-		  std::string &err) const;
+	    std::string &err) const;
 	bool remove(const std::string &run_id, std::string &err) const;
 	bool exists(const std::string &run_id) const;
 

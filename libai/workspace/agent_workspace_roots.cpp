@@ -24,9 +24,9 @@ using ::webcool::ai::record_codec::hex_value;
 
 bool hex_decode(const std::string &value, std::string &decoded)
 {
-	if (value.size() % 2 != 0)
-		return false;
-	return ::webcool::ai::record_codec::hex_decode(value, decoded);
+	if (!(value.size() % 2 != 0))
+		return ::webcool::ai::record_codec::hex_decode(value, decoded);
+	return false;
 }
 
 #ifndef _WIN32
@@ -38,27 +38,25 @@ std::string registry_identity(const struct stat &value)
 	const auto mt = value.st_mtim, ct = value.st_ctim;
 #endif
 	return std::to_string(value.st_dev) + ":" +
-	       std::to_string(value.st_ino) + ":" +
-	       std::to_string(value.st_size) + ":" + std::to_string(mt.tv_sec) +
-	       ":" + std::to_string(mt.tv_nsec) + ":" +
-	       std::to_string(ct.tv_sec) + ":" + std::to_string(ct.tv_nsec);
+	    std::to_string(value.st_ino) + ":" + std::to_string(value.st_size) +
+	    ":" + std::to_string(mt.tv_sec) + ":" + std::to_string(mt.tv_nsec) +
+	    ":" + std::to_string(ct.tv_sec) + ":" + std::to_string(ct.tv_nsec);
 }
 #endif
 
 bool read_project_roots(const std::string &user_root,
-			std::map<std::string, std::string> &roots,
-			std::string &err)
+    std::map<std::string, std::string> &roots, std::string &err)
 {
 	roots.clear();
 #ifndef _WIN32
 	// All callers hold g_project_root_registry_mutex. Revalidate metadata on
 	// EVERY access, including after external edits; no time-based stale window.
 	typedef std::pair<std::string, std::map<std::string, std::string>>
-		cached_roots_t;
+	    cached_roots_t;
 	static std::map<std::string, cached_roots_t> cache;
 	struct stat before;
 	const bool present =
-		stat(registry_path(user_root).c_str(), &before) == 0;
+	    stat(registry_path(user_root).c_str(), &before) == 0;
 #ifdef __APPLE__
 	const bool precise = present && before.st_ctimespec.tv_nsec != 0;
 #else
@@ -115,7 +113,7 @@ bool make_private_directory_if_needed(const std::string &path)
 	const DWORD attrs = GetFileAttributesW(wide.c_str());
 	if (attrs != INVALID_FILE_ATTRIBUTES)
 		return (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0 &&
-		       (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
+		    (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
 	return _wmkdir(wide.c_str()) == 0;
 #else
 	struct stat st;
@@ -128,9 +126,8 @@ bool make_private_directory_if_needed(const std::string &path)
 } // namespace
 
 bool agent_workspace_t::register_project_root(const std::string &user_root,
-					      const std::string &logical_path,
-					      const std::string &absolute_root,
-					      std::string &err)
+    const std::string &logical_path, const std::string &absolute_root,
+    std::string &err)
 {
 	std::string logical;
 	if (!normalize_path(logical_path, logical, false, err))
@@ -169,7 +166,7 @@ bool agent_workspace_t::register_project_root(const std::string &user_root,
 		return false;
 	}
 	for (std::map<std::string, std::string>::const_iterator it =
-		     roots.begin();
+	         roots.begin();
 	     it != roots.end(); ++it) {
 		out << hex_encode(it->first) << '\t' << hex_encode(it->second)
 		    << '\n';
@@ -187,18 +184,16 @@ bool agent_workspace_t::register_project_root(const std::string &user_root,
 		return false;
 	}
 #endif
-	if (!replace_file(temporary, target)) {
-		remove(temporary.c_str());
-		err = "cannot install external project root registry";
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, target))
+		return true;
+	remove(temporary.c_str());
+	err = "cannot install external project root registry";
+	return false;
 }
 
 bool agent_workspace_t::resolve_project_root(const std::string &user_root,
-					     const std::string &logical_path,
-					     std::string &absolute_root,
-					     std::string &err)
+    const std::string &logical_path, std::string &absolute_root,
+    std::string &err)
 {
 	std::string logical;
 	if (!normalize_path(logical_path, logical, true, err))
@@ -207,44 +202,43 @@ bool agent_workspace_t::resolve_project_root(const std::string &user_root,
 	std::string mapped_physical;
 	{
 		std::lock_guard<std::mutex> guard(
-			g_project_root_registry_mutex);
+		    g_project_root_registry_mutex);
 		std::map<std::string, std::string> roots;
 		if (!read_project_roots(user_root, roots, err))
 			return false;
 		for (std::map<std::string, std::string>::const_iterator it =
-			     roots.begin();
+		         roots.begin();
 		     it != roots.end(); ++it) {
-			if (path_has_prefix(logical, it->first) &&
-			    it->first.size() > mapped_logical.size()) {
-				mapped_logical = it->first;
-				mapped_physical = it->second;
-			}
+			if (!(path_has_prefix(logical, it->first) &&
+			        it->first.size() > mapped_logical.size()))
+				continue;
+			mapped_logical = it->first;
+			mapped_physical = it->second;
 		}
 	}
-	const std::string suffix =
-		mapped_logical.empty() ?
-			logical :
-			(logical.size() == mapped_logical.size() ?
-				 "" :
-				 logical.substr(mapped_logical.size() + 1));
+	const std::string suffix = mapped_logical.empty() ?
+	    logical :
+	    (logical.size() == mapped_logical.size() ?
+	            "" :
+	            logical.substr(mapped_logical.size() + 1));
 	const std::string base =
-		mapped_logical.empty() ? user_root : mapped_physical;
+	    mapped_logical.empty() ? user_root : mapped_physical;
 	const path_component_state_t state =
-		inspect_path_components(base, suffix);
+	    inspect_path_components(base, suffix);
 	if (state == PATH_COMPONENT_LINK) {
 		err = "project path contains a symbolic link or reparse point";
 		return false;
 	}
 	if (state != PATH_COMPONENT_NORMAL) {
 		err = state == PATH_COMPONENT_MISSING ?
-			      "workspace path does not exist" :
-			      "cannot inspect project path attributes";
+		    "workspace path does not exist" :
+		    "cannot inspect project path attributes";
 		return false;
 	}
 	char base_path[PATH_MAX];
 	char candidate_path[PATH_MAX];
 	const std::string candidate =
-		suffix.empty() ? base : join_path(base, suffix);
+	    suffix.empty() ? base : join_path(base, suffix);
 	if (realpath(base.c_str(), base_path) == NULL ||
 	    realpath(candidate.c_str(), candidate_path) == NULL ||
 	    !path_is_within(base_path, candidate_path)) {
@@ -256,8 +250,7 @@ bool agent_workspace_t::resolve_project_root(const std::string &user_root,
 }
 
 bool agent_workspace_t::unregister_project_root(const std::string &user_root,
-						const std::string &logical_path,
-						std::string &err)
+    const std::string &logical_path, std::string &err)
 {
 	std::string logical;
 	if (!normalize_path(logical_path, logical, false, err))
@@ -276,7 +269,7 @@ bool agent_workspace_t::unregister_project_root(const std::string &user_root,
 		return false;
 	}
 	for (std::map<std::string, std::string>::const_iterator it =
-		     roots.begin();
+	         roots.begin();
 	     it != roots.end(); ++it) {
 		out << hex_encode(it->first) << '\t' << hex_encode(it->second)
 		    << '\n';
@@ -291,17 +284,16 @@ bool agent_workspace_t::unregister_project_root(const std::string &user_root,
 		err = "cannot flush external project root registry";
 		return false;
 	}
-	if (!replace_file(temporary, target)) {
-		remove(temporary.c_str());
-		err = "cannot install external project root registry";
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, target))
+		return true;
+	remove(temporary.c_str());
+	err = "cannot install external project root registry";
+	return false;
 }
 
-bool agent_workspace_t::resolve_project_state_root(
-	const std::string &user_root, const std::string &logical_path,
-	std::string &absolute_root, std::string &err)
+bool agent_workspace_t::resolve_project_state_root(const std::string &user_root,
+    const std::string &logical_path, std::string &absolute_root,
+    std::string &err)
 {
 	std::string project_root;
 	if (!resolve_project_root(user_root, logical_path, project_root, err)) {
@@ -322,7 +314,7 @@ bool agent_workspace_t::resolve_project_state_root(
 		return true;
 	}
 	const std::string metadata =
-		std::string(resolved_user) + "/.webcool_agent";
+	    std::string(resolved_user) + "/.webcool_agent";
 	const std::string states = metadata + "/external-project-state";
 	const std::string digest = content_sha256(logical_path);
 	if (digest.empty() || !make_private_directory_if_needed(metadata) ||

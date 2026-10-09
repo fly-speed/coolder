@@ -34,14 +34,12 @@ typedef bool (*provider_request_cancel_fn)(void *context);
 class provider_request_scheduler_t {
 public:
 	static bool acquire(const std::string &opaque_key,
-			    provider_request_cancel_fn cancelled,
-			    void *cancel_context,
-			    provider_request_permit_t &permit,
-			    std::string &err);
+	    provider_request_cancel_fn cancelled, void *cancel_context,
+	    provider_request_permit_t &permit, std::string &err);
 	static void finish(provider_request_permit_t &permit, int http_status,
-			   bool retryable, unsigned long retry_after_seconds);
-	static provider_request_scheduler_snapshot_t
-	inspect(const std::string &opaque_key);
+	    bool retryable, unsigned long retry_after_seconds);
+	static provider_request_scheduler_snapshot_t inspect(
+	    const std::string &opaque_key);
 
 	// Test-only reset; production code has no reason to discard learned
 	// back-pressure while the server process remains alive.

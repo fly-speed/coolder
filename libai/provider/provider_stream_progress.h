@@ -18,17 +18,15 @@ struct provider_stream_progress_t {
 	std::string phase = "waiting_headers";
 };
 inline const char *provider_stream_deadline(const provider_stream_progress_t &p,
-					    long long idle_ms,
-					    long long stall_ms,
-					    long long total_ms)
+    long long idle_ms, long long stall_ms, long long total_ms)
 {
 	if (p.elapsed_ms >= total_ms)
 		return "request_total_timeout";
 	if (p.elapsed_ms - p.last_data_ms >= idle_ms)
 		return "connection_idle_timeout";
-	if (p.elapsed_ms - p.last_effective_ms >= stall_ms)
-		return "effective_output_stalled";
-	return "";
+	if (!(p.elapsed_ms - p.last_effective_ms >= stall_ms))
+		return "";
+	return "effective_output_stalled";
 }
 }
 }

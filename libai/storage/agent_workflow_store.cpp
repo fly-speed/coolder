@@ -37,8 +37,9 @@ bool valid_hex_id(const std::string &value)
 		return false;
 	for (size_t i = 0; i < value.size(); ++i) {
 		const char ch = value[i];
-		if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')))
-			return false;
+		if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))
+			continue;
+		return false;
 	}
 	return true;
 }
@@ -49,10 +50,11 @@ bool valid_token(const std::string &value, size_t maximum)
 		return false;
 	for (size_t i = 0; i < value.size(); ++i) {
 		const char ch = value[i];
-		if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-		      (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' ||
-		      ch == '.'))
-			return false;
+		if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+		    (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' ||
+		    ch == '.')
+			continue;
+		return false;
 	}
 	return true;
 }
@@ -63,9 +65,9 @@ using ::webcool::ai::record_codec::hex_value;
 
 bool hex_decode(const std::string &value, std::string &output)
 {
-	if (value.size() % 2 != 0)
-		return false;
-	return ::webcool::ai::record_codec::hex_decode(value, output);
+	if (!(value.size() % 2 != 0))
+		return ::webcool::ai::record_codec::hex_decode(value, output);
+	return false;
 }
 
 using ::webcool::ai::record_codec::split_tabs;
@@ -87,22 +89,25 @@ bool valid_checkpoint(const agent_workflow_checkpoint_t &value)
 	    value.updated_at < 0)
 		return false;
 	for (size_t i = 0; i < value.command_queue.size(); ++i) {
-		if (!valid_token(value.command_queue[i], 128))
-			return false;
+		if (valid_token(value.command_queue[i], 128))
+			continue;
+		return false;
 	}
 	if (!value.failed_command_id.empty() &&
 	    !valid_token(value.failed_command_id, 128))
 		return false;
 	for (size_t i = 0; i < value.diagnostics.size(); ++i) {
 		const agent_workflow_diagnostic_t &item = value.diagnostics[i];
-		if (item.path.size() > 2048 ||
-		    item.path.find('\0') != std::string::npos ||
-		    item.path.find('\n') != std::string::npos ||
-		    item.path.find('\r') != std::string::npos ||
-		    item.line < 0 || item.column < 0 ||
-		    (item.severity != "error" && item.severity != "warning" &&
-		     item.severity != "note"))
-			return false;
+		if (!(item.path.size() > 2048 ||
+		        item.path.find('\0') != std::string::npos ||
+		        item.path.find('\n') != std::string::npos ||
+		        item.path.find('\r') != std::string::npos ||
+		        item.line < 0 || item.column < 0 ||
+		        (item.severity != "error" &&
+		            item.severity != "warning" &&
+		            item.severity != "note")))
+			continue;
+		return false;
 	}
 	return true;
 }
@@ -113,10 +118,10 @@ std::string directory_path(const std::string &root)
 }
 
 std::string checkpoint_path(const std::string &root, const std::string &project,
-			    const std::string &session, const std::string &task)
+    const std::string &session, const std::string &task)
 {
-	return join_path(directory_path(root),
-			 project + "." + session + "." + task + ".v1");
+	return join_path(
+	    directory_path(root), project + "." + session + "." + task + ".v1");
 }
 
 bool ensure_one_directory(const std::string &path, std::string &err)
@@ -143,16 +148,16 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 	}
 #else
 	struct stat st;
-	if (lstat(path.c_str(), &st) != 0) {
-		if (mkdir(path.c_str(), 0700) != 0 ||
-		    lstat(path.c_str(), &st) != 0) {
-			err = "cannot create workflow checkpoint directory";
-			return false;
-		}
+
+	if ((lstat(path.c_str(), &st) != 0) &&
+	    (mkdir(path.c_str(), 0700) != 0 || lstat(path.c_str(), &st) != 0)) {
+		err = "cannot create workflow checkpoint directory";
+		return false;
 	}
 	if (!S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode) ||
 	    chmod(path.c_str(), 0700) != 0) {
-		err = "workflow checkpoint path is not a safe private directory";
+		err =
+		    "workflow checkpoint path is not a safe private directory";
 		return false;
 	}
 #endif
@@ -162,15 +167,14 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 bool ensure_directories(const std::string &root, std::string &err)
 {
 	return ensure_one_directory(join_path(root, ".webcool_agent"), err) &&
-	       ensure_one_directory(directory_path(root), err);
+	    ensure_one_directory(directory_path(root), err);
 }
 
 using ::webcool::ai::file_ops::replace_file;
 
 bool remove_matching_files(const std::string &directory,
-			   const std::string &prefix,
-			   const std::string &contains, size_t &removed,
-			   std::string &err)
+    const std::string &prefix, const std::string &contains, size_t &removed,
+    std::string &err)
 {
 	removed = 0;
 #ifdef _WIN32
@@ -188,17 +192,17 @@ bool remove_matching_files(const std::string &directory,
 	do {
 		std::string name;
 		if (!webcool_wide_to_utf8(data.cFileName, name) ||
-		    (data.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY |
-					      FILE_ATTRIBUTE_REPARSE_POINT)) !=
-			    0)
+		    (data.dwFileAttributes &
+		        (FILE_ATTRIBUTE_DIRECTORY |
+		            FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
 			continue;
 		if ((!prefix.empty() &&
-		     name.compare(0, prefix.size(), prefix) != 0) ||
+		        name.compare(0, prefix.size(), prefix) != 0) ||
 		    (!contains.empty() &&
-		     name.find(contains) == std::string::npos))
+		        name.find(contains) == std::string::npos))
 			continue;
 		const std::wstring target =
-			directory_wide + L"\\" + data.cFileName;
+		    directory_wide + L"\\" + data.cFileName;
 		if (!DeleteFileW(target.c_str())) {
 			err = "cannot remove workflow checkpoint metadata";
 			FindClose(search);
@@ -217,9 +221,9 @@ bool remove_matching_files(const std::string &directory,
 	if (directory_handle == NULL) {
 		if (errno == ENOENT)
 			return true;
-		err = std::string(
-			      "cannot scan workflow checkpoint directory: ") +
-		      strerror(errno);
+		err =
+		    std::string("cannot scan workflow checkpoint directory: ") +
+		    strerror(errno);
 		return false;
 	}
 	for (dirent *entry = readdir(directory_handle); entry != NULL;
@@ -227,9 +231,9 @@ bool remove_matching_files(const std::string &directory,
 		const std::string name = entry->d_name;
 		if (name == "." || name == ".." ||
 		    (!prefix.empty() &&
-		     name.compare(0, prefix.size(), prefix) != 0) ||
+		        name.compare(0, prefix.size(), prefix) != 0) ||
 		    (!contains.empty() &&
-		     name.find(contains) == std::string::npos))
+		        name.find(contains) == std::string::npos))
 			continue;
 		const std::string target = join_path(directory, name);
 		struct stat st;
@@ -237,9 +241,10 @@ bool remove_matching_files(const std::string &directory,
 		    S_ISLNK(st.st_mode))
 			continue;
 		if (::remove(target.c_str()) != 0) {
-			err = std::string(
-				      "cannot remove workflow checkpoint metadata: ") +
-			      strerror(errno);
+			err =
+			    std::string(
+			        "cannot remove workflow checkpoint metadata: ") +
+			    strerror(errno);
 			closedir(directory_handle);
 			return false;
 		}
@@ -253,12 +258,12 @@ bool remove_matching_files(const std::string &directory,
 } // namespace
 
 agent_workflow_store_t::agent_workflow_store_t(const std::string &user_root)
-	: user_root_(user_root)
+        : user_root_(user_root)
 {
 }
 
-bool agent_workflow_store_t::save(const agent_workflow_checkpoint_t &value,
-				  std::string &err) const
+bool agent_workflow_store_t::save(
+    const agent_workflow_checkpoint_t &value, std::string &err) const
 {
 	if (!valid_checkpoint(value)) {
 		err = "invalid agent workflow checkpoint";
@@ -269,10 +274,10 @@ bool agent_workflow_store_t::save(const agent_workflow_checkpoint_t &value,
 		return ai_error("agent.workflow", "prepare-directory", err);
 	}
 	const std::string target = checkpoint_path(
-		user_root_, value.project_id, value.session_id, value.task_id);
+	    user_root_, value.project_id, value.session_id, value.task_id);
 	const std::string temporary = target + ".tmp";
 	std::ofstream out(temporary.c_str(),
-			  std::ios::out | std::ios::binary | std::ios::trunc);
+	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write agent workflow checkpoint";
 		return ai_error("agent.workflow", "open-temporary", err);
@@ -304,21 +309,17 @@ bool agent_workflow_store_t::save(const agent_workflow_checkpoint_t &value,
 		return ai_error("agent.workflow", "protect", err);
 	}
 #endif
-	if (!replace_file(temporary, target)) {
-		::remove(temporary.c_str());
-		err = std::string(
-			      "cannot install agent workflow checkpoint: ") +
-		      strerror(errno);
-		return ai_error("agent.workflow", "install", err);
-	}
-	return true;
+	if (replace_file(temporary, target))
+		return true;
+	::remove(temporary.c_str());
+	err = std::string("cannot install agent workflow checkpoint: ") +
+	    strerror(errno);
+	return ai_error("agent.workflow", "install", err);
 }
 
 bool agent_workflow_store_t::load(const std::string &project,
-				  const std::string &session,
-				  const std::string &task,
-				  agent_workflow_checkpoint_t &value,
-				  bool &found, std::string &err) const
+    const std::string &session, const std::string &task,
+    agent_workflow_checkpoint_t &value, bool &found, std::string &err) const
 {
 	found = false;
 	value = agent_workflow_checkpoint_t();
@@ -329,8 +330,8 @@ bool agent_workflow_store_t::load(const std::string &project,
 	}
 	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
 	std::ifstream in(
-		checkpoint_path(user_root_, project, session, task).c_str(),
-		std::ios::in | std::ios::binary);
+	    checkpoint_path(user_root_, project, session, task).c_str(),
+	    std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true;
 	std::string line;
@@ -362,8 +363,8 @@ bool agent_workflow_store_t::load(const std::string &project,
 			std::string command;
 			if (!hex_decode(fields[1], command)) {
 				err = "invalid workflow command encoding";
-				return ai_error("agent.workflow",
-						"parse-command", err);
+				return ai_error(
+				    "agent.workflow", "parse-command", err);
 			}
 			value.command_queue.push_back(command);
 		} else if (fields.size() == 5 && fields[0] == "D") {
@@ -372,8 +373,8 @@ bool agent_workflow_store_t::load(const std::string &project,
 			    !parse_number(fields[2], item.line) ||
 			    !parse_number(fields[3], item.column)) {
 				err = "invalid workflow diagnostic encoding";
-				return ai_error("agent.workflow",
-						"parse-diagnostic", err);
+				return ai_error(
+				    "agent.workflow", "parse-diagnostic", err);
 			}
 			item.severity = fields[4];
 			value.diagnostics.push_back(item);
@@ -392,9 +393,7 @@ bool agent_workflow_store_t::load(const std::string &project,
 }
 
 bool agent_workflow_store_t::remove(const std::string &project,
-				    const std::string &session,
-				    const std::string &task,
-				    std::string &err) const
+    const std::string &session, const std::string &task, std::string &err) const
 {
 	if (!valid_hex_id(project) || !valid_hex_id(session) ||
 	    !valid_token(task, 64)) {
@@ -402,48 +401,43 @@ bool agent_workflow_store_t::remove(const std::string &project,
 		return ai_error("agent.workflow", "validate-remove", err);
 	}
 	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
-	if (::remove(checkpoint_path(user_root_, project, session, task)
-			     .c_str()) != 0 &&
-	    errno != ENOENT) {
-		err = std::string("cannot remove agent workflow checkpoint: ") +
-		      strerror(errno);
-		return ai_error("agent.workflow", "remove", err);
-	}
-	return true;
+	if (!(::remove(checkpoint_path(user_root_, project, session, task)
+	                   .c_str()) != 0 &&
+	        errno != ENOENT))
+		return true;
+	err = std::string("cannot remove agent workflow checkpoint: ") +
+	    strerror(errno);
+	return ai_error("agent.workflow", "remove", err);
 }
 
-bool agent_workflow_store_t::remove_for_project(const std::string &project,
-						size_t &removed,
-						std::string &err) const
+bool agent_workflow_store_t::remove_for_project(
+    const std::string &project, size_t &removed, std::string &err) const
 {
 	if (!valid_hex_id(project)) {
 		err = "invalid agent workflow project identity";
-		return ai_error("agent.workflow", "validate-remove-project",
-				err);
+		return ai_error(
+		    "agent.workflow", "validate-remove-project", err);
 	}
 	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
-	if (!remove_matching_files(directory_path(user_root_), project + ".",
-				   "", removed, err)) {
-		return ai_error("agent.workflow", "remove-project", err);
-	}
-	return true;
+	if (remove_matching_files(
+	        directory_path(user_root_), project + ".", "", removed, err))
+		return true;
+	return ai_error("agent.workflow", "remove-project", err);
 }
 
-bool agent_workflow_store_t::remove_for_session(const std::string &session,
-						size_t &removed,
-						std::string &err) const
+bool agent_workflow_store_t::remove_for_session(
+    const std::string &session, size_t &removed, std::string &err) const
 {
 	if (!valid_hex_id(session)) {
 		err = "invalid agent workflow session identity";
-		return ai_error("agent.workflow", "validate-remove-session",
-				err);
+		return ai_error(
+		    "agent.workflow", "validate-remove-session", err);
 	}
 	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
-	if (!remove_matching_files(directory_path(user_root_), "",
-				   "." + session + ".", removed, err)) {
-		return ai_error("agent.workflow", "remove-session", err);
-	}
-	return true;
+	if (remove_matching_files(directory_path(user_root_), "",
+	        "." + session + ".", removed, err))
+		return true;
+	return ai_error("agent.workflow", "remove-session", err);
 }
 
 } // namespace ai

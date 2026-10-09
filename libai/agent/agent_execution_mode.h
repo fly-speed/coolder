@@ -17,12 +17,11 @@ struct agent_execution_profile_t {
 
 // Derives one immutable run profile without ever exceeding administrator
 // policy. Mode selection changes cost/iteration behavior, not permissions.
-bool build_agent_execution_profile(
-	const std::string &mode, size_t policy_tool_calls,
-	size_t policy_no_progress_calls, size_t policy_compaction_bytes,
-	long long policy_output_tokens, long long quick_mode_output_tokens,
-	long long requested_output_tokens, agent_execution_profile_t &profile,
-	std::string &err);
+bool build_agent_execution_profile(const std::string &mode,
+    size_t policy_tool_calls, size_t policy_no_progress_calls,
+    size_t policy_compaction_bytes, long long policy_output_tokens,
+    long long quick_mode_output_tokens, long long requested_output_tokens,
+    agent_execution_profile_t &profile, std::string &err);
 
 } // namespace ai
 } // namespace webcool

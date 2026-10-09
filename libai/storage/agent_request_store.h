@@ -12,16 +12,15 @@ namespace ai
 class agent_request_store_t {
 public:
 	agent_request_store_t(const std::string &user_root,
-			      const std::string &project_path,
-			      const std::string &run_id);
+	    const std::string &project_path, const std::string &run_id);
 
 	// Chooses the next monotonically increasing filename without overwriting a
 	// request retained by an earlier process or restart. relative_path receives
 	// the project-relative path of the committed JSON document.
 	bool append(const std::string &payload, std::string &relative_path,
-		    std::string &err) const;
-	bool operation_log(std::string &content, bool write,
-			   std::string &err) const;
+	    std::string &err) const;
+	bool operation_log(
+	    std::string &content, bool write, std::string &err) const;
 
 private:
 	std::string user_root_;

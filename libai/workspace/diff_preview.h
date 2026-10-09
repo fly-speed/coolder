@@ -14,17 +14,16 @@ struct line_diff_preview_t {
 	std::vector<bool> visible;
 	size_t removed_lines = 0, added_lines = 0;
 
-	static void split_lines(const std::string &content,
-				std::vector<std::string> &lines)
+	static void split_lines(
+	    const std::string &content, std::vector<std::string> &lines)
 	{
 		lines.clear();
 		size_t begin = 0;
 		while (begin < content.size()) {
 			const size_t end = content.find('\n', begin);
-			std::string line = content.substr(
-				begin, end == std::string::npos ?
-					       std::string::npos :
-					       end - begin);
+			std::string line = content.substr(begin,
+			    end == std::string::npos ? std::string::npos :
+			                               end - begin);
 			if (!line.empty() && line[line.size() - 1] == '\r')
 				line.resize(line.size() - 1);
 			lines.push_back(line);
@@ -33,8 +32,8 @@ struct line_diff_preview_t {
 			begin = end + 1;
 		}
 	}
-	line_diff_preview_t(const std::string &original,
-			    const std::string &proposed)
+	line_diff_preview_t(
+	    const std::string &original, const std::string &proposed)
 	{
 		split_lines(original, old_lines);
 		split_lines(proposed, new_lines);
@@ -53,20 +52,19 @@ struct line_diff_preview_t {
 				visible[j] = true;
 		}
 	}
-	void append_line(std::ostringstream &out,
-			 const line_diff_op_t &op) const
+	void append_line(
+	    std::ostringstream &out, const line_diff_op_t &op) const
 	{
-		const char marker =
-			op.kind == line_diff_equal ?
-				' ' :
-				(op.kind == line_diff_removed ? '-' : '+');
+		const char marker = op.kind == line_diff_equal ?
+		    ' ' :
+		    (op.kind == line_diff_removed ? '-' : '+');
 		const size_t old_line =
-			op.kind == line_diff_added ? 0 : op.old_index + 1;
+		    op.kind == line_diff_added ? 0 : op.old_index + 1;
 		const size_t new_line =
-			op.kind == line_diff_removed ? 0 : op.new_index + 1;
+		    op.kind == line_diff_removed ? 0 : op.new_index + 1;
 		const std::string &text = op.kind == line_diff_added ?
-						  new_lines[op.new_index] :
-						  old_lines[op.old_index];
+		    new_lines[op.new_index] :
+		    old_lines[op.old_index];
 		out << marker << ' ';
 		if (old_line == 0)
 			out << "    ";

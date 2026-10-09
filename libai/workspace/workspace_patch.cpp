@@ -91,8 +91,8 @@ bool replace_plan_file(const std::string &temporary, const std::string &target)
 	return ::webcool::ai::file_ops::replace_file(temporary, target);
 }
 
-bool ensure_plan_directory(const std::string &user_root, std::string &directory,
-			   std::string &err)
+bool ensure_plan_directory(
+    const std::string &user_root, std::string &directory, std::string &err)
 {
 	const std::string agent = join_path(user_root, ".webcool_agent");
 	directory = join_path(agent, "patches");
@@ -116,8 +116,7 @@ std::string plan_path(const std::string &directory)
 }
 
 void build_preview(const std::string &path, const std::string &original,
-		   const std::string &proposed,
-		   workspace_patch_preview_t &preview)
+    const std::string &proposed, workspace_patch_preview_t &preview)
 {
 	const line_diff_preview_t diff(original, proposed);
 	const std::vector<line_diff_op_t> &operations = diff.operations;
@@ -158,13 +157,13 @@ void build_preview(const std::string &path, const std::string &original,
 	}
 }
 
-bool save_patch(const std::string &directory, const stored_patch_t &patch,
-		std::string &err)
+bool save_patch(
+    const std::string &directory, const stored_patch_t &patch, std::string &err)
 {
 	const std::string path = plan_path(directory);
 	const std::string temporary = path + ".tmp";
 	std::ofstream out(temporary.c_str(),
-			  std::ios::out | std::ios::binary | std::ios::trunc);
+	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write workspace patch plan";
 		return false;
@@ -189,17 +188,16 @@ bool save_patch(const std::string &directory, const stored_patch_t &patch,
 		return false;
 	}
 #endif
-	if (!replace_plan_file(temporary, path)) {
-		remove(temporary.c_str());
-		err = std::string("cannot install workspace patch plan: ") +
-		      strerror(errno);
-		return false;
-	}
-	return true;
+	if (replace_plan_file(temporary, path))
+		return true;
+	remove(temporary.c_str());
+	err = std::string("cannot install workspace patch plan: ") +
+	    strerror(errno);
+	return false;
 }
 
 bool load_patch(const std::string &directory, const std::string &id,
-		stored_patch_t &patch, std::string &err)
+    stored_patch_t &patch, std::string &err)
 {
 	if (!valid_id(id)) {
 		err = "invalid workspace patch id";
@@ -234,26 +232,24 @@ bool load_patch(const std::string &directory, const std::string &id,
 		return false;
 	}
 	patch.id = stored_id;
-	if (patch.content.size() > kMaxPatchBytes ||
-	    agent_workspace_t::content_sha256(patch.content) !=
-		    patch.proposed_sha256) {
-		err = "workspace patch plan failed integrity validation";
-		return false;
-	}
-	return true;
+	if (!(patch.content.size() > kMaxPatchBytes ||
+	        agent_workspace_t::content_sha256(patch.content) !=
+	            patch.proposed_sha256))
+		return true;
+	err = "workspace patch plan failed integrity validation";
+	return false;
 }
 
 } // namespace
 
 workspace_patch_store_t::workspace_patch_store_t(const std::string &user_root)
-	: user_root_(user_root)
+        : user_root_(user_root)
 {
 }
 
 bool workspace_patch_store_t::create(const std::string &relative_file,
-				     const std::string &proposed_content,
-				     workspace_patch_preview_t &preview,
-				     std::string &err) const
+    const std::string &proposed_content, workspace_patch_preview_t &preview,
+    std::string &err) const
 {
 	if (proposed_content.size() > kMaxPatchBytes ||
 	    proposed_content.find('\0') != std::string::npos) {
@@ -262,8 +258,8 @@ bool workspace_patch_store_t::create(const std::string &relative_file,
 	}
 	agent_workspace_t workspace(user_root_);
 	std::string normalized;
-	if (!agent_workspace_t::normalize_path(relative_file, normalized, false,
-					       err)) {
+	if (!agent_workspace_t::normalize_path(
+	        relative_file, normalized, false, err)) {
 		return ai_error("workspace.patch", "normalize-path", err);
 	}
 	std::string original;
@@ -273,8 +269,8 @@ bool workspace_patch_store_t::create(const std::string &relative_file,
 	}
 	if (truncated) {
 		err = "workspace file is too large to patch";
-		return ai_error("workspace.patch", "validate-original-size",
-				err);
+		return ai_error(
+		    "workspace.patch", "validate-original-size", err);
 	}
 	if (original == proposed_content) {
 		err = "proposed file is identical to the current file";
@@ -285,7 +281,7 @@ bool workspace_patch_store_t::create(const std::string &relative_file,
 	patch.path = normalized;
 	patch.original_sha256 = agent_workspace_t::content_sha256(original);
 	patch.proposed_sha256 =
-		agent_workspace_t::content_sha256(proposed_content);
+	    agent_workspace_t::content_sha256(proposed_content);
 	patch.content = proposed_content;
 	patch.created_at = static_cast<long long>(time(NULL));
 	if (patch.id.empty() || patch.original_sha256.empty() ||
@@ -301,18 +297,16 @@ bool workspace_patch_store_t::create(const std::string &relative_file,
 	std::lock_guard<webcool::mutex> guard(g_patch_store_mutex);
 	std::string directory;
 	if (!ensure_plan_directory(user_root_, directory, err)) {
-		return ai_error("workspace.patch", "prepare-private-store",
-				err);
+		return ai_error(
+		    "workspace.patch", "prepare-private-store", err);
 	}
-	if (!save_patch(directory, patch, err)) {
-		return ai_error("workspace.patch", "save-plan", err);
-	}
-	return true;
+	if (save_patch(directory, patch, err))
+		return true;
+	return ai_error("workspace.patch", "save-plan", err);
 }
 
 bool workspace_patch_store_t::apply(const std::string &patch_id,
-				    workspace_patch_result_t &result,
-				    std::string &err) const
+    workspace_patch_result_t &result, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_patch_store_mutex);
 	std::string directory;
@@ -332,7 +326,7 @@ bool workspace_patch_store_t::apply(const std::string &patch_id,
 	}
 	agent_workspace_t workspace(user_root_);
 	if (!workspace.replace_text_if_unchanged(
-		    patch.path, patch.original_sha256, patch.content, err)) {
+	        patch.path, patch.original_sha256, patch.content, err)) {
 		return ai_error("workspace.patch", "compare-and-replace", err);
 	}
 	remove(plan_path(directory).c_str());

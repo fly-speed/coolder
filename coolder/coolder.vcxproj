@@ -113,35 +113,75 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\third-party\acl\lib_acl\lib_acl_vc2022.vcxproj">
-      <Project>{B40213C2-507C-4C7F-A6E1-B850C9BDC27B}</Project>
+      <Project>{B40213C2-507C-4C7F-A6E1-B850C9BDC27B}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\third-party\acl\lib_protocol\lib_protocol_vc2022.vcxproj">
-      <Project>{FE724EF7-3763-4E78-BDF5-BCBC075719FD}</Project>
+      <Project>{FE724EF7-3763-4E78-BDF5-BCBC075719FD}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\third-party\acl\lib_acl_cpp\lib_acl_cpp_vc2022.vcxproj">
-      <Project>{6EC1F44E-6A6A-48E9-B699-D7E89B63C8DC}</Project>
+      <Project>{6EC1F44E-6A6A-48E9-B699-D7E89B63C8DC}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\third-party\acl\lib_fiber\c\libfiber_vc2022.vcxproj">
-      <Project>{AD99B75A-40BF-46DC-844B-23417FDC8690}</Project>
+      <Project>{AD99B75A-40BF-46DC-844B-23417FDC8690}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\third-party\acl\lib_fiber\cpp\libfiber_cpp_vc2022.vcxproj">
-      <Project>{F2479E2C-7267-436C-A1F1-A63B39E7CB30}</Project>
+      <Project>{F2479E2C-7267-436C-A1F1-A63B39E7CB30}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\third-party\zlib-1.2.11\visualc\vc2022\zlib.vcxproj">
-      <Project>{EBE2BD9D-26AC-4476-A843-21FE77B66757}</Project>
+      <Project>{EBE2BD9D-26AC-4476-A843-21FE77B66757}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="..\libai\libai.vcxproj">
-      <Project>{95D55176-4806-4E55-AEAF-4A624014DA18}</Project>
+      <Project>{95D55176-4806-4E55-AEAF-4A624014DA18}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <ProjectReference Include="coolder-sandbox-helper.vcxproj">
-      <Project>{2CBD0E97-91D8-5CC3-A43C-4A11D4673272}</Project>
+      <Project>{2CBD0E97-91D8-5CC3-A43C-4A11D4673272}  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
+</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
   </ItemGroup>
@@ -163,4 +203,9 @@
     </ItemGroup>
     <Copy SourceFiles="@(CoolderOpenSslDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(CoolderOpenSslDll)'!=''" />
   </Target>
+  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp" />
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp" />
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h" />
+  </ItemGroup>
 </Project>

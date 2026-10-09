@@ -14,7 +14,7 @@ inline std::wstring application_directory()
 {
 	std::vector<wchar_t> path(32768, L'\0');
 	const DWORD length = GetModuleFileNameW(
-		NULL, path.data(), static_cast<DWORD>(path.size()));
+	    NULL, path.data(), static_cast<DWORD>(path.size()));
 	if (!length || length >= path.size())
 		return L"";
 	const std::wstring executable(path.data(), length);
@@ -29,9 +29,8 @@ inline bool readable_file(const std::wstring &path)
 	    (attributes & FILE_ATTRIBUTE_DIRECTORY))
 		return false;
 	HANDLE file = CreateFileW(path.c_str(), GENERIC_READ,
-				  FILE_SHARE_READ | FILE_SHARE_WRITE |
-					  FILE_SHARE_DELETE,
-				  NULL, OPEN_EXISTING, 0, NULL);
+	    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+	    OPEN_EXISTING, 0, NULL);
 	if (file == INVALID_HANDLE_VALUE)
 		return false;
 	LARGE_INTEGER size;
@@ -62,11 +61,12 @@ inline bool matching_file(const std::wstring &pattern)
 		    !wcscmp(entry.cFileName, L".") ||
 		    !wcscmp(entry.cFileName, L".."))
 			continue;
-		if (matching_file(directory_pattern.substr(0, parent + 1) +
-				  entry.cFileName + pattern.substr(slash))) {
-			found = true;
-			break;
-		}
+		if (!matching_file(directory_pattern.substr(0, parent + 1) +
+		        entry.cFileName + pattern.substr(slash)))
+			continue;
+		found = true;
+		break;
+
 	} while (FindNextFileW(search, &entry));
 	FindClose(search);
 	return found;
@@ -81,26 +81,24 @@ inline bool available(const std::wstring &directory, std::string &reason)
 	}
 	const std::wstring browser = directory + L"/browser";
 	for (const wchar_t *relative :
-	     { L"/browser_probe.cjs", L"/node_modules/playwright/index.js",
-	       L"/node_modules/playwright-core/index.js" }) {
-		if (!readable_file(browser + relative)) {
-			reason =
-				"browser runner or Playwright dependencies are missing";
-			return false;
-		}
-	}
-	if (!matching_file(
-		    browser +
-		    L"/.browsers/chromium_headless_shell-*/chrome-headless-shell-win*/chrome-headless-shell.exe")) {
-		reason = "bundled Chromium headless shell is missing";
+	    { L"/browser_probe.cjs", L"/node_modules/playwright/index.js",
+	        L"/node_modules/playwright-core/index.js" }) {
+		if (readable_file(browser + relative))
+			continue;
+		reason =
+		    "browser runner or Playwright dependencies are missing";
 		return false;
 	}
 	if (!matching_file(browser +
-			   L"/.browsers/firefox-*/firefox/firefox.exe")) {
-		reason = "bundled Firefox is missing";
+	        L"/.browsers/chromium_headless_shell-*/chrome-headless-shell-win*/chrome-headless-shell.exe")) {
+		reason = "bundled Chromium headless shell is missing";
 		return false;
 	}
-	return true;
+	if (matching_file(
+	        browser + L"/.browsers/firefox-*/firefox/firefox.exe"))
+		return true;
+	reason = "bundled Firefox is missing";
+	return false;
 }
 
 inline std::string bundled_node(const std::wstring &directory)
@@ -108,12 +106,13 @@ inline std::string bundled_node(const std::wstring &directory)
 	if (directory.empty())
 		return "";
 	for (const wchar_t *relative :
-	     { L"/browser/node.exe", L"/browser/.node/runtime/node.exe" }) {
+	    { L"/browser/node.exe", L"/browser/.node/runtime/node.exe" }) {
 		const std::wstring path = directory + relative;
 		std::string utf8;
-		if (readable_file(path) &&
-		    webcool_wide_to_utf8(path.c_str(), utf8))
-			return utf8;
+		if (!(readable_file(path) &&
+		        webcool_wide_to_utf8(path.c_str(), utf8)))
+			continue;
+		return utf8;
 	}
 	return "";
 }

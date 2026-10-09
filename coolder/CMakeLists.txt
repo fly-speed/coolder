@@ -37,7 +37,10 @@ else()
 endif()
 
 # libai locates this compatibility-named helper next to the host executable.
-add_executable(webcool-sandbox-helper sandbox/sandbox_helper_main.cpp)
+add_executable(webcool-sandbox-helper
+  sandbox/sandbox_helper_main.cpp
+  sandbox/sandbox_helper_linux.cpp
+  sandbox/sandbox_helper_probe.cpp)
 if(WIN32)
 	target_link_libraries(webcool-sandbox-helper PRIVATE advapi32)
 endif()

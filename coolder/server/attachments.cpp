@@ -36,15 +36,14 @@ bool decode(const std::string &encoded, std::string &bytes)
 		++padding;
 	}
 	if (encoded.find_first_not_of(
-		    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
-		    0) < encoded.size() - padding) {
+	        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+	        0) < encoded.size() - padding) {
 		return false;
 	}
 	bytes.resize(encoded.size() / 4 * 3);
-	int n = EVP_DecodeBlock(
-		reinterpret_cast<unsigned char *>(&bytes[0]),
-		reinterpret_cast<const unsigned char *>(encoded.data()),
-		encoded.size());
+	int n = EVP_DecodeBlock(reinterpret_cast<unsigned char *>(&bytes[0]),
+	    reinterpret_cast<const unsigned char *>(encoded.data()),
+	    encoded.size());
 	if (n < static_cast<int>(padding)) {
 		return false;
 	}
@@ -57,10 +56,10 @@ bool safe_name(const std::string &name)
 		return false;
 	}
 	for (unsigned char c : name) {
-		if (c < 32 || c == 127 ||
-		    std::string("/\\<>\"&:").find(c) != std::string::npos) {
-			return false;
-		}
+		if (!(c < 32 || c == 127 ||
+		        std::string("/\\<>\"&:").find(c) != std::string::npos))
+			continue;
+		return false;
 	}
 	return true;
 }
@@ -74,10 +73,9 @@ fs::path attachment_root(const account_t &account)
 			throw std::runtime_error("unsafe attachment directory");
 		}
 		fs::create_directory(root);
-		if (!fs::is_directory(root)) {
-			throw std::runtime_error(
-				"invalid attachment directory");
-		}
+		if (fs::is_directory(root))
+			continue;
+		throw std::runtime_error("invalid attachment directory");
 	}
 	return root;
 }
@@ -94,8 +92,8 @@ struct draft_guard {
 };
 }
 
-bool attachment_route(request_t &req, response_t &res, const account_t &account,
-		      bool discard)
+bool attachment_route(
+    request_t &req, response_t &res, const account_t &account, bool discard)
 {
 	using namespace action::agent_detail;
 	auto *body = req.getJson(discard ? 4096 : 24 * 1024 * 1024);
@@ -106,25 +104,23 @@ bool attachment_route(request_t &req, response_t &res, const account_t &account,
 	if (discard) {
 		const auto draft = text((*body)["attachment_draft"]);
 		if (draft.size() !=
-			    std::string(".webcool_agent/attachments/draft-")
-					    .size() +
-				    24 ||
-		    draft.compare(
-			    0,
-			    std::string(".webcool_agent/attachments/draft-")
-				    .size(),
-			    ".webcool_agent/attachments/draft-") != 0 ||
+		        std::string(".webcool_agent/attachments/draft-")
+		                .size() +
+		            24 ||
+		    draft.compare(0,
+		        std::string(".webcool_agent/attachments/draft-").size(),
+		        ".webcool_agent/attachments/draft-") != 0 ||
 		    draft.substr(draft.size() - 24)
-				    .find_first_not_of("0123456789abcdef") !=
-			    std::string::npos) {
+		            .find_first_not_of("0123456789abcdef") !=
+		        std::string::npos) {
 			return fail(res, 400, "invalid attachment draft");
 		}
 		const auto path = root / fs::path(draft).filename();
 		if (fs::is_symlink(fs::symlink_status(path))) {
 			return fail(res, 400, "invalid attachment draft");
 		}
-		remove_temporary_attachment_draft(draft,
-						  account_workspace(account));
+		remove_temporary_attachment_draft(
+		    draft, account_workspace(account));
 		return reply(res, 200, "{\"ok\":true}");
 	}
 	auto *files = json_array_node((*body)["files"]);
@@ -136,7 +132,7 @@ bool attachment_route(request_t &req, response_t &res, const account_t &account,
 		return fail(res, 500, "cannot create attachment draft");
 	}
 	const std::string draft =
-		".webcool_agent/attachments/draft-" + id.substr(0, 24);
+	    ".webcool_agent/attachments/draft-" + id.substr(0, 24);
 	const auto path = root / fs::path(draft).filename();
 	if (!fs::create_directory(path)) {
 		return fail(res, 500, "cannot create attachment draft");
@@ -167,8 +163,7 @@ bool attachment_route(request_t &req, response_t &res, const account_t &account,
 		std::string data;
 		if (!decode(text((*file)["base64"]), data)) {
 			return reject(
-				400,
-				"invalid attachment or file exceeds 8 MiB");
+			    400, "invalid attachment or file exceeds 8 MiB");
 		}
 		total += data.size();
 		if (total > max_total) {
@@ -181,14 +176,13 @@ bool attachment_route(request_t &req, response_t &res, const account_t &account,
 		if (!output) {
 			return reject(500, "cannot save attachment");
 		}
-		paths.add_child(json.create_array_text(
-			(draft + "/" + filename).c_str()));
+		paths.add_child(
+		    json.create_array_text((draft + "/" + filename).c_str()));
 	}
 	std::vector<webcool::ai::completion_image_t> images;
 	std::string context, err;
 	if (!load_temporary_attachments(&paths, draft,
-					account_workspace(account), images,
-					context, err)) {
+	        account_workspace(account), images, context, err)) {
 		return reject(400, err.c_str());
 	}
 	cleanup.keep = true;

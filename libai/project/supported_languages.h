@@ -13,26 +13,26 @@ namespace ai
 inline bool supported_project_language(const std::string &value)
 {
 	return value == "cpp" || value == "c" || value == "javascript" ||
-	       value == "python" || value == "java" || value == "go" ||
-	       value == "rust" || value == "objective-c" || value == "swift" ||
-	       value == "csharp" || value == "kotlin" || value == "php" ||
-	       value == "d";
+	    value == "python" || value == "java" || value == "go" ||
+	    value == "rust" || value == "objective-c" || value == "swift" ||
+	    value == "csharp" || value == "kotlin" || value == "php" ||
+	    value == "d";
 }
 
 inline bool supported_configurable_language_tool(const std::string &value)
 {
 	return supported_project_language(value) && value != "cpp" &&
-	       value != "c";
+	    value != "c";
 }
 
 inline bool supported_project_platform(const std::string &value)
 {
 	return value == "cross-platform" || value == "windows" ||
-	       value == "linux" || value == "macos";
+	    value == "linux" || value == "macos";
 }
 
-inline bool project_language_supports_platform(const std::string &language,
-					       const std::string &platform)
+inline bool project_language_supports_platform(
+    const std::string &language, const std::string &platform)
 {
 	return language != "objective-c" || platform == "macos";
 }

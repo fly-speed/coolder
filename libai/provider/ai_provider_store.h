@@ -95,47 +95,41 @@ struct master_key_rotation_result_t {
 class provider_store_t {
 public:
 	provider_store_t(const std::string &upload_root,
-			 const std::string &user_root,
-			 const std::string &username);
+	    const std::string &user_root, const std::string &username);
 
-	bool list(std::vector<provider_config_t> &providers,
-		  std::string &err) const;
+	bool list(
+	    std::vector<provider_config_t> &providers, std::string &err) const;
 	bool save(const provider_input_t &input, provider_config_t &saved,
-		  std::string &err);
+	    std::string &err);
 	bool remove(const std::string &id, std::string &err);
 	bool reveal_api_key(const provider_config_t &provider,
-			    std::string &api_key, std::string &err) const;
+	    std::string &api_key, std::string &err) const;
 	// Persist the latest connection-test outcome in this user's own directory.
 	// error_summary is sanitized and bounded before it reaches disk.
 	bool record_test_result(const std::string &id, bool succeeded,
-				int http_status, long long latency_ms,
-				const std::string &error_summary,
-				std::string &err);
+	    int http_status, long long latency_ms,
+	    const std::string &error_summary, std::string &err);
 
 	// Rotate the installation key for every providers.v1 file under the normal
 	// multi-user storage root. A dual-key journal keeps mixed old/new records
 	// readable if the process or machine stops during rotation.
 	static bool rotate_master_key(const std::string &upload_root,
-				      master_key_rotation_result_t &result,
-				      std::string &err);
+	    master_key_rotation_result_t &result, std::string &err);
 
 	// Reuse the installation keyring for other narrowly scoped per-user secret
 	// state such as restart checkpoints. binding becomes authenticated data, so
 	// ciphertext cannot be moved between users, runs or data types.
 	static bool seal_user_data(const std::string &upload_root,
-				   const std::string &username,
-				   const std::string &binding,
-				   const std::string &plaintext,
-				   std::string &encoded, std::string &err);
+	    const std::string &username, const std::string &binding,
+	    const std::string &plaintext, std::string &encoded,
+	    std::string &err);
 	static bool open_user_data(const std::string &upload_root,
-				   const std::string &username,
-				   const std::string &binding,
-				   const std::string &encoded,
-				   std::string &plaintext, std::string &err);
+	    const std::string &username, const std::string &binding,
+	    const std::string &encoded, std::string &plaintext,
+	    std::string &err);
 
 	static bool validate_input(const provider_input_t &input,
-				   bool allow_insecure_remote,
-				   std::string &err);
+	    bool allow_insecure_remote, std::string &err);
 
 private:
 	std::string upload_root_;

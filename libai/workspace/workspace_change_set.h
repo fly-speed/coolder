@@ -66,19 +66,18 @@ public:
 	explicit workspace_change_set_store_t(const std::string &user_root);
 
 	bool create(const std::vector<workspace_change_input_t> &changes,
-		    workspace_change_set_preview_t &preview,
-		    std::string &err) const;
+	    workspace_change_set_preview_t &preview, std::string &err) const;
 	bool apply(const std::string &id,
-		   std::vector<workspace_change_result_t> &results,
-		   std::string &err) const;
+	    std::vector<workspace_change_result_t> &results,
+	    std::string &err) const;
 	// Used by the coding runtime after it has durably saved the model result.
 	// Preview creation and application share one lock, so no other transaction
 	// can interleave filesystem mutations between those two steps.
-	bool
-	create_and_apply(const std::vector<workspace_change_input_t> &changes,
-			 workspace_change_set_preview_t &preview,
-			 std::vector<workspace_change_result_t> &results,
-			 std::string &err) const;
+	bool create_and_apply(
+	    const std::vector<workspace_change_input_t> &changes,
+	    workspace_change_set_preview_t &preview,
+	    std::vector<workspace_change_result_t> &results,
+	    std::string &err) const;
 	// Recovers an interrupted apply operation from the durable per-user undo
 	// journal. create() and apply() invoke this automatically; the public method
 	// also lets application startup and maintenance code report recovery errors.
@@ -88,11 +87,10 @@ public:
 
 private:
 	bool create_locked(const std::vector<workspace_change_input_t> &changes,
-			   workspace_change_set_preview_t &preview,
-			   std::string &err) const;
+	    workspace_change_set_preview_t &preview, std::string &err) const;
 	bool apply_locked(const std::string &id,
-			  std::vector<workspace_change_result_t> &results,
-			  std::string &err) const;
+	    std::vector<workspace_change_result_t> &results,
+	    std::string &err) const;
 	std::string user_root_;
 };
 

@@ -68,7 +68,7 @@ class VisualStudioProjectTests(unittest.TestCase):
             ),
             (
                 "coolder-sandbox-helper.vcxproj",
-                {ROOT / "sandbox/sandbox_helper_main.cpp"},
+                set(ROOT.glob("sandbox/*.cpp")),
             ),
         ):
             project = read_project(ROOT / filename)
@@ -86,6 +86,24 @@ class VisualStudioProjectTests(unittest.TestCase):
             helper.findtext("./m:PropertyGroup/m:TargetName", namespaces=NS),
             "webcool-sandbox-helper",
         )
+
+    def test_libai_source_coverage_and_filters(self):
+        directory = ROOT.parent / "libai"
+        project = read_project(directory / "libai.vcxproj")
+        filters = read_project(directory / "libai.vcxproj.filters")
+        expected = {directory / "stdafx.cpp"} | {
+            path for path in directory.glob("*/*.cpp")
+            if path.parent.name not in {"tests", "examples"}
+        }
+        actual = {
+            directory / relative.replace("\\", "/")
+            for relative in items(project, "ClCompile")
+        }
+        self.assertEqual(actual, expected)
+        for tag in ("ClCompile", "ClInclude"):
+            self.assertEqual(items(project, tag), items(filters, tag))
+            for relative in items(project, tag):
+                self.assertTrue((directory / relative.replace("\\", "/")).is_file())
 
     def test_resource_packaging(self):
         project = read_project(ROOT / "coolder.vcxproj")

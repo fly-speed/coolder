@@ -29,8 +29,8 @@ public:
 		remember(before);
 		if (before == after)
 			return false;
-		const bool cycle = std::find(seen_.begin(), seen_.end(),
-					     after) != seen_.end();
+		const bool cycle =
+		    std::find(seen_.begin(), seen_.end(), after) != seen_.end();
 		remember(after);
 		return cycle;
 	}

@@ -13,10 +13,9 @@ struct text_read_page_t {
 	bool eof = false;
 };
 inline bool read_text_page(const std::string &content, const std::string &query,
-			   text_read_page_t &page, std::string &error,
-			   size_t chunk_bytes = 8192,
-			   size_t file_limit_bytes = 1024 * 1024,
-			   bool prefer_complete_small_file = false)
+    text_read_page_t &page, std::string &error, size_t chunk_bytes = 8192,
+    size_t file_limit_bytes = 1024 * 1024,
+    bool prefer_complete_small_file = false)
 {
 	page = text_read_page_t();
 	if (chunk_bytes < 4 || chunk_bytes > 65536 ||
@@ -32,7 +31,8 @@ inline bool read_text_page(const std::string &content, const std::string &query,
 	for (size_t i = 0; i < query.size(); ++i) {
 		if (query[i] < '0' || query[i] > '9' ||
 		    offset > 1024 * 1024 / 10) {
-			error = "read query must be a decimal byte offset from next_query";
+			error =
+			    "read query must be a decimal byte offset from next_query";
 			return false;
 		}
 		offset = offset * 10 + static_cast<size_t>(query[i] - '0');

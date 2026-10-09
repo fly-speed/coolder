@@ -27,7 +27,7 @@ struct coding_turn_t {
 	batch_validation_evidence_t batch_validation{};
 	std::string tool_result{};
 	std::vector<webcool::ai::completion_tool_output_t>
-		current_tool_outputs{};
+	    current_tool_outputs{};
 	bool have_native_outputs{};
 	std::string staged_fingerprint_after{};
 	bool staged_progress{};
@@ -47,27 +47,24 @@ struct coding_turn_t {
 namespace coding_loop_detail
 {
 
-std::string validation_repair_context(
-	const std::string &user_root, const std::string &project_path,
-	const std::string &run_id,
-	const std::vector<agent_change_proposal_t> &changes,
-	const std::string &validation_result, size_t maximum_bytes,
-	const webcool::ai::completion_request_t *evidence = NULL);
+std::string validation_repair_context(const std::string &user_root,
+    const std::string &project_path, const std::string &run_id,
+    const std::vector<agent_change_proposal_t> &changes,
+    const std::string &validation_result, size_t maximum_bytes,
+    const webcool::ai::completion_request_t *evidence = NULL);
 
-bool save_coding_progress(
-	webcool::ai::agent_progress_store_t &store,
-	const webcool::ai::provider_config_t &provider,
-	const std::shared_ptr<agent_runtime_task_t> &runtime_task,
-	const std::string &project_path, const std::string &original_prompt,
-	const std::string &transcript, const std::string &reasoning,
-	const std::string &last_error, size_t completed_tool_calls,
-	std::string &err);
+bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
+    const webcool::ai::provider_config_t &provider,
+    const std::shared_ptr<agent_runtime_task_t> &runtime_task,
+    const std::string &project_path, const std::string &original_prompt,
+    const std::string &transcript, const std::string &reasoning,
+    const std::string &last_error, size_t completed_tool_calls,
+    std::string &err);
 
-std::string
-compact_coding_transcript(const std::string &original_prompt,
-			  const std::vector<agent_change_proposal_t> &changes,
-			  const std::vector<agent_tool_trace_t> &traces,
-			  const std::string &latest_exchange, bool chinese);
+std::string compact_coding_transcript(const std::string &original_prompt,
+    const std::vector<agent_change_proposal_t> &changes,
+    const std::vector<agent_tool_trace_t> &traces,
+    const std::string &latest_exchange, bool chinese);
 
 } // namespace coding_loop_detail
 

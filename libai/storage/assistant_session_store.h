@@ -36,41 +36,40 @@ struct assistant_session_t {
 };
 
 bool assistant_session_id_valid(const std::string &id);
-bool assistant_session_parse(acl::json_node *node, assistant_session_t &session,
-			     std::string &err);
+bool assistant_session_parse(
+    acl::json_node *node, assistant_session_t &session, std::string &err);
 void assistant_session_json(acl::json &json, acl::json_node &node,
-			    const assistant_session_t &session, bool detail);
+    const assistant_session_t &session, bool detail);
 
 class assistant_session_store_t {
 public:
 	explicit assistant_session_store_t(const std::string &user_root);
 
-	bool list(std::vector<assistant_session_t> &sessions,
-		  std::string &err) const;
+	bool list(
+	    std::vector<assistant_session_t> &sessions, std::string &err) const;
 	bool get(const std::string &id, assistant_session_t &session,
-		 std::string &err) const;
+	    std::string &err) const;
 	// Migration is create-only: retrying must never overwrite server messages.
-	bool import_session(const assistant_session_t &session,
-			    std::string &err) const;
+	bool import_session(
+	    const assistant_session_t &session, std::string &err) const;
 	bool append(const std::string &id, const assistant_message_t &message,
-		    std::string &err) const;
+	    std::string &err) const;
 
 	bool update(const std::string &operation,
-		    const std::vector<std::string> &ids,
-		    const std::string &title, std::string &err) const;
+	    const std::vector<std::string> &ids, const std::string &title,
+	    std::string &err) const;
 
 	bool save_image(const std::string &id, const std::string &session_id,
-			const std::string &mime, const std::string &bytes,
-			std::string &err) const;
+	    const std::string &mime, const std::string &bytes,
+	    std::string &err) const;
 	bool load_image(const std::string &id, std::string &mime,
-			std::string &bytes, std::string &err) const;
+	    std::string &bytes, std::string &err) const;
 	bool add_tag(const std::string &id, const std::string &tag_id,
-		     std::string &err) const;
+	    std::string &err) const;
 	bool list_tag(const std::string &tag_id,
-		      std::vector<assistant_session_t> &sessions,
-		      std::string &err) const;
-	bool remove_tags(const std::vector<std::string> &tag_ids,
-			 std::string &err) const;
+	    std::vector<assistant_session_t> &sessions, std::string &err) const;
+	bool remove_tags(
+	    const std::vector<std::string> &tag_ids, std::string &err) const;
 
 private:
 	std::string user_root_;

@@ -105,7 +105,7 @@ class operation_trace_t;
 struct agent_runtime_task_t;
 extern webcool::mutex g_agent_runtime_mutex;
 extern std::map<std::string, std::shared_ptr<agent_runtime_task_t>>
-	g_agent_runtime_tasks;
+    g_agent_runtime_tasks;
 struct agent_tool_trace_t {
 	// Metadata returned to the current browser session only. Tool result text is
 	// deliberately absent so it cannot leak through run history or SSE events.
@@ -150,7 +150,7 @@ struct agent_runtime_task_t {
 	std::string streamed_reasoning;
 	std::string completion_summary;
 	std::string task_contract_json, task_acceptance_json,
-		task_acceptance_status;
+	    task_acceptance_status;
 	size_t completed_tool_calls = 0;
 	// Incremented only after a mutating tool has durably created a path. The
 	// browser uses it to refresh the project tree while the run is still active.
@@ -193,7 +193,7 @@ struct agent_runtime_task_t {
 	std::string provider_response_id;
 	bool provider_response_pending = false;
 	std::vector<webcool::ai::completion_tool_output_t>
-		provider_tool_outputs;
+	    provider_tool_outputs;
 	// One JSONL file per run accompanies the optional reasoning text file. This
 	// contains only operational metadata (never prompts, source, tool results or
 	// credentials) and is updated while the model/tool loop is still running.
@@ -229,389 +229,362 @@ struct batch_validation_evidence_t {
 };
 
 // Runtime helpers.
-std::string runtime_task_key(const std::string &user_root,
-			     const std::string &id);
+std::string runtime_task_key(
+    const std::string &user_root, const std::string &id);
 
-bool register_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
-			   std::string &err);
+bool register_runtime_task(
+    const std::shared_ptr<agent_runtime_task_t> &task, std::string &err);
 
 bool wait_for_runtime_admission(
-	const std::shared_ptr<agent_runtime_task_t> &task);
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
 void remove_runtime_task(const std::string &user_root, const std::string &id);
 
 bool runtime_cancel_requested(
-	const std::shared_ptr<agent_runtime_task_t> &task);
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
-size_t
-runtime_completed_tool_count(const std::shared_ptr<agent_runtime_task_t> &task);
+size_t runtime_completed_tool_count(
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
 bool wait_while_runtime_paused(
-	const std::shared_ptr<agent_runtime_task_t> &task);
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
 bool request_runtime_pause(const std::string &user_root, const std::string &id,
-			   bool paused, bool &already_done,
-			   bool &pause_requested);
+    bool paused, bool &already_done, bool &pause_requested);
 
-bool request_runtime_cancel(const std::string &user_root, const std::string &id,
-			    bool &already_done);
+bool request_runtime_cancel(
+    const std::string &user_root, const std::string &id, bool &already_done);
 
 void attach_runtime_worker(const std::shared_ptr<agent_runtime_task_t> &task,
-			   const std::shared_ptr<acl::fiber> &worker);
+    const std::shared_ptr<acl::fiber> &worker);
 
+bool workspace_entry_state(webcool::ai::agent_workspace_t &workspace,
+    const std::string &raw_path, bool &exists, bool &directory,
+    std::string &err);
+std::string operation_log_path(
+    const std::shared_ptr<agent_runtime_task_t> &task);
+std::string sanitize_operation_detail(const std::string &input);
 void append_runtime_operation_events(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::vector<acl::json_node *> &events);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::vector<acl::json_node *> &events);
 
 void append_runtime_operation_event(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	acl::json_node &event);
+    const std::shared_ptr<agent_runtime_task_t> &task, acl::json_node &event);
 
 void append_simple_operation_event(
-	const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
-	const std::string &phase, const std::string &tool,
-	size_t completed_tool_calls);
+    const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
+    const std::string &phase, const std::string &tool,
+    size_t completed_tool_calls);
 
 void append_model_operation_event(
-	const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
-	const webcool::ai::completion_result_t &output,
-	const std::string &error = std::string(),
-	long long effective_max_output_tokens = 0);
+    const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
+    const webcool::ai::completion_result_t &output,
+    const std::string &error = std::string(),
+    long long effective_max_output_tokens = 0);
 
 void update_runtime_progress(const std::shared_ptr<agent_runtime_task_t> &task,
-			     const std::string &phase,
-			     const std::string &current_tool,
-			     size_t completed_tool_calls);
+    const std::string &phase, const std::string &current_tool,
+    size_t completed_tool_calls);
 
 void complete_runtime_tool(const std::shared_ptr<agent_runtime_task_t> &task,
-			   const agent_tool_trace_t &trace,
-			   size_t completed_tool_calls);
+    const agent_tool_trace_t &trace, size_t completed_tool_calls);
 
 void begin_runtime_model_stream(
-	const std::shared_ptr<agent_runtime_task_t> &task);
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
-std::string
-runtime_reasoning_snapshot(const std::shared_ptr<agent_runtime_task_t> &task);
+std::string runtime_reasoning_snapshot(
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
-std::string
-runtime_reasoning_for_save(const std::shared_ptr<agent_runtime_task_t> &task);
+std::string runtime_reasoning_for_save(
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
 void mark_runtime_recovery_available(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::string &progress_file);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::string &progress_file);
 
 bool append_runtime_reasoning_delta(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::string &delta);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::string &delta);
 
 bool append_runtime_model_delta(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::string &delta);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::string &delta);
 
-unsigned long long
-runtime_event_version(const std::shared_ptr<agent_runtime_task_t> &task);
+unsigned long long runtime_event_version(
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
 unsigned long long runtime_staged_change_version(
-	const std::shared_ptr<agent_runtime_task_t> &task);
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
 bool begin_runtime_subscription(
-	const std::shared_ptr<agent_runtime_task_t> &task);
+    const std::shared_ptr<agent_runtime_task_t> &task);
 
-std::shared_ptr<agent_runtime_task_t>
-find_runtime_task(const std::string &user_root, const std::string &id);
+std::shared_ptr<agent_runtime_task_t> find_runtime_task(
+    const std::string &user_root, const std::string &id);
 
 void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
-			 const std::string &status, const std::string &error,
-			 const webcool::ai::completion_result_t *output,
-			 const std::vector<agent_tool_trace_t> *traces,
-			 const std::vector<agent_change_proposal_t> *changes,
-			 size_t rejected_changes);
+    const std::string &status, const std::string &error,
+    const webcool::ai::completion_result_t *output,
+    const std::vector<agent_tool_trace_t> *traces,
+    const std::vector<agent_change_proposal_t> *changes,
+    size_t rejected_changes);
 
 void set_runtime_result_artifact(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::string &path, const std::string &decision);
+    const std::shared_ptr<agent_runtime_task_t> &task, const std::string &path,
+    const std::string &decision);
 
 void set_runtime_completion_summary(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::string &completion_summary);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::string &completion_summary);
 
 void set_runtime_changes_applied(
-	const std::shared_ptr<agent_runtime_task_t> &task, bool applied,
-	const std::string &apply_error, const std::string &last_path,
-	size_t mutation_count);
+    const std::shared_ptr<agent_runtime_task_t> &task, bool applied,
+    const std::string &apply_error, const std::string &last_path,
+    size_t mutation_count);
 
 void publish_runtime_staged_changes(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::vector<agent_change_proposal_t> &changes);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::vector<agent_change_proposal_t> &changes);
 
 void publish_runtime_change_reviews(
-	const std::shared_ptr<agent_runtime_task_t> &task,
-	const std::vector<webcool::ai::agent_change_review_t> & /* reviews */,
-	const webcool::ai::agent_result_t &persisted);
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::vector<webcool::ai::agent_change_review_t> & /* reviews */,
+    const webcool::ai::agent_result_t &persisted);
 
-void attach_change_preview_diffs(
-	std::vector<agent_change_proposal_t> &changes,
-	const webcool::ai::workspace_change_set_preview_t &preview);
+void attach_change_preview_diffs(std::vector<agent_change_proposal_t> &changes,
+    const webcool::ai::workspace_change_set_preview_t &preview);
 
-void add_run_record_json(acl::json_node &item,
-			 const webcool::ai::agent_run_record_t &record);
+void add_run_record_json(
+    acl::json_node &item, const webcool::ai::agent_run_record_t &record);
 
-void add_runtime_result_json(
-	acl::json_node &root, const std::shared_ptr<agent_runtime_task_t> &task,
-	const webcool::ai::agent_result_t *persisted = NULL,
-	bool include_changes = true);
+void add_runtime_result_json(acl::json_node &root,
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const webcool::ai::agent_result_t *persisted = NULL,
+    bool include_changes = true);
 
 void add_durable_recovery_json(acl::json_node &root,
-			       const std::string &user_root,
-			       const webcool::ai::agent_run_record_t &record,
-			       const std::string &session_hint);
+    const std::string &user_root, const webcool::ai::agent_run_record_t &record,
+    const std::string &session_hint);
 
 void add_persisted_result_json(acl::json_node &root,
-			       const webcool::ai::agent_result_t &result,
-			       const std::string &relative_path);
+    const webcool::ai::agent_result_t &result,
+    const std::string &relative_path);
 
 // Context helpers.
 
 bool local_project_location(const std::string &input, std::string &logical,
-			    std::string &physical, std::string &err);
+    std::string &physical, std::string &err);
 
 bool safe_git_project_directory(const std::string &physical);
 
-bool load_temporary_attachments(
-	acl::json_node *attachment_node, const std::string &draft,
-	const std::string &user_root,
-	std::vector<webcool::ai::completion_image_t> &images,
-	std::string &text_context, std::string &err);
+bool load_temporary_attachments(acl::json_node *attachment_node,
+    const std::string &draft, const std::string &user_root,
+    std::vector<webcool::ai::completion_image_t> &images,
+    std::string &text_context, std::string &err);
 
-void remove_temporary_attachment_draft(const std::string &draft,
-				       const std::string &user_root);
+void remove_temporary_attachment_draft(
+    const std::string &draft, const std::string &user_root);
 
 std::string new_run_id();
 
-const webcool::ai::provider_config_t *
-select_provider(const std::vector<webcool::ai::provider_config_t> &providers,
-		const std::string &requested);
+const webcool::ai::provider_config_t *select_provider(
+    const std::vector<webcool::ai::provider_config_t> &providers,
+    const std::string &requested);
 
 bool provider_is_deepseek(const webcool::ai::provider_config_t &provider);
 
 bool provider_supports_thinking_disable(
-	const webcool::ai::provider_config_t &provider);
+    const webcool::ai::provider_config_t &provider);
 
 bool provider_requires_extended_reasoning_budget(
-	const webcool::ai::provider_config_t &provider);
+    const webcool::ai::provider_config_t &provider);
 
-bool compose_initial_prompt(
-	webcool::ai::agent_workspace_t &workspace,
-	const webcool::ai::provider_config_t &provider,
-	const std::string &user_root, const std::string &project_path,
-	const std::string &prompt, const std::string &current_session_id,
-	const std::string &execution_mode, const std::string &previous_summary,
-	std::string &initial_prompt, std::string &err, bool chinese,
-	const webcool::ai::agent_project_record_t *selected_project = NULL,
-	operation_trace_t *trace = NULL);
+bool compose_initial_prompt(webcool::ai::agent_workspace_t &workspace,
+    const webcool::ai::provider_config_t &provider,
+    const std::string &user_root, const std::string &project_path,
+    const std::string &prompt, const std::string &current_session_id,
+    const std::string &execution_mode, const std::string &previous_summary,
+    std::string &initial_prompt, std::string &err, bool chinese,
+    const webcool::ai::agent_project_record_t *selected_project = NULL,
+    operation_trace_t *trace = NULL);
 
-std::string deterministic_delivery_summary(
-	const std::string &user_request,
-	const std::vector<agent_change_proposal_t> &changes,
-	const std::string &validation_state);
+std::string deterministic_delivery_summary(const std::string &user_request,
+    const std::vector<agent_change_proposal_t> &changes,
+    const std::string &validation_state);
 
-std::string
-completion_summary_for_run(const std::string &provided,
-			   const std::string &memory_summary,
-			   const std::string &final_text,
-			   const std::vector<agent_change_proposal_t> &changes,
-			   const std::string &original_prompt);
+std::string completion_summary_for_run(const std::string &provided,
+    const std::string &memory_summary, const std::string &final_text,
+    const std::vector<agent_change_proposal_t> &changes,
+    const std::string &original_prompt);
 
 // Tools helpers.
 std::string tool_error_json(const std::string &error);
 
 void collect_proposal_failure_causes(const std::string &result,
-				     std::vector<std::string> &causes,
-				     size_t depth = 0);
+    std::vector<std::string> &causes, size_t depth = 0);
 
 bool is_incremental_proposal_tool(const std::string &name);
 
 bool request_contains_only_proposals(const agent_tool_request_t &request);
 
 agent_tool_request_t merge_completion_tool_calls(
-	const std::vector<webcool::ai::completion_tool_call_t> &calls);
+    const std::vector<webcool::ai::completion_tool_call_t> &calls);
 
 bool build_native_tool_outputs(
-	const std::vector<webcool::ai::completion_tool_call_t> &calls,
-	const std::string &combined_result,
-	std::vector<webcool::ai::completion_tool_output_t> &outputs);
+    const std::vector<webcool::ai::completion_tool_call_t> &calls,
+    const std::string &combined_result,
+    std::vector<webcool::ai::completion_tool_output_t> &outputs);
 
 bool completion_calls_have_ids(
-	const std::vector<webcool::ai::completion_tool_call_t> &calls);
+    const std::vector<webcool::ai::completion_tool_call_t> &calls);
 
 std::string annotate_read_coverage(const std::string &name,
-				   const std::string &result,
-				   webcool::ai::agent_read_coverage_t &coverage,
-				   bool chinese);
+    const std::string &result, webcool::ai::agent_read_coverage_t &coverage,
+    bool chinese);
 
 void collect_observation_signatures(const std::string &name,
-				    const std::string &result,
-				    std::vector<std::string> &signatures);
+    const std::string &result, std::vector<std::string> &signatures);
 
 bool repeated_repair_failure(const std::string &report,
-			     const std::string &draft,
-			     webcool::ai::repair_failure_tracker_t &tracker);
+    const std::string &draft, webcool::ai::repair_failure_tracker_t &tracker);
 
 bool repair_review_read_only(const agent_tool_request_t &request);
 
 void consume_repair_reads(const std::string &name, const std::string &result,
-			  std::map<std::string, std::string> &required);
+    std::map<std::string, std::string> &required);
 
-std::string
-repair_review_required(const std::map<std::string, std::string> &required,
-		       bool chinese);
+std::string repair_review_required(
+    const std::map<std::string, std::string> &required, bool chinese);
 
-std::string batch_read_continuation(const std::string &name,
-				    const std::string &result);
+std::string batch_read_continuation(
+    const std::string &name, const std::string &result);
 bool remember_read_result(const std::string &name, const std::string &result,
-			  webcool::ai::agent_read_context_t &context);
+    webcool::ai::agent_read_context_t &context);
 
 bool read_result_is_retained(const std::string &name, const std::string &result,
-			     const webcool::ai::agent_read_context_t &context);
+    const webcool::ai::agent_read_context_t &context);
 
-void restore_read_context(const std::string &transcript,
-			  webcool::ai::agent_read_context_t &context);
+void restore_read_context(
+    const std::string &transcript, webcool::ai::agent_read_context_t &context);
 
 bool project_path_to_draft_path(const std::string &project_path,
-				const std::string &path,
-				std::string &draft_path);
+    const std::string &path, std::string &draft_path);
 
-std::string
-validation_baseline_fingerprint(webcool::ai::agent_workspace_t &workspace,
-				const std::string &project_path);
+std::string validation_baseline_fingerprint(
+    webcool::ai::agent_workspace_t &workspace, const std::string &project_path);
 
-std::string successful_validation_summary(const std::string &report,
-					  bool chinese);
+std::string successful_validation_summary(
+    const std::string &report, bool chinese);
 
-std::string execute_workspace_tool(
-	webcool::ai::agent_workspace_t &workspace, const std::string &user_root,
-	const std::string &project_path, bool allow_file_content,
-	const agent_tool_request_t &request, agent_tool_trace_t &trace,
-	std::vector<agent_change_proposal_t> *staged_changes,
-	const std::string &run_id,
-	const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
-	const unavailable_validation_t *unavailable_validation = NULL,
-	validation_cache_t *validation_cache = NULL,
-	std::string *saved_proposal_batch = NULL,
-	batch_validation_evidence_t *batch_validation = NULL);
+std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
+    const std::string &user_root, const std::string &project_path,
+    bool allow_file_content, const agent_tool_request_t &request,
+    agent_tool_trace_t &trace,
+    std::vector<agent_change_proposal_t> *staged_changes,
+    const std::string &run_id,
+    const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
+    const unavailable_validation_t *unavailable_validation = NULL,
+    validation_cache_t *validation_cache = NULL,
+    std::string *saved_proposal_batch = NULL,
+    batch_validation_evidence_t *batch_validation = NULL);
 
 // Drafts helpers.
 bool verify_result_changes_applied(const std::string &user_root,
-				   const webcool::ai::agent_result_t &result,
-				   std::string &err);
+    const webcool::ai::agent_result_t &result, std::string &err);
 
-bool workspace_change_matches(
-	const std::string &user_root,
-	const webcool::ai::workspace_change_input_t &change, bool &matches,
-	std::string &err);
+bool workspace_change_matches(const std::string &user_root,
+    const webcool::ai::workspace_change_input_t &change, bool &matches,
+    std::string &err);
 
-bool workspace_path_is_below(const std::string &path,
-			     const std::string &directory);
+bool workspace_path_is_below(
+    const std::string &path, const std::string &directory);
 
 std::string persistent_draft_root(const std::string &user_root,
-				  const std::string &project_path,
-				  const std::string &run_id);
+    const std::string &project_path, const std::string &run_id);
 
-bool materialize_staged_worktree(
-	const std::string &user_root, const std::string &project_path,
-	const std::string &run_id,
-	const std::vector<agent_change_proposal_t> &changes,
-	size_t &skipped_files, std::string &err);
+bool materialize_staged_worktree(const std::string &user_root,
+    const std::string &project_path, const std::string &run_id,
+    const std::vector<agent_change_proposal_t> &changes, size_t &skipped_files,
+    std::string &err);
 
 bool synchronize_live_review_state(
-	const std::shared_ptr<agent_runtime_task_t> &runtime_task,
-	const std::string &project_path,
-	std::vector<agent_change_proposal_t> &active_changes,
-	size_t &resolved_count, std::string &err);
+    const std::shared_ptr<agent_runtime_task_t> &runtime_task,
+    const std::string &project_path,
+    std::vector<agent_change_proposal_t> &active_changes,
+    size_t &resolved_count, std::string &err);
 
 bool remove_persistent_worktree(const std::string &user_root,
-				const std::string &project_path,
-				const std::string &run_id, std::string &err);
+    const std::string &project_path, const std::string &run_id,
+    std::string &err);
 
 bool schedule_reviewed_worktree_cleanup(const std::string &user_root,
-					const std::string &project_path,
-					const std::string &run_id,
-					std::string &err);
+    const std::string &project_path, const std::string &run_id,
+    std::string &err);
 
-std::string validate_staged_draft(
-	const std::string &user_root, const std::string &project_path,
-	const std::string &run_id,
-	const std::vector<agent_change_proposal_t> &changes,
-	const webcool::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
-	std::string *source_fingerprint = NULL, bool build_only = false);
+std::string validate_staged_draft(const std::string &user_root,
+    const std::string &project_path, const std::string &run_id,
+    const std::vector<agent_change_proposal_t> &changes,
+    const webcool::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
+    std::string *source_fingerprint = NULL, bool build_only = false);
 
-std::string
-staged_change_fingerprint(const std::vector<agent_change_proposal_t> &changes);
+std::string staged_change_fingerprint(
+    const std::vector<agent_change_proposal_t> &changes);
 
-std::string
-staged_cycle_fingerprint(const std::vector<agent_change_proposal_t> &changes);
+std::string staged_cycle_fingerprint(
+    const std::vector<agent_change_proposal_t> &changes);
 
 // Loop helpers.
-bool load_matching_coding_progress(
-	webcool::ai::agent_progress_store_t &store,
-	const webcool::ai::provider_config_t &provider,
-	const std::string &project_path, const std::string &original_prompt,
-	std::string &initial_prompt, std::string &recovered_reasoning,
-	size_t &completed_tool_calls, bool &resumed, std::string &err);
+bool load_matching_coding_progress(webcool::ai::agent_progress_store_t &store,
+    const webcool::ai::provider_config_t &provider,
+    const std::string &project_path, const std::string &original_prompt,
+    std::string &initial_prompt, std::string &recovered_reasoning,
+    size_t &completed_tool_calls, bool &resumed, std::string &err);
 
-bool run_coding_tool_loop(
-	const webcool::ai::provider_config_t &provider,
-	const std::string &api_key, webcool::ai::agent_workspace_t &workspace,
-	const std::string &project_path, const std::string &original_prompt,
-	const std::string &initial_prompt,
-	const std::string &recovered_reasoning,
-	const std::vector<webcool::ai::completion_image_t> &request_images,
-	size_t initial_completed_tool_calls, size_t max_tool_calls,
-	long long max_output_tokens, size_t max_no_progress_tool_calls,
-	size_t tool_context_compaction_bytes,
-	const webcool::ai::sandbox_limits_t &sandbox_limits,
-	const std::string &thinking_mode, const std::string &reasoning_effort,
-	webcool::ai::completion_result_t &final_output,
-	std::vector<agent_tool_trace_t> &traces,
-	std::vector<agent_change_proposal_t> &changes,
-	std::string &memory_summary, std::string &completion_summary,
-	std::string &session_title, size_t &rejected_changes,
-	const std::shared_ptr<agent_runtime_task_t> &runtime_task,
-	std::string &err);
+bool run_coding_tool_loop(const webcool::ai::provider_config_t &provider,
+    const std::string &api_key, webcool::ai::agent_workspace_t &workspace,
+    const std::string &project_path, const std::string &original_prompt,
+    const std::string &initial_prompt, const std::string &recovered_reasoning,
+    const std::vector<webcool::ai::completion_image_t> &request_images,
+    size_t initial_completed_tool_calls, size_t max_tool_calls,
+    long long max_output_tokens, size_t max_no_progress_tool_calls,
+    size_t tool_context_compaction_bytes,
+    const webcool::ai::sandbox_limits_t &sandbox_limits,
+    const std::string &thinking_mode, const std::string &reasoning_effort,
+    webcool::ai::completion_result_t &final_output,
+    std::vector<agent_tool_trace_t> &traces,
+    std::vector<agent_change_proposal_t> &changes, std::string &memory_summary,
+    std::string &completion_summary, std::string &session_title,
+    size_t &rejected_changes,
+    const std::shared_ptr<agent_runtime_task_t> &runtime_task,
+    std::string &err);
 
 // Worker helpers.
 bool run_assistant_image_task(const std::shared_ptr<agent_runtime_task_t> &task,
-			      const webcool::ai::provider_config_t &provider,
-			      const std::string &api_key,
-			      webcool::ai::completion_result_t &output,
-			      std::string &err);
+    const webcool::ai::provider_config_t &provider, const std::string &api_key,
+    webcool::ai::completion_result_t &output, std::string &err);
 
 void run_async_coding_task(
-	const std::shared_ptr<agent_runtime_task_t> &runtime_task,
-	webcool::ai::provider_config_t provider, std::string api_key,
-	const std::string &project_path, const std::string &original_prompt,
-	const std::string &initial_prompt,
-	const std::string &recovered_reasoning,
-	const std::vector<webcool::ai::completion_image_t> &request_images,
-	size_t initial_completed_tool_calls, size_t max_tool_calls,
-	long long max_output_tokens, size_t max_no_progress_tool_calls,
-	size_t tool_context_compaction_bytes,
-	const webcool::ai::sandbox_limits_t &sandbox_limits,
-	const std::string &thinking_mode, const std::string &reasoning_effort);
+    const std::shared_ptr<agent_runtime_task_t> &runtime_task,
+    webcool::ai::provider_config_t provider, std::string api_key,
+    const std::string &project_path, const std::string &original_prompt,
+    const std::string &initial_prompt, const std::string &recovered_reasoning,
+    const std::vector<webcool::ai::completion_image_t> &request_images,
+    size_t initial_completed_tool_calls, size_t max_tool_calls,
+    long long max_output_tokens, size_t max_no_progress_tool_calls,
+    size_t tool_context_compaction_bytes,
+    const webcool::ai::sandbox_limits_t &sandbox_limits,
+    const std::string &thinking_mode, const std::string &reasoning_effort);
 
-std::shared_ptr<agent_runtime_task_t>
-recover_runtime_task(const std::string &upload_root,
-		     const std::string &user_root, const std::string &username,
-		     const webcool::ai::agent_run_record_t &record,
-		     std::string &err);
+std::shared_ptr<agent_runtime_task_t> recover_runtime_task(
+    const std::string &upload_root, const std::string &user_root,
+    const std::string &username, const webcool::ai::agent_run_record_t &record,
+    std::string &err);
 
 // Common helpers.
 
 bool load_review_run_record(const std::string &user_root,
-			    const std::string &run_id,
-			    const std::string &session_id,
-			    webcool::ai::agent_run_record_t &record,
-			    std::string &err);
+    const std::string &run_id, const std::string &session_id,
+    webcool::ai::agent_run_record_t &record, std::string &err);
 
 bool reviewable_agent_run_status(const std::string &status);
 
@@ -623,8 +596,8 @@ bool json_bool(acl::json_node *node, bool fallback);
 
 acl::json_node *json_array_node(acl::json_node *node);
 
-bool parse_string_array(acl::json_node *node, size_t limit,
-			std::vector<std::string> &values);
+bool parse_string_array(
+    acl::json_node *node, size_t limit, std::vector<std::string> &values);
 
 std::string serialize_json(acl::json_node &root);
 
@@ -632,7 +605,7 @@ std::string serialize_json(acl::json_node &root);
 // other fibers on the same OS thread; process time includes concurrent requests.
 struct operation_cpu_snapshot_t {
 	std::chrono::steady_clock::time_point wall =
-		std::chrono::steady_clock::now();
+	    std::chrono::steady_clock::now();
 	double thread_ms = -1, process_ms = -1;
 	operation_cpu_snapshot_t()
 	{
@@ -642,33 +615,32 @@ struct operation_cpu_snapshot_t {
 			thread_ms = ts.tv_sec * 1000.0 + ts.tv_nsec / 1000000.0;
 		if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0)
 			process_ms =
-				ts.tv_sec * 1000.0 + ts.tv_nsec / 1000000.0;
+			    ts.tv_sec * 1000.0 + ts.tv_nsec / 1000000.0;
 #endif
 	}
-	void add_delta(acl::json_node &node,
-		       const operation_cpu_snapshot_t &end) const
+	void add_delta(
+	    acl::json_node &node, const operation_cpu_snapshot_t &end) const
 	{
 		const double elapsed =
-			std::chrono::duration<double, std::milli>(end.wall -
-								  wall)
-				.count();
+		    std::chrono::duration<double, std::milli>(end.wall - wall)
+		        .count();
 		const double thread = thread_ms < 0 || end.thread_ms < 0 ?
-					      -1 :
-					      end.thread_ms - thread_ms;
+		    -1 :
+		    end.thread_ms - thread_ms;
 		const double process = process_ms < 0 || end.process_ms < 0 ?
-					       -1 :
-					       end.process_ms - process_ms;
+		    -1 :
+		    end.process_ms - process_ms;
 		node.add_number("elapsed_ms", (long long)elapsed);
 		node.add_number("thread_cpu_ms", (long long)thread);
 		node.add_number("process_cpu_ms", (long long)process);
 		node.add_number("thread_cpu_average_percent",
-				thread < 0 || elapsed <= 0 ?
-					-1 :
-					(long long)(thread * 100 / elapsed));
+		    thread < 0 || elapsed <= 0 ?
+		        -1 :
+		        (long long)(thread * 100 / elapsed));
 		node.add_number("process_cpu_average_percent",
-				process < 0 || elapsed <= 0 ?
-					-1 :
-					(long long)(process * 100 / elapsed));
+		    process < 0 || elapsed <= 0 ?
+		        -1 :
+		        (long long)(process * 100 / elapsed));
 	}
 };
 
@@ -687,7 +659,7 @@ class operation_trace_t {
 
 public:
 	explicit operation_trace_t(const char *operation)
-		: operation_(operation)
+	        : operation_(operation)
 	{
 	}
 	void bind(const std::shared_ptr<agent_runtime_task_t> &task)
@@ -725,8 +697,8 @@ public:
 			event.add_text("event", "operation_performance");
 			event.add_text("operation", operation_.c_str());
 			if (!project_id_.empty())
-				event.add_text("project_id",
-					       project_id_.c_str());
+				event.add_text(
+				    "project_id", project_id_.c_str());
 			event.add_bool("completed", completed_);
 			started_.add_delta(event, phase_started_);
 			auto &stages = json.create_array();
@@ -739,10 +711,10 @@ public:
 			// Server log also covers requests rejected before a run is created,
 			// and archived reviews without a live runtime task.
 			if (task_)
-				event.add_text("trace_run_id",
-					       task_->id.c_str());
+				event.add_text(
+				    "trace_run_id", task_->id.c_str());
 			logger("agent.performance %s",
-			       serialize_json(event).c_str());
+			    serialize_json(event).c_str());
 			append_runtime_operation_event(task_, event);
 		} catch (...) {
 			logger_error("agent.performance trace failed");

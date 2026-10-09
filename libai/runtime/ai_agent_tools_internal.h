@@ -6,32 +6,31 @@ namespace action
 namespace agent_detail
 {
 std::string edit_rebase_error(const std::string &error, const std::string &path,
-			      const std::string &source, bool chinese);
+    const std::string &source, bool chinese);
 
-std::string
-proposal_error_json(const std::vector<proposal_validation_error_t> &failures,
-		    bool chinese);
+std::string proposal_error_json(
+    const std::vector<proposal_validation_error_t> &failures, bool chinese);
 
 bool is_parallel_read_tool(const std::string &name);
 
-std::string draft_path_to_project_path(const std::string &project_path,
-				       const std::string &draft_path);
+std::string draft_path_to_project_path(
+    const std::string &project_path, const std::string &draft_path);
 
 void append_edit_snapshot(acl::json &json, acl::json_node &root,
-			  const std::string &source, size_t at, bool chinese);
+    const std::string &source, size_t at, bool chinese);
 
 bool path_has_pending_proposal(
-	const std::vector<agent_change_proposal_t> *staged_changes,
-	const std::string &path);
+    const std::vector<agent_change_proposal_t> *staged_changes,
+    const std::string &path);
 
-agent_tool_request_t
-completion_tool_request(const webcool::ai::completion_tool_call_t &call);
+agent_tool_request_t completion_tool_request(
+    const webcool::ai::completion_tool_call_t &call);
 
-std::string workspace_inspection_error(const std::string &err,
-				       const std::string &path, bool chinese);
+std::string workspace_inspection_error(
+    const std::string &err, const std::string &path, bool chinese);
 
-bool remember_read_page(acl::json_node &page,
-			webcool::ai::agent_read_context_t &context);
+bool remember_read_page(
+    acl::json_node &page, webcool::ai::agent_read_context_t &context);
 
 namespace workspace_tool_detail
 {
@@ -67,19 +66,18 @@ struct workspace_tool_context_t {
 std::string finish_workspace_tool_result(workspace_tool_context_t &context);
 
 std::string workspace_read_path_to_project(const std::string &project_path,
-					   bool live_source_view,
-					   const std::string &value);
+    bool live_source_view, const std::string &value);
 
-std::string execute_workspace_batch(
-	webcool::ai::agent_workspace_t &workspace, const std::string &user_root,
-	const std::string &project_path, bool allow_file_content,
-	const agent_tool_request_t &request, agent_tool_trace_t &trace,
-	std::vector<agent_change_proposal_t> *staged_changes,
-	const std::string &run_id,
-	const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
-	const unavailable_validation_t *unavailable_validation,
-	validation_cache_t *validation_cache, std::string *saved_proposal_batch,
-	batch_validation_evidence_t *batch_validation);
+std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
+    const std::string &user_root, const std::string &project_path,
+    bool allow_file_content, const agent_tool_request_t &request,
+    agent_tool_trace_t &trace,
+    std::vector<agent_change_proposal_t> *staged_changes,
+    const std::string &run_id,
+    const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
+    const unavailable_validation_t *unavailable_validation,
+    validation_cache_t *validation_cache, std::string *saved_proposal_batch,
+    batch_validation_evidence_t *batch_validation);
 
 std::string execute_workspace_validate(workspace_tool_context_t &context);
 
@@ -103,8 +101,8 @@ std::string execute_workspace_patch_set(workspace_tool_context_t &context);
 
 std::string execute_workspace_replace(workspace_tool_context_t &context);
 
-std::string
-execute_workspace_propose_operation(workspace_tool_context_t &context);
+std::string execute_workspace_propose_operation(
+    workspace_tool_context_t &context);
 
 std::string execute_workspace_mkdir(workspace_tool_context_t &context);
 

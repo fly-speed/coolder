@@ -482,4 +482,74 @@
       <Filter>workspace</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="project\project_toolchain_build.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClInclude Include="project\project_toolchain_internal.h">
+      <Filter>project</Filter>
+    </ClInclude>
+    <ClCompile Include="project\project_toolchain_languages.cpp">
+      <Filter>project</Filter>
+    </ClCompile>
+    <ClInclude Include="prompt\prompt_types.h">
+      <Filter>prompt</Filter>
+    </ClInclude>
+    <ClCompile Include="provider\ai_provider_records.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_secrets.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="provider\ai_provider_service.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClInclude Include="provider\ai_provider_store_internal.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClInclude Include="provider\ai_provider_transport_internal.h">
+      <Filter>provider</Filter>
+    </ClInclude>
+    <ClCompile Include="provider\ai_provider_transport_stream.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_events.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_results.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\ai_agent_validation.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClInclude Include="sandbox\program_sandbox_internal.h">
+      <Filter>sandbox</Filter>
+    </ClInclude>
+    <ClCompile Include="sandbox\program_sandbox_process.cpp">
+      <Filter>sandbox</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_draft_dependencies.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\agent_draft_files.cpp">
+      <Filter>storage</Filter>
+    </ClCompile>
+    <ClInclude Include="storage\agent_draft_store_internal.h">
+      <Filter>storage</Filter>
+    </ClInclude>
+    <ClCompile Include="workspace\workspace_change_journal.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClCompile Include="workspace\workspace_change_records.cpp">
+      <Filter>workspace</Filter>
+    </ClCompile>
+    <ClInclude Include="workspace\workspace_change_set_internal.h">
+      <Filter>workspace</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="common\windows_browser_runtime.h">
+      <Filter>common</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

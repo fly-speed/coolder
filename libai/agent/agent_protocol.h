@@ -24,7 +24,7 @@ struct agent_tool_request_t {
 	// review proposal and never overwrites the formal project file directly.
 	std::string content;
 	bool content_present =
-		false; // Explicit JSON string, including an intentional empty deletion.
+	    false; // Explicit JSON string, including an intentional empty deletion.
 };
 
 // A model proposal remains outside the formal project until server-side
@@ -82,8 +82,8 @@ struct agent_protocol_message_t {
 
 // Returns false when the model did not emit the structured WebCool protocol.
 // Callers may safely treat that output as a plain final response.
-bool parse_agent_protocol_message(const std::string &raw,
-				  agent_protocol_message_t &message);
+bool parse_agent_protocol_message(
+    const std::string &raw, agent_protocol_message_t &message);
 
 } // namespace ai
 } // namespace webcool

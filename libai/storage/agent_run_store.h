@@ -45,21 +45,21 @@ public:
 
 	bool create(const agent_run_record_t &record, std::string &err) const;
 	bool complete(const std::string &id, long long input_tokens,
-		      long long cached_input_tokens, long long output_tokens,
-		      long long reasoning_tokens, long long latency_ms,
-		      long long tool_calls, long long proposed_changes,
-		      long long rejected_changes, std::string &err) const;
+	    long long cached_input_tokens, long long output_tokens,
+	    long long reasoning_tokens, long long latency_ms,
+	    long long tool_calls, long long proposed_changes,
+	    long long rejected_changes, std::string &err) const;
 	bool fail(const std::string &id, const std::string &error,
-		  std::string &err) const;
+	    std::string &err) const;
 	bool fail(const std::string &id, const std::string &error,
-		  const std::string &provider_error_category,
-		  int provider_http_status, bool provider_error_retryable,
-		  std::string &err) const;
+	    const std::string &provider_error_category,
+	    int provider_http_status, bool provider_error_retryable,
+	    std::string &err) const;
 	bool cancel(const std::string &id, std::string &err) const;
 	bool get(const std::string &id, agent_run_record_t &record,
-		 std::string &err) const;
+	    std::string &err) const;
 	bool list(size_t limit, std::vector<agent_run_record_t> &records,
-		  std::string &err) const;
+	    std::string &err) const;
 
 private:
 	std::string user_root_;

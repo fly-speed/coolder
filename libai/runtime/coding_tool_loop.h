@@ -54,14 +54,14 @@ private:
 	std::string probe_browser_experiment();
 	std::string browser_experiment_selector;
 	std::vector<webcool::ai::completion_image_t> browser_experiment_images,
-		browser_verified_images;
+	    browser_verified_images;
 	bool require_browser_connection();
 	bool run_impl();
 	bool prepare_task_contract();
 	void record_acceptance_evidence(const std::string &report);
 	void finish_task_acceptance(bool completed);
 	std::string task_contract, acceptance_report, acceptance_draft,
-		acceptance_baseline;
+	    acceptance_baseline;
 	bool acceptance_review_requested = false;
 	std::string requirement_progress_json;
 
@@ -79,13 +79,30 @@ private:
 	void discover_validation_capabilities();
 
 	// Provider requests, retries and response handling.
+	void track_repair_edits(coding_turn_t &turn);
+	void build_repair_focus(coding_turn_t &turn);
+	void select_repair_sources(coding_turn_t &turn);
+	void supply_repair_review_sources(coding_turn_t &turn);
+	bool prepare_browser_experiment(coding_turn_t &turn);
+	void merge_final_proposals(coding_turn_t &turn);
+	bool restore_checkpoint_contents(
+	    const webcool::ai::agent_progress_t &restored,
+	    std::string &restore_err);
+	bool retrieve_pending_model(coding_turn_t &turn,
+	    runtime_stream_observer_t &observer, bool &model_call_completed);
+	void invalidate_changed_read_context(coding_turn_t &turn);
 	void build_model_request(coding_turn_t &turn);
+	void build_request_instructions(coding_turn_t &turn);
+	void build_request_contract(coding_turn_t &turn);
+	void build_request_options(coding_turn_t &turn);
+	void select_request_tools(coding_turn_t &turn);
+	void restore_request_evidence(coding_turn_t &turn);
+
 	void log_model_request(coding_turn_t &turn);
 	bool request_or_retrieve_model(coding_turn_t &turn,
-				       runtime_stream_observer_t &observer,
-				       bool &model_call_completed);
-	bool retry_interrupted_stream(coding_turn_t &turn,
-				      bool &model_call_completed);
+	    runtime_stream_observer_t &observer, bool &model_call_completed);
+	bool retry_interrupted_stream(
+	    coding_turn_t &turn, bool &model_call_completed);
 	bool request_model(coding_turn_t &turn);
 	step_t handle_preview_response(coding_turn_t &turn);
 	void record_model_response(coding_turn_t &turn);
@@ -127,7 +144,7 @@ private:
 	std::map<std::string, std::string> repair_required_reads;
 	std::map<std::string, std::string> repair_supplied_versions;
 	std::map<std::string, std::pair<std::string, std::string>>
-		pending_repair_edits;
+	    pending_repair_edits;
 	std::string unresolved_repair_contract, repair_contract_findings;
 	std::set<std::string> repair_changed_paths;
 	size_t repair_blocked_finals = 0;
@@ -136,7 +153,7 @@ private:
 	unavailable_validation_t unavailable_validation;
 	validation_cache_t validation_cache;
 	std::string
-		saved_proposal_batch; // One bounded payload, scoped to this running task.
+	    saved_proposal_batch; // One bounded payload, scoped to this running task.
 	// Once a model has exhausted an entire output budget on reasoning, keep the
 	// remainder of this run in direct protocol mode. A single successful recovery
 	// must not be followed immediately by another high-effort reasoning loop.
@@ -144,12 +161,12 @@ private:
 	bool recovery_repair_only = false;
 	std::string provider_response_id;
 	std::vector<webcool::ai::completion_tool_output_t>
-		provider_tool_outputs;
+	    provider_tool_outputs;
 	bool provider_response_pending = false;
 	std::string next_tool_guidance;
 	std::string provider_history_base;
 	std::vector<webcool::ai::completion_tool_exchange_t>
-		provider_tool_history;
+	    provider_tool_history;
 
 	std::string accumulated_reasoning;
 	bool recovered_checkpoint_reconciled = false;
@@ -163,7 +180,7 @@ private:
 	webcool::ai::agent_context_window_t recent_findings;
 	std::string validation_capabilities;
 	std::shared_ptr<webcool::ai::provider_transport_session_t>
-		transport_session;
+	    transport_session;
 	size_t read_batch_argument_errors = 0;
 
 	// A resumed run gets a fresh window while checkpoint counts stay cumulative.

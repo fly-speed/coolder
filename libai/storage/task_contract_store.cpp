@@ -28,9 +28,9 @@ bool decode(const std::string &value, std::vector<request_t> &requests)
 	     item = array->next_child()) {
 		request_t request;
 		request.run = json_value::nullable_text(
-			json_value::object_child(item, "run_id"));
+		    json_value::object_child(item, "run_id"));
 		request.text = json_value::nullable_text(
-			json_value::object_child(item, "text"));
+		    json_value::object_child(item, "text"));
 		if (request.text.empty() || requests.size() >= 256)
 			return false;
 		requests.push_back(request);
@@ -39,10 +39,9 @@ bool decode(const std::string &value, std::vector<request_t> &requests)
 }
 }
 bool begin_task_contract(const std::string &user_root,
-			 const std::string &project,
-			 const std::string &session_id,
-			 const std::string &run_id, const std::string &prompt,
-			 bool resume, std::string &contract, std::string &error)
+    const std::string &project, const std::string &session_id,
+    const std::string &run_id, const std::string &prompt, bool resume,
+    std::string &contract, std::string &error)
 {
 	std::lock_guard<webcool::mutex> lock(contract_mutex);
 	if (!identifiers::valid_id(run_id) ||
@@ -51,19 +50,18 @@ bool begin_task_contract(const std::string &user_root,
 		return false;
 	}
 	std::string root;
-	if (!agent_workspace_t::resolve_project_state_root(user_root, project,
-							   root, error))
+	if (!agent_workspace_t::resolve_project_state_root(
+	        user_root, project, root, error))
 		return false;
 	const std::string directory =
-		file_ops::join_path(root, ".webcool_agent");
+	    file_ops::join_path(root, ".webcool_agent");
 	if (!file_ops::make_private_directory(directory)) {
 		error = "cannot create safe task contract directory";
 		return false;
 	}
 	agent_workspace_t storage(directory);
 	const std::string name = "task-contract-" +
-				 (session_id.empty() ? run_id : session_id) +
-				 ".json";
+	    (session_id.empty() ? run_id : session_id) + ".json";
 	std::vector<request_t> requests;
 	bool bootstrapped = false;
 	if (file_ops::path_entry_exists(file_ops::join_path(directory, name))) {
@@ -72,28 +70,32 @@ bool begin_task_contract(const std::string &user_root,
 		if (!storage.read(name, value, truncated, error))
 			return false;
 		if (truncated || !decode(value, requests)) {
-			error = "task contract is invalid or too large; refusing to discard requirements";
+			error =
+			    "task contract is invalid or too large; refusing to discard requirements";
 			return false;
 		}
 	} else if (!session_id.empty()) {
 		agent_session_record_t session;
-		if (!agent_session_store_t(user_root).get(session_id, session,
-							  error))
+		if (!agent_session_store_t(user_root).get(
+		        session_id, session, error))
 			return false;
 		if (session.project_path != project) {
 			error = "task contract project mismatch";
 			return false;
 		}
-		for (const auto &message : session.messages)
-			if (message.role == "user")
-				requests.push_back(
-					{ message.run_id, message.text });
+		for (const auto &message : session.messages) {
+			if (!(message.role == "user"))
+				continue;
+			requests.push_back({ message.run_id, message.text });
+		}
 		bootstrapped = !requests.empty();
 	}
 	bool duplicate = false;
-	for (const auto &request : requests)
-		if (request.run == run_id)
-			duplicate = true;
+	for (const auto &request : requests) {
+		if (!(request.run == run_id))
+			continue;
+		duplicate = true;
+	}
 	if (resume && !requests.empty() && requests.back().text == prompt)
 		duplicate = true;
 	if (!duplicate)
@@ -102,7 +104,8 @@ bool begin_task_contract(const std::string &user_root,
 	for (const auto &request : requests)
 		bytes += request.text.size();
 	if (bytes > 64 * 1024 || requests.size() > 256) {
-		error = "task contract exceeds context capacity; start a new scoped session (requirements were not truncated)";
+		error =
+		    "task contract exceeds context capacity; start a new scoped session (requirements were not truncated)";
 		return false;
 	}
 	acl::json json;
@@ -111,9 +114,8 @@ bool begin_task_contract(const std::string &user_root,
 	node.add_text("project_path", project.c_str());
 	node.add_text("session_id", session_id.c_str());
 	node.add_text("authority", "user_requests");
-	node.add_text(
-		"history_limit",
-		"Older sessions import only retained user messages; missing history is unknown.");
+	node.add_text("history_limit",
+	    "Older sessions import only retained user messages; missing history is unknown.");
 	node.add_bool("bootstrapped_from_history", bootstrapped);
 	auto &array = json.create_array();
 	node.add_child("requests", array);
@@ -126,11 +128,11 @@ bool begin_task_contract(const std::string &user_root,
 		item.add_text("text", request.text.c_str());
 	}
 	contract = node.to_string().c_str();
-	if (contract.size() > 128 * 1024) {
-		error = "encoded task contract exceeds context capacity; requirements were not truncated";
-		return false;
-	}
-	return storage.save_generated_text(name, contract, error);
+	if (!(contract.size() > 128 * 1024))
+		return storage.save_generated_text(name, contract, error);
+	error =
+	    "encoded task contract exceeds context capacity; requirements were not truncated";
+	return false;
 }
 }
 }

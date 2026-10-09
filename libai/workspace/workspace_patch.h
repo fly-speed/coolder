@@ -31,10 +31,10 @@ public:
 	explicit workspace_patch_store_t(const std::string &user_root);
 
 	bool create(const std::string &relative_file,
-		    const std::string &proposed_content,
-		    workspace_patch_preview_t &preview, std::string &err) const;
+	    const std::string &proposed_content,
+	    workspace_patch_preview_t &preview, std::string &err) const;
 	bool apply(const std::string &patch_id,
-		   workspace_patch_result_t &result, std::string &err) const;
+	    workspace_patch_result_t &result, std::string &err) const;
 
 private:
 	std::string user_root_;

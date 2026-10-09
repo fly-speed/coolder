@@ -24,17 +24,16 @@ public:
 	explicit agent_progress_supervisor_t(size_t max_no_progress_calls);
 
 	agent_progress_decision_t observe(const std::string &signature,
-					  bool tool_succeeded,
-					  bool draft_changed);
-	agent_progress_decision_t
-	observe_many(const std::vector<std::string> &signatures,
-		     bool tool_succeeded, bool draft_changed);
+	    bool tool_succeeded, bool draft_changed);
+	agent_progress_decision_t observe_many(
+	    const std::vector<std::string> &signatures, bool tool_succeeded,
+	    bool draft_changed);
 	// Legacy recovery entry point; resets rather than guessing prior stagnation.
 	void prime_recovered_read_only_loop();
 	// Stop on the second occurrence of an unresolved proposal precondition.
 	// Reads do not repair preconditions; a changed draft or external review resets them.
-	bool observe_proposal_failures(const std::vector<std::string> &causes,
-				       bool draft_changed);
+	bool observe_proposal_failures(
+	    const std::vector<std::string> &causes, bool draft_changed);
 	// A user review can update the formal workspace while a provider request is
 	// in flight. Begin a fresh observation window after rebasing that draft.
 	void reset_after_external_progress();

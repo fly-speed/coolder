@@ -56,16 +56,15 @@ bool path_exists(const std::string &path)
 using ::webcool::ai::file_ops::replace_file;
 
 bool resolve_project(const std::string &user_root,
-		     const std::string &project_path, std::string &project,
-		     std::string &err)
+    const std::string &project_path, std::string &project, std::string &err)
 {
 	return agent_workspace_t::resolve_project_state_root(
-		       user_root, project_path, project, err) &&
-	       normal_directory(project);
+	           user_root, project_path, project, err) &&
+	    normal_directory(project);
 }
 
-bool prepare_directory(const std::string &project, std::string &directory,
-		       std::string &err)
+bool prepare_directory(
+    const std::string &project, std::string &directory, std::string &err)
 {
 	const std::string agent = join_path(project, ".webcool_agent");
 	directory = join_path(agent, "requests");
@@ -99,8 +98,8 @@ bool valid_json_payload(const std::string &payload)
 	return json.finish();
 }
 
-bool save_file(const std::string &target, const std::string &payload,
-	       std::string &err)
+bool save_file(
+    const std::string &target, const std::string &payload, std::string &err)
 {
 	const std::string temporary = target + ".tmp";
 	// fopen is mapped to the UTF-8-aware webcool_fopen on Windows.  A narrow
@@ -111,8 +110,8 @@ bool save_file(const std::string &target, const std::string &payload,
 		err = "cannot write AI request archive";
 		return false;
 	}
-	const bool written = fwrite(payload.data(), 1, payload.size(), out) ==
-			     payload.size();
+	const bool written =
+	    fwrite(payload.data(), 1, payload.size(), out) == payload.size();
 	const bool flushed = written && fflush(out) == 0;
 	const bool closed = fclose(out) == 0;
 	if (!flushed || !closed) {
@@ -127,29 +126,26 @@ bool save_file(const std::string &target, const std::string &payload,
 		return false;
 	}
 #endif
-	if (!replace_file(temporary, target)) {
-		unlink(temporary.c_str());
-		err = std::string("cannot install AI request archive: ") +
-		      strerror(errno);
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, target))
+		return true;
+	unlink(temporary.c_str());
+	err = std::string("cannot install AI request archive: ") +
+	    strerror(errno);
+	return false;
 }
 
 } // namespace
 
 agent_request_store_t::agent_request_store_t(const std::string &user_root,
-					     const std::string &project_path,
-					     const std::string &run_id)
-	: user_root_(user_root)
-	, project_path_(project_path)
-	, run_id_(run_id)
+    const std::string &project_path, const std::string &run_id)
+        : user_root_(user_root)
+        , project_path_(project_path)
+        , run_id_(run_id)
 {
 }
 
 bool agent_request_store_t::append(const std::string &payload,
-				   std::string &relative_path,
-				   std::string &err) const
+    std::string &relative_path, std::string &err) const
 {
 	relative_path.clear();
 	if (!valid_run_id(run_id_) || !valid_json_payload(payload)) {
@@ -175,17 +171,17 @@ bool agent_request_store_t::append(const std::string &payload,
 			return ai_error("agent.request", "persist", err);
 		}
 		relative_path = join_path(
-			join_path(join_path(project_path_, ".webcool_agent"),
-				  "requests"),
-			name);
+		    join_path(
+		        join_path(project_path_, ".webcool_agent"), "requests"),
+		    name);
 		return true;
 	}
 	err = "AI request archive sequence limit reached";
 	return ai_error("agent.request", "sequence-limit", err);
 }
 
-bool agent_request_store_t::operation_log(std::string &content, bool write,
-					  std::string &err) const
+bool agent_request_store_t::operation_log(
+    std::string &content, bool write, std::string &err) const
 {
 	if (!valid_run_id(run_id_)) {
 		err = "invalid operation log run ID";
@@ -197,7 +193,7 @@ bool agent_request_store_t::operation_log(std::string &content, bool write,
 	std::lock_guard<webcool::mutex> guard(g_request_store_mutex);
 	const std::string directory = join_path(project, ".webcool_agent");
 	if (!(write ? make_directory(directory) :
-		      normal_directory(directory))) {
+	              normal_directory(directory))) {
 		err = "operation log directory unavailable";
 		return false;
 	}

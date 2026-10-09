@@ -97,8 +97,8 @@ ai_admin_policy_t ai_runtime_policy_get();
 bool ai_agent_access_allowed(const ai_admin_policy_t &policy, bool admin);
 bool ai_language_tool_enabled(const std::string &language);
 bool ai_extra_sensitive_path(const std::string &normalized_path);
-unsigned long ai_tool_call_limit_for_mode(const ai_admin_policy_t &policy,
-					  const std::string &mode);
+unsigned long ai_tool_call_limit_for_mode(
+    const ai_admin_policy_t &policy, const std::string &mode);
 
 } // namespace ai
 } // namespace webcool

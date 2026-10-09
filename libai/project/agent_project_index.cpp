@@ -57,8 +57,8 @@ using ::webcool::ai::record_codec::split_tabs;
 
 bool parse_number(const std::string &text, long long &value)
 {
-	return ::webcool::ai::record_codec::parse_nonnegative_number(text,
-								     value);
+	return ::webcool::ai::record_codec::parse_nonnegative_number(
+	    text, value);
 }
 
 bool safe_text(const std::string &value, size_t limit, bool required)
@@ -67,9 +67,10 @@ bool safe_text(const std::string &value, size_t limit, bool required)
 		return false;
 	for (size_t i = 0; i < value.size(); ++i) {
 		const unsigned char c = static_cast<unsigned char>(value[i]);
-		if (c == 0 || c == '\r' || c == '\n' || c == '\t' || c == 127) {
-			return false;
-		}
+		if (!(c == 0 || c == '\r' || c == '\n' || c == '\t' ||
+		        c == 127))
+			continue;
+		return false;
 	}
 	return true;
 }
@@ -108,16 +109,16 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 	}
 #else
 	struct stat st;
-	if (lstat(path.c_str(), &st) != 0) {
-		if (mkdir(path.c_str(), 0700) != 0 ||
-		    lstat(path.c_str(), &st) != 0) {
-			err = "cannot create agent project index directory";
-			return false;
-		}
+
+	if ((lstat(path.c_str(), &st) != 0) &&
+	    (mkdir(path.c_str(), 0700) != 0 || lstat(path.c_str(), &st) != 0)) {
+		err = "cannot create agent project index directory";
+		return false;
 	}
 	if (!S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode) ||
 	    chmod(path.c_str(), 0700) != 0) {
-		err = "agent project index path is not a safe private directory";
+		err =
+		    "agent project index path is not a safe private directory";
 		return false;
 	}
 #endif
@@ -126,9 +127,9 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 
 bool ensure_directories(const std::string &user_root, std::string &err)
 {
-	return ensure_one_directory(join_path(user_root, ".webcool_agent"),
-				    err) &&
-	       ensure_one_directory(index_directory(user_root), err);
+	return ensure_one_directory(
+	           join_path(user_root, ".webcool_agent"), err) &&
+	    ensure_one_directory(index_directory(user_root), err);
 }
 
 using ::webcool::ai::file_ops::replace_file;
@@ -136,25 +137,25 @@ using ::webcool::ai::file_ops::replace_file;
 bool valid_entry(const agent_project_index_entry_t &entry)
 {
 	if (!(safe_text(entry.path, 2048, true) &&
-	      safe_text(entry.module_id, 64, false) &&
-	      safe_text(entry.kind, 32, true) &&
-	      safe_text(entry.language, 32, false) && entry.size >= 0 &&
-	      entry.modified_at >= 0))
+	        safe_text(entry.module_id, 64, false) &&
+	        safe_text(entry.kind, 32, true) &&
+	        safe_text(entry.language, 32, false) && entry.size >= 0 &&
+	        entry.modified_at >= 0))
 		return false;
 	if (entry.symbols.size() > kMaxSymbolsPerFile)
 		return false;
 	for (size_t i = 0; i < entry.symbols.size(); ++i) {
-		if (entry.symbols[i].line == 0 ||
-		    !safe_text(entry.symbols[i].kind, 32, true) ||
-		    !safe_text(entry.symbols[i].text, 500, true))
-			return false;
+		if (!(entry.symbols[i].line == 0 ||
+		        !safe_text(entry.symbols[i].kind, 32, true) ||
+		        !safe_text(entry.symbols[i].text, 500, true)))
+			continue;
+		return false;
 	}
 	return true;
 }
 
 bool save_snapshot(const std::string &user_root,
-		   const agent_project_index_snapshot_t &snapshot,
-		   std::string &err)
+    const agent_project_index_snapshot_t &snapshot, std::string &err)
 {
 	if (!valid_project_id(snapshot.project_id) ||
 	    !safe_text(snapshot.project_path, 2048, true) ||
@@ -167,7 +168,7 @@ bool save_snapshot(const std::string &user_root,
 	const std::string path = index_path(user_root, snapshot.project_id);
 	const std::string temporary = path + ".tmp";
 	std::ofstream out(temporary.c_str(),
-			  std::ios::out | std::ios::binary | std::ios::trunc);
+	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write agent project index";
 		return false;
@@ -195,7 +196,7 @@ bool save_snapshot(const std::string &user_root,
 		for (size_t symbol_index = 0;
 		     symbol_index < entry.symbols.size(); symbol_index++) {
 			const agent_project_symbol_t &symbol =
-				entry.symbols[symbol_index];
+			    entry.symbols[symbol_index];
 			out << "S\t" << hex_encode(entry.path) << '\t'
 			    << symbol.line << '\t' << hex_encode(symbol.kind)
 			    << '\t' << hex_encode(symbol.text) << '\n';
@@ -214,24 +215,23 @@ bool save_snapshot(const std::string &user_root,
 		return false;
 	}
 #endif
-	if (!replace_file(temporary, path)) {
-		remove(temporary.c_str());
-		err = std::string("cannot install agent project index: ") +
-		      strerror(errno);
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, path))
+		return true;
+	remove(temporary.c_str());
+	err = std::string("cannot install agent project index: ") +
+	    strerror(errno);
+	return false;
 }
 
 bool load_snapshot(const std::string &user_root,
-		   const agent_project_record_t &project,
-		   agent_project_index_snapshot_t &snapshot, std::string &err)
+    const agent_project_record_t &project,
+    agent_project_index_snapshot_t &snapshot, std::string &err)
 {
 	snapshot = agent_project_index_snapshot_t();
 	snapshot.project_id = project.id;
 	snapshot.project_path = project.project_path;
 	std::ifstream in(index_path(user_root, project.id).c_str(),
-			 std::ios::in | std::ios::binary);
+	    std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true;
 	std::string line;
@@ -275,14 +275,16 @@ bool load_snapshot(const std::string &user_root,
 			    !safe_text(symbol.kind, 32, true) ||
 			    !safe_text(symbol.text, 500, true) ||
 			    entry_indexes.find(path) == entry_indexes.end()) {
-				err = "invalid agent project semantic index entry";
+				err =
+				    "invalid agent project semantic index entry";
 				return false;
 			}
 			symbol.line = static_cast<unsigned long>(line_number);
 			agent_project_index_entry_t &owner =
-				snapshot.files[entry_indexes[path]];
+			    snapshot.files[entry_indexes[path]];
 			if (owner.symbols.size() >= kMaxSymbolsPerFile) {
-				err = "agent project semantic index exceeds file limit";
+				err =
+				    "agent project semantic index exceeds file limit";
 				return false;
 			}
 			owner.symbols.push_back(symbol);
@@ -315,8 +317,9 @@ std::string basename(const std::string &path)
 std::string lowercase(std::string value)
 {
 	for (size_t i = 0; i < value.size(); ++i) {
-		if (value[i] >= 'A' && value[i] <= 'Z')
-			value[i] += 'a' - 'A';
+		if (!(value[i] >= 'A' && value[i] <= 'Z'))
+			continue;
+		value[i] += 'a' - 'A';
 	}
 	return value;
 }
@@ -325,29 +328,30 @@ bool generated_directory(const std::string &path)
 {
 	const std::string name = lowercase(basename(path));
 	return name == "build" || name == "target" || name == "node_modules" ||
-	       name == ".build" || name == ".gradle" || name == "dist" ||
-	       name == "out" || name == "__pycache__" || name == ".venv" ||
-	       name == "venv" || name == "coverage";
+	    name == ".build" || name == ".gradle" || name == "dist" ||
+	    name == "out" || name == "__pycache__" || name == ".venv" ||
+	    name == "venv" || name == "coverage";
 }
 
 bool path_within(const std::string &parent, const std::string &path)
 {
-	return path == parent || (path.size() > parent.size() &&
-				  path.compare(0, parent.size(), parent) == 0 &&
-				  path[parent.size()] == '/');
+	return path == parent ||
+	    (path.size() > parent.size() &&
+	        path.compare(0, parent.size(), parent) == 0 &&
+	        path[parent.size()] == '/');
 }
 
-std::string module_for_path(const agent_project_record_t &project,
-			    const std::string &path)
+std::string module_for_path(
+    const agent_project_record_t &project, const std::string &path)
 {
 	std::string selected;
 	size_t selected_length = 0;
 	for (size_t i = 0; i < project.modules.size(); ++i) {
-		if (path_within(project.modules[i].path, path) &&
-		    project.modules[i].path.size() > selected_length) {
-			selected = project.modules[i].id;
-			selected_length = project.modules[i].path.size();
-		}
+		if (!(path_within(project.modules[i].path, path) &&
+		        project.modules[i].path.size() > selected_length))
+			continue;
+		selected = project.modules[i].id;
+		selected_length = project.modules[i].path.size();
 	}
 	return selected;
 }
@@ -367,9 +371,9 @@ bool agent_diagnostic_file(const std::string &path)
 	// to the model on later turns, where they would waste context and may create a
 	// self-referential read loop.
 	return (name.compare(0, 13, "ai-reasoning-") == 0 &&
-		extension(name) == ".txt") ||
-	       (name.compare(0, 14, "ai-operations-") == 0 &&
-		extension(name) == ".jsonl");
+	           extension(name) == ".txt") ||
+	    (name.compare(0, 14, "ai-operations-") == 0 &&
+	        extension(name) == ".jsonl");
 }
 
 std::string file_language(const std::string &path)
@@ -407,9 +411,9 @@ std::string file_language(const std::string &path)
 		return "d";
 	if (ext == ".sh")
 		return "shell";
-	if (ext == ".bat" || ext == ".cmd" || ext == ".ps1")
-		return "script";
-	return "";
+	if (!(ext == ".bat" || ext == ".cmd" || ext == ".ps1"))
+		return "";
+	return "script";
 }
 
 std::string file_kind(const std::string &path, const std::string &language)
@@ -434,15 +438,14 @@ std::string file_kind(const std::string &path, const std::string &language)
 		return "documentation";
 	if (!language.empty())
 		return "source";
-	if (ext == ".json" || ext == ".yaml" || ext == ".yml" ||
-	    ext == ".toml" || ext == ".xml" || ext == ".ini") {
-		return "configuration";
-	}
-	return "other";
+	if (!(ext == ".json" || ext == ".yaml" || ext == ".yml" ||
+	        ext == ".toml" || ext == ".xml" || ext == ".ini"))
+		return "other";
+	return "configuration";
 }
 
 bool entry_less(const agent_project_index_entry_t &left,
-		const agent_project_index_entry_t &right)
+    const agent_project_index_entry_t &right)
 {
 	return left.path < right.path;
 }
@@ -456,7 +459,7 @@ std::string fingerprint(const agent_project_index_entry_t &entry)
 }
 
 long long changed_files(const agent_project_index_snapshot_t &before,
-			const agent_project_index_snapshot_t &after)
+    const agent_project_index_snapshot_t &after)
 {
 	std::map<std::string, std::string> previous;
 	for (size_t i = 0; i < before.files.size(); ++i) {
@@ -465,13 +468,14 @@ long long changed_files(const agent_project_index_snapshot_t &before,
 	long long changed = 0;
 	for (size_t i = 0; i < after.files.size(); ++i) {
 		std::map<std::string, std::string>::iterator found =
-			previous.find(after.files[i].path);
+		    previous.find(after.files[i].path);
 		if (found == previous.end() ||
 		    found->second != fingerprint(after.files[i])) {
 			++changed;
 		}
-		if (found != previous.end())
-			previous.erase(found);
+		if (!(found != previous.end()))
+			continue;
+		previous.erase(found);
 	}
 	return changed + static_cast<long long>(previous.size());
 }
@@ -479,13 +483,13 @@ long long changed_files(const agent_project_index_snapshot_t &before,
 } // namespace
 
 agent_project_index_store_t::agent_project_index_store_t(
-	const std::string &user_root)
-	: user_root_(user_root)
+    const std::string &user_root)
+        : user_root_(user_root)
 {
 }
 
-bool agent_project_index_store_t::remove(const std::string &project_id,
-					 std::string &err) const
+bool agent_project_index_store_t::remove(
+    const std::string &project_id, std::string &err) const
 {
 	if (!valid_project_id(project_id)) {
 		err = "invalid agent project index id";
@@ -493,33 +497,73 @@ bool agent_project_index_store_t::remove(const std::string &project_id,
 	}
 	std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
 	const std::string path = index_path(user_root_, project_id);
-	if (::remove(path.c_str()) != 0 && errno != ENOENT) {
-		err = std::string("cannot remove agent project index: ") +
-		      strerror(errno);
-		return ai_error("agent.project-index", "remove", err);
-	}
-	return true;
+	if (!(::remove(path.c_str()) != 0 && errno != ENOENT))
+		return true;
+	err = std::string("cannot remove agent project index: ") +
+	    strerror(errno);
+	return ai_error("agent.project-index", "remove", err);
 }
 
 bool agent_project_index_store_t::load(const agent_project_record_t &project,
-				       agent_project_index_snapshot_t &snapshot,
-				       std::string &err) const
+    agent_project_index_snapshot_t &snapshot, std::string &err) const
 {
 	if (!valid_project_id(project.id)) {
 		err = "invalid agent project index owner";
 		return ai_error("agent.project-index", "validate-load", err);
 	}
 	std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
-	if (!load_snapshot(user_root_, project, snapshot, err)) {
-		return ai_error("agent.project-index", "load", err);
-	}
-	return true;
+	if (load_snapshot(user_root_, project, snapshot, err))
+		return true;
+	return ai_error("agent.project-index", "load", err);
 }
 
-bool agent_project_index_store_t::refresh(
-	const agent_project_record_t &project, agent_workspace_t &workspace,
-	agent_project_index_snapshot_t &snapshot, std::string &err,
-	const std::function<void(const char *)> &phase) const
+static void refresh_file_outline(agent_workspace_t &workspace,
+    agent_project_index_entry_t &indexed,
+    agent_project_index_snapshot_t &snapshot)
+{
+	std::vector<workspace_outline_item_t> outline;
+	bool outline_truncated = false;
+	std::string outline_err;
+	if (workspace.outline(
+	        indexed.path, outline, outline_truncated, outline_err)) {
+		const size_t count =
+		    std::min<size_t>(outline.size(), kMaxSymbolsPerFile);
+		for (size_t symbol_index = 0; symbol_index < count;
+		     symbol_index++) {
+			agent_project_symbol_t symbol;
+			symbol.line = outline[symbol_index].line;
+			symbol.kind = outline[symbol_index].kind;
+			symbol.text = outline[symbol_index].text;
+			indexed.symbols.push_back(symbol);
+		}
+		if (outline_truncated || outline.size() > count) {
+			snapshot.truncated = true;
+		}
+	} else {
+		// A single unreadable/binary source should not invalidate the
+		// metadata index for the rest of a large project.
+		ai_log_error(
+		    "agent.project-index", "outline-changed-file", outline_err);
+	}
+}
+
+static void queue_index_directory(const workspace_entry_t &entry, size_t depth,
+    std::vector<std::pair<std::string, size_t>> &pending,
+    agent_project_index_snapshot_t &snapshot)
+{
+	if (generated_directory(entry.path) || depth >= kMaxDepth) {
+		++snapshot.skipped_directory_count;
+		if (!(depth >= kMaxDepth))
+			return;
+		snapshot.truncated = true;
+		return;
+	}
+	pending.push_back(std::make_pair(entry.path, depth + 1));
+}
+
+bool agent_project_index_store_t::refresh(const agent_project_record_t &project,
+    agent_workspace_t &workspace, agent_project_index_snapshot_t &snapshot,
+    std::string &err, const std::function<void(const char *)> &phase) const
 {
 	if (!valid_project_id(project.id)) {
 		err = "invalid agent project index owner";
@@ -534,13 +578,13 @@ bool agent_project_index_store_t::refresh(
 		std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
 		if (!load_snapshot(user_root_, project, previous, err)) {
 			return ai_error("agent.project-index",
-					"load-for-incremental-refresh", err);
+			    "load-for-incremental-refresh", err);
 		}
 	}
 	if (phase)
 		phase("index_prepare_lookup");
 	std::map<std::string, const agent_project_index_entry_t *>
-		previous_files;
+	    previous_files;
 	for (size_t i = 0; i < previous.files.size(); ++i) {
 		previous_files[previous.files[i].path] = &previous.files[i];
 	}
@@ -560,22 +604,14 @@ bool agent_project_index_store_t::refresh(
 		}
 		std::vector<workspace_entry_t> entries;
 		if (!workspace.list(pending[cursor].first, entries, err)) {
-			return ai_error("agent.project-index", "list-workspace",
-					err);
+			return ai_error(
+			    "agent.project-index", "list-workspace", err);
 		}
 		++snapshot.directory_count;
 		for (size_t i = 0; i < entries.size(); ++i) {
 			if (entries[i].directory) {
-				if (generated_directory(entries[i].path) ||
-				    pending[cursor].second >= kMaxDepth) {
-					++snapshot.skipped_directory_count;
-					if (pending[cursor].second >= kMaxDepth)
-						snapshot.truncated = true;
-					continue;
-				}
-				pending.push_back(std::make_pair(
-					entries[i].path,
-					pending[cursor].second + 1));
+				queue_index_directory(entries[i],
+				    pending[cursor].second, pending, snapshot);
 				continue;
 			}
 			if (agent_diagnostic_file(entries[i].path))
@@ -587,56 +623,22 @@ bool agent_project_index_store_t::refresh(
 			agent_project_index_entry_t indexed;
 			indexed.path = entries[i].path;
 			indexed.module_id =
-				module_for_path(project, indexed.path);
+			    module_for_path(project, indexed.path);
 			indexed.language = file_language(indexed.path);
 			indexed.kind =
-				file_kind(indexed.path, indexed.language);
+			    file_kind(indexed.path, indexed.language);
 			indexed.size = entries[i].size;
 			indexed.modified_at = entries[i].modified_at;
-			std::map<std::string, const agent_project_index_entry_t
-						      *>::const_iterator old =
-				previous_files.find(indexed.path);
+			std::map<std::string,
+			    const agent_project_index_entry_t *>::const_iterator
+			    old = previous_files.find(indexed.path);
 			if (old != previous_files.end() &&
 			    fingerprint(*old->second) == fingerprint(indexed)) {
 				indexed.symbols = old->second->symbols;
 			} else if (indexed.kind == "source" &&
-				   indexed.size <= 1024 * 1024) {
-				std::vector<workspace_outline_item_t> outline;
-				bool outline_truncated = false;
-				std::string outline_err;
-				if (workspace.outline(indexed.path, outline,
-						      outline_truncated,
-						      outline_err)) {
-					const size_t count = std::min<size_t>(
-						outline.size(),
-						kMaxSymbolsPerFile);
-					for (size_t symbol_index = 0;
-					     symbol_index < count;
-					     symbol_index++) {
-						agent_project_symbol_t symbol;
-						symbol.line =
-							outline[symbol_index]
-								.line;
-						symbol.kind =
-							outline[symbol_index]
-								.kind;
-						symbol.text =
-							outline[symbol_index]
-								.text;
-						indexed.symbols.push_back(
-							symbol);
-					}
-					if (outline_truncated ||
-					    outline.size() > count) {
-						snapshot.truncated = true;
-					}
-				} else {
-					// A single unreadable/binary source should not invalidate the
-					// metadata index for the rest of a large project.
-					ai_log_error("agent.project-index",
-						     "outline-changed-file",
-						     outline_err);
-				}
+			    indexed.size <= 1024 * 1024) {
+				refresh_file_outline(
+				    workspace, indexed, snapshot);
 			}
 			snapshot.files.push_back(indexed);
 		}
@@ -654,37 +656,35 @@ bool agent_project_index_store_t::refresh(
 		// distinct revisions and compare against the latest committed snapshot.
 		agent_project_index_snapshot_t latest;
 		if (!load_snapshot(user_root_, project, latest, err)) {
-			return ai_error("agent.project-index",
-					"load-for-refresh", err);
+			return ai_error(
+			    "agent.project-index", "load-for-refresh", err);
 		}
 		if (phase)
 			phase("index_compare");
 		snapshot.changed_file_count = changed_files(latest, snapshot);
-		bool identical =
-			latest.revision > 0 &&
-			snapshot.changed_file_count == 0 &&
-			latest.project_path == snapshot.project_path &&
-			latest.directory_count == snapshot.directory_count &&
-			latest.skipped_directory_count ==
-				snapshot.skipped_directory_count &&
-			latest.truncated == snapshot.truncated;
+		bool identical = latest.revision > 0 &&
+		    snapshot.changed_file_count == 0 &&
+		    latest.project_path == snapshot.project_path &&
+		    latest.directory_count == snapshot.directory_count &&
+		    latest.skipped_directory_count ==
+		        snapshot.skipped_directory_count &&
+		    latest.truncated == snapshot.truncated;
 		// Compare semantic records too; a refresh must not discard a new outline
 		// merely because the cheap file metadata fingerprint stayed unchanged.
 		for (size_t i = 0; identical && i < snapshot.files.size();
 		     ++i) {
 			const auto &before = latest.files[i];
 			const auto &after = snapshot.files[i];
-			identical =
-				before.path == after.path &&
-				before.symbols.size() == after.symbols.size();
+			identical = before.path == after.path &&
+			    before.symbols.size() == after.symbols.size();
 			for (size_t j = 0;
 			     identical && j < after.symbols.size(); ++j)
 				identical = before.symbols[j].line ==
-						    after.symbols[j].line &&
-					    before.symbols[j].kind ==
-						    after.symbols[j].kind &&
-					    before.symbols[j].text ==
-						    after.symbols[j].text;
+				        after.symbols[j].line &&
+				    before.symbols[j].kind ==
+				        after.symbols[j].kind &&
+				    before.symbols[j].text ==
+				        after.symbols[j].text;
 		}
 		if (identical) {
 			snapshot.revision = latest.revision;
@@ -695,16 +695,16 @@ bool agent_project_index_store_t::refresh(
 		if (phase)
 			phase("index_save");
 		if (!save_snapshot(user_root_, snapshot, err)) {
-			return ai_error("agent.project-index", "save-refresh",
-					err);
+			return ai_error(
+			    "agent.project-index", "save-refresh", err);
 		}
 	}
 	return true;
 }
 
 std::string agent_project_index_store_t::prompt_summary(
-	const agent_project_index_snapshot_t &snapshot, size_t byte_limit,
-	bool chinese)
+    const agent_project_index_snapshot_t &snapshot, size_t byte_limit,
+    bool chinese)
 {
 	if (byte_limit < 256)
 		return "";
@@ -733,15 +733,16 @@ std::string agent_project_index_store_t::prompt_summary(
 			if (static_cast<size_t>(out.tellp()) + 80 >= byte_limit)
 				break;
 		}
-		if (static_cast<size_t>(out.tellp()) + 80 >= byte_limit) {
-			out << "[project index truncated]\n";
-			break;
-		}
+		if (!(static_cast<size_t>(out.tellp()) + 80 >= byte_limit))
+			continue;
+		out << "[project index truncated]\n";
+		break;
 	}
 	out << "</webcool_project_index>\n";
 	std::string result = out.str();
-	if (result.size() > byte_limit)
-		result.resize(byte_limit);
+	if (!(result.size() > byte_limit))
+		return result;
+	result.resize(byte_limit);
 	return result;
 }
 

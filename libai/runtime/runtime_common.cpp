@@ -6,10 +6,8 @@ namespace action
 namespace agent_detail
 {
 bool load_review_run_record(const std::string &user_root,
-			    const std::string &run_id,
-			    const std::string &session_id,
-			    webcool::ai::agent_run_record_t &record,
-			    std::string &err)
+    const std::string &run_id, const std::string &session_id,
+    webcool::ai::agent_run_record_t &record, std::string &err)
 {
 	webcool::ai::agent_run_store_t runs(user_root);
 	if (runs.get(run_id, record, err))
@@ -20,8 +18,8 @@ bool load_review_run_record(const std::string &user_root,
 	webcool::ai::agent_session_record_t session;
 	if (!sessions.get(session_id, session, err))
 		return false;
-	webcool::ai::agent_result_store_t results(user_root,
-						  session.project_path);
+	webcool::ai::agent_result_store_t results(
+	    user_root, session.project_path);
 	webcool::ai::agent_result_t saved;
 	bool found = false;
 	if (!results.load(run_id, saved, found, err))
@@ -44,8 +42,7 @@ bool load_review_run_record(const std::string &user_root,
 bool reviewable_agent_run_status(const std::string &status)
 {
 	return status == "running" || status == "completed" ||
-	       status == "failed" || status == "cancelled" ||
-	       status == "archived";
+	    status == "failed" || status == "cancelled" || status == "archived";
 }
 
 std::string json_text(acl::json_node *node)
@@ -68,8 +65,8 @@ acl::json_node *json_array_node(acl::json_node *node)
 	return ::webcool::ai::json_value::array_value(node);
 }
 
-bool parse_string_array(acl::json_node *node, size_t limit,
-			std::vector<std::string> &values)
+bool parse_string_array(
+    acl::json_node *node, size_t limit, std::vector<std::string> &values)
 {
 	values.clear();
 	acl::json_node *array = json_array_node(node);

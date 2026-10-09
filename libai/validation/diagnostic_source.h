@@ -6,9 +6,8 @@ namespace webcool
 {
 namespace ai
 {
-inline std::string
-unique_diagnostic_source(const std::string &basename,
-			 const std::vector<std::string> &paths)
+inline std::string unique_diagnostic_source(
+    const std::string &basename, const std::vector<std::string> &paths)
 {
 	std::string found;
 	for (const auto &path : paths) {
@@ -22,8 +21,8 @@ unique_diagnostic_source(const std::string &basename,
 	}
 	return found;
 }
-inline std::vector<std::string>
-diagnostic_source_files(const agent_workspace_t &workspace)
+inline std::vector<std::string> diagnostic_source_files(
+    const agent_workspace_t &workspace)
 {
 	std::vector<std::string> directories(1, ""), paths;
 	size_t entries_seen = 0;
@@ -40,14 +39,14 @@ diagnostic_source_files(const agent_workspace_t &workspace)
 				return {};
 			const auto slash = entry.path.rfind('/');
 			const auto name = entry.path.substr(
-				slash == std::string::npos ? 0 : slash + 1);
+			    slash == std::string::npos ? 0 : slash + 1);
 			if (name.empty() || name[0] == '.' || name == "build" ||
 			    name == "vendor" || name == "node_modules" ||
 			    entry.path == "Library/Caches")
 				continue;
+			if (entry.directory && directories.size() >= 128)
+				return {};
 			if (entry.directory) {
-				if (directories.size() >= 128)
-					return {};
 				directories.push_back(entry.path);
 			} else
 				paths.push_back(entry.path);

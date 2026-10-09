@@ -36,11 +36,11 @@ std::string trim_ascii(const std::string &value)
 {
 	size_t begin = 0;
 	while (begin < value.size() &&
-	       std::isspace(static_cast<unsigned char>(value[begin])))
+	    std::isspace(static_cast<unsigned char>(value[begin])))
 		++begin;
 	size_t end = value.size();
 	while (end > begin &&
-	       std::isspace(static_cast<unsigned char>(value[end - 1])))
+	    std::isspace(static_cast<unsigned char>(value[end - 1])))
 		--end;
 	return value.substr(begin, end - begin);
 }
@@ -52,11 +52,11 @@ std::string unwrap_json_fence(const std::string &value)
 		return text;
 	const size_t first_line = text.find('\n');
 	const size_t closing = text.rfind("```");
-	if (first_line == std::string::npos || closing == std::string::npos ||
-	    closing <= first_line)
-		return text;
-	return trim_ascii(
-		text.substr(first_line + 1, closing - first_line - 1));
+	if (!(first_line == std::string::npos || closing == std::string::npos ||
+	        closing <= first_line))
+		return trim_ascii(
+		    text.substr(first_line + 1, closing - first_line - 1));
+	return text;
 }
 
 void truncate_utf8_bytes(std::string &value, size_t maximum_bytes)
@@ -65,15 +65,15 @@ void truncate_utf8_bytes(std::string &value, size_t maximum_bytes)
 		return;
 	size_t keep = maximum_bytes;
 	while (keep > 0 &&
-	       (static_cast<unsigned char>(value[keep]) & 0xc0) == 0x80)
+	    (static_cast<unsigned char>(value[keep]) & 0xc0) == 0x80)
 		--keep;
 	value.resize(keep);
 }
 
 } // namespace
 
-bool parse_agent_protocol_message(const std::string &raw,
-				  agent_protocol_message_t &message)
+bool parse_agent_protocol_message(
+    const std::string &raw, agent_protocol_message_t &message)
 {
 	message = agent_protocol_message_t();
 	const std::string candidate = unwrap_json_fence(raw);
@@ -86,10 +86,10 @@ bool parse_agent_protocol_message(const std::string &raw,
 		message.final_text = node_text(json["text"]);
 		message.memory_summary = node_text(json["memory_summary"]);
 		message.completion_summary =
-			node_text(json["completion_summary"]);
+		    node_text(json["completion_summary"]);
 		message.requirement_progress_json =
-			normalize_requirement_progress(
-				json["requirement_progress"]);
+		    normalize_requirement_progress(
+		        json["requirement_progress"]);
 		message.session_title = node_text(json["session_title"]);
 		if (message.session_title.size() > 120) {
 			message.session_title.resize(120);
@@ -99,26 +99,25 @@ bool parse_agent_protocol_message(const std::string &raw,
 		}
 		truncate_utf8_bytes(message.completion_summary, 4 * 1024);
 		acl::json_node *items = array_value(json["changes"]);
-		if (items != NULL) {
-			for (acl::json_node *item = items->first_child();
-			     item != NULL && message.changes.size() < 20;
-			     item = items->next_child()) {
-				agent_change_proposal_t change;
-				change.operation = node_text(
-					object_child(item, "operation"));
-				if (change.operation.empty())
-					change.operation = "write";
-				change.path =
-					node_text(object_child(item, "path"));
-				change.target_path = node_text(
-					object_child(item, "target_path"));
-				change.content = node_text(
-					object_child(item, "content"));
-				change.reason =
-					node_text(object_child(item, "reason"));
-				message.changes.push_back(change);
-			}
+		if (!(items != NULL))
+			return !message.final_text.empty();
+		for (acl::json_node *item = items->first_child();
+		     item != NULL && message.changes.size() < 20;
+		     item = items->next_child()) {
+			agent_change_proposal_t change;
+			change.operation =
+			    node_text(object_child(item, "operation"));
+			if (change.operation.empty())
+				change.operation = "write";
+			change.path = node_text(object_child(item, "path"));
+			change.target_path =
+			    node_text(object_child(item, "target_path"));
+			change.content =
+			    node_text(object_child(item, "content"));
+			change.reason = node_text(object_child(item, "reason"));
+			message.changes.push_back(change);
 		}
+
 		return !message.final_text.empty();
 	}
 	// Some providers label an otherwise explicit patch_set call with its
@@ -126,7 +125,7 @@ bool parse_agent_protocol_message(const std::string &raw,
 	// validation and the normal staged-review transaction still apply.
 	if (type != "tool_call" &&
 	    !(type == "patch_set" &&
-	      node_text(json["name"]) == "workspace.patch_set"))
+	        node_text(json["name"]) == "workspace.patch_set"))
 		return false;
 	message.tool.name = node_text(json["name"]);
 	acl::json_node *arguments = json["arguments"];
@@ -134,11 +133,11 @@ bool parse_agent_protocol_message(const std::string &raw,
 	message.tool.query = node_text(object_child(arguments, "query"));
 	message.tool.old_text = node_text(object_child(arguments, "old_text"));
 	message.tool.target_path =
-		node_text(object_child(arguments, "target_path"));
+	    node_text(object_child(arguments, "target_path"));
 	acl::json_node *content = object_child(arguments, "content");
 	message.tool.content_present = content != NULL && content->is_string();
 	message.tool.content =
-		message.tool.content_present ? node_text(content) : "";
+	    message.tool.content_present ? node_text(content) : "";
 	return !message.tool.name.empty();
 }
 

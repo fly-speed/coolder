@@ -84,4 +84,9 @@
     <ClCompile Include="sandbox\sandbox_helper_main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <ClCompile Include="sandbox\sandbox_helper_linux.cpp" />
+    <ClInclude Include="sandbox\sandbox_helper_main_internal.h" />
+    <ClCompile Include="sandbox\sandbox_helper_probe.cpp" />
+  </ItemGroup>
 </Project>

@@ -19,15 +19,15 @@ struct proposal_validation_error_t {
 	std::string detail;
 };
 
-inline bool path_is_in_project(const std::string &project,
-			       const std::string &path)
+inline bool path_is_in_project(
+    const std::string &project, const std::string &path)
 {
-	if (project.empty())
-		return true;
-	return path == project ||
-	       (path.size() > project.size() &&
-		path.compare(0, project.size(), project) == 0 &&
-		path[project.size()] == '/');
+	if (!project.empty())
+		return path == project ||
+		    (path.size() > project.size() &&
+		        path.compare(0, project.size(), project) == 0 &&
+		        path[project.size()] == '/');
+	return true;
 }
 
 // Model-facing tools use paths relative to the selected project, while the
@@ -35,12 +35,11 @@ inline bool path_is_in_project(const std::string &project,
 // Accept both forms and normalize immediately. This also keeps older saved
 // conversations working after the clearer project-relative contract is used.
 inline bool resolve_project_tool_path(const std::string &raw_path,
-				      const std::string &project_path,
-				      bool allow_empty, std::string &path,
-				      std::string &err)
+    const std::string &project_path, bool allow_empty, std::string &path,
+    std::string &err)
 {
-	if (!webcool::ai::agent_workspace_t::normalize_path(raw_path, path,
-							    allow_empty, err))
+	if (!webcool::ai::agent_workspace_t::normalize_path(
+	        raw_path, path, allow_empty, err))
 		return false;
 	if (path_is_in_project(project_path, path))
 		return true;
@@ -50,7 +49,7 @@ inline bool resolve_project_tool_path(const std::string &raw_path,
 	}
 	std::string project_relative;
 	if (!webcool::ai::agent_workspace_t::normalize_path(
-		    project_path + "/" + path, project_relative, false, err) ||
+	        project_path + "/" + path, project_relative, false, err) ||
 	    !path_is_in_project(project_path, project_relative)) {
 		err = "tool path is outside the selected project";
 		return false;
@@ -60,10 +59,9 @@ inline bool resolve_project_tool_path(const std::string &raw_path,
 }
 
 // Add review-only directory dependencies, never create formal filesystem paths.
-inline bool stage_missing_proposal_parent(
-	agent_workspace_t &workspace, const std::string &project,
-	const std::string &directory,
-	std::vector<agent_change_proposal_t> &accepted, std::string &err)
+inline bool stage_missing_proposal_parent(agent_workspace_t &workspace,
+    const std::string &project, const std::string &directory,
+    std::vector<agent_change_proposal_t> &accepted, std::string &err)
 {
 	for (const auto &change : accepted) {
 		if (change.path != directory)
@@ -81,13 +79,14 @@ inline bool stage_missing_proposal_parent(
 		return false;
 	const size_t slash = directory.rfind('/');
 	const std::string parent =
-		slash == std::string::npos ? "" : directory.substr(0, slash);
-	if (!stage_missing_proposal_parent(workspace, project, parent, accepted,
-					   err))
+	    slash == std::string::npos ? "" : directory.substr(0, slash);
+	if (!stage_missing_proposal_parent(
+	        workspace, project, parent, accepted, err))
 		return false;
 	// Reserve one entry for the file whose parent chain is being staged.
 	if (accepted.size() + 1 >= kMaxAgentChanges) {
-		err = "maximum accumulated changes exceeded by directory dependencies";
+		err =
+		    "maximum accumulated changes exceeded by directory dependencies";
 		return false;
 	}
 	agent_change_proposal_t proposal;
@@ -98,14 +97,92 @@ inline bool stage_missing_proposal_parent(
 	return true;
 }
 
+template <typename Reject>
+inline bool inspect_proposal_target(agent_workspace_t &workspace,
+    const std::string &target, bool &target_exists, const Reject &reject)
+{
+	std::string err;
+	if (target.empty())
+		return true;
+	const size_t target_slash = target.rfind('/');
+	const std::string target_parent = target_slash == std::string::npos ?
+	    "" :
+	    target.substr(0, target_slash);
+	std::vector<webcool::ai::workspace_entry_t> target_entries;
+	if (!workspace.list(target_parent, target_entries, err)) {
+		reject(err == "workspace path does not exist" ?
+		        "parent_missing" :
+		        "parent_unavailable",
+		    target_parent, err);
+		return false;
+	}
+	for (size_t j = 0; j < target_entries.size(); ++j) {
+		if (!(target_entries[j].path == target))
+			continue;
+		target_exists = true;
+	}
+
+	return true;
+}
+
+template <typename Reject>
+inline bool inspect_proposal_parent(agent_workspace_t &workspace,
+    const std::string &project_path, const agent_change_proposal_t &change,
+    const std::string &normalized,
+    std::vector<agent_change_proposal_t> &accepted, bool duplicate,
+    bool auto_missing_parents, bool &exists, const Reject &reject)
+{
+	std::string err;
+	const size_t slash = normalized.rfind('/');
+	const std::string parent =
+	    slash == std::string::npos ? "" : normalized.substr(0, slash);
+	std::vector<webcool::ai::workspace_entry_t> entries;
+	bool virtual_parent = false;
+	for (size_t j = 0; j < accepted.size(); ++j) {
+		if (!(accepted[j].creates_directory &&
+		        accepted[j].path == parent))
+			continue;
+		virtual_parent = true;
+		break;
+	}
+	if (!duplicate && virtual_parent) {
+		// The parent will exist after the same reviewed atomic change set.
+		exists = false;
+	} else if (!duplicate && workspace.list(parent, entries, err)) {
+		for (size_t j = 0; j < entries.size(); ++j) {
+			if (!(entries[j].path == normalized))
+				continue;
+			exists = true;
+			break;
+		}
+	} else if (!duplicate) {
+		auto with_parents = accepted;
+		if (auto_missing_parents && change.operation == "write" &&
+		    err == "workspace path does not exist" &&
+		    stage_missing_proposal_parent(
+		        workspace, project_path, parent, with_parents, err)) {
+			accepted.swap(with_parents);
+		} else {
+			reject(err == "workspace path does not exist" ?
+			        "parent_missing" :
+			        err ==
+			            "maximum accumulated changes exceeded by directory dependencies" ?
+			        "change_limit" :
+			        "parent_unavailable",
+			    parent, err);
+			return false;
+		}
+	}
+	return true;
+}
+
 inline size_t validate_change_proposals(
-	webcool::ai::agent_workspace_t &workspace,
-	const std::string &project_path,
-	std::vector<agent_change_proposal_t> &changes,
-	std::vector<proposal_validation_error_t> *errors = NULL,
-	bool auto_missing_parents = false,
-	std::vector<std::string> *unchanged_paths = NULL,
-	std::vector<std::string> *missing_deletes = NULL)
+    webcool::ai::agent_workspace_t &workspace, const std::string &project_path,
+    std::vector<agent_change_proposal_t> &changes,
+    std::vector<proposal_validation_error_t> *errors = NULL,
+    bool auto_missing_parents = false,
+    std::vector<std::string> *unchanged_paths = NULL,
+    std::vector<std::string> *missing_deletes = NULL)
 {
 	if (errors != NULL)
 		errors->clear();
@@ -117,58 +194,50 @@ inline size_t validate_change_proposals(
 		std::string target;
 		std::string err;
 		auto reject = [&](const std::string &code,
-				  const std::string &related,
-				  const std::string &detail) {
+		                  const std::string &related,
+		                  const std::string &detail) {
 			++rejected;
-			if (errors != NULL) {
-				proposal_validation_error_t failure;
-				failure.code = code;
-				failure.path = normalized.empty() ?
-						       changes[i].path :
-						       normalized;
-				failure.related_path = related;
-				failure.detail = detail;
-				errors->push_back(failure);
-			}
+			if (errors == NULL)
+				return;
+			errors->push_back({ code,
+			    normalized.empty() ? changes[i].path : normalized,
+			    related, detail });
 		};
 		if (accepted.size() >= kMaxAgentChanges) {
 			reject("change_limit", "",
-			       "maximum accumulated changes: " +
-				       std::to_string(kMaxAgentChanges));
+			    "maximum accumulated changes: " +
+			        std::to_string(kMaxAgentChanges));
 			continue;
 		}
 		if (changes[i].operation.empty())
 			changes[i].operation = "write";
-		const bool valid_operation =
-			changes[i].operation == "write" ||
-			changes[i].operation == "delete" ||
-			changes[i].operation == "move" ||
-			changes[i].operation == "mkdir" ||
-			changes[i].operation ==
-				"replace_empty_file_with_directory";
+		const bool valid_operation = changes[i].operation == "write" ||
+		    changes[i].operation == "delete" ||
+		    changes[i].operation == "move" ||
+		    changes[i].operation == "mkdir" ||
+		    changes[i].operation == "replace_empty_file_with_directory";
 		if (!resolve_project_tool_path(changes[i].path, project_path,
-					       false, normalized, err)) {
+		        false, normalized, err)) {
 			reject("invalid_path", "", err);
 			continue;
 		}
 		if (changes[i].operation == "write" &&
-		    explicit_placeholder_proposal(normalized,
-						  changes[i].content,
-						  changes[i].reason)) {
+		    explicit_placeholder_proposal(
+		        normalized, changes[i].content, changes[i].reason)) {
 			reject("explicit_placeholder", "",
-			       "source content or short-source reason is explicitly marked placeholder");
+			    "source content or short-source reason is explicitly marked placeholder");
 			continue;
 		}
-		if (!valid_operation || (changes[i].operation != "write" &&
-					 !changes[i].content.empty())) {
+		if (!valid_operation ||
+		    (changes[i].operation != "write" &&
+		        !changes[i].content.empty())) {
 			reject("invalid_operation", "", "");
 			continue;
 		}
 		if (changes[i].operation == "move" &&
 		    (!resolve_project_tool_path(changes[i].target_path,
-						project_path, false, target,
-						err) ||
-		     target == normalized)) {
+		         project_path, false, target, err) ||
+		        target == normalized)) {
 			reject("invalid_target", changes[i].target_path, err);
 			continue;
 		}
@@ -189,102 +258,44 @@ inline size_t validate_change_proposals(
 				placeholder_delete = j;
 				break;
 			}
-			if (accepted[j].path == normalized ||
-			    (!target.empty() &&
-			     (accepted[j].path == target ||
-			      accepted[j].target_path == target)) ||
-			    (!accepted[j].target_path.empty() &&
-			     accepted[j].target_path == normalized)) {
-				duplicate = true;
-				break;
-			}
+			if (!(accepted[j].path == normalized ||
+			        (!target.empty() &&
+			            (accepted[j].path == target ||
+			                accepted[j].target_path == target)) ||
+			        (!accepted[j].target_path.empty() &&
+			            accepted[j].target_path == normalized)))
+				continue;
+			duplicate = true;
+			break;
 		}
 		if (placeholder_delete < accepted.size()) {
 			std::string placeholder;
 			bool placeholder_truncated = false;
 			if (!workspace.read(normalized, placeholder,
-					    placeholder_truncated, err) ||
+			        placeholder_truncated, err) ||
 			    placeholder_truncated || !placeholder.empty()) {
 				reject("placeholder_not_empty", "", err);
 				continue;
 			}
 			accepted[placeholder_delete].operation =
-				"replace_empty_file_with_directory";
+			    "replace_empty_file_with_directory";
 			accepted[placeholder_delete].creates_directory = true;
 			continue;
 		}
-		const size_t slash = normalized.rfind('/');
-		const std::string parent = slash == std::string::npos ?
-						   "" :
-						   normalized.substr(0, slash);
-		std::vector<webcool::ai::workspace_entry_t> entries;
 		bool exists = false;
-		bool virtual_parent = false;
-		for (size_t j = 0; j < accepted.size(); ++j) {
-			if (accepted[j].creates_directory &&
-			    accepted[j].path == parent) {
-				virtual_parent = true;
-				break;
-			}
-		}
-		if (!duplicate && virtual_parent) {
-			// The parent will exist after the same reviewed atomic change set.
-			exists = false;
-		} else if (!duplicate && workspace.list(parent, entries, err)) {
-			for (size_t j = 0; j < entries.size(); ++j) {
-				if (entries[j].path == normalized) {
-					exists = true;
-					break;
-				}
-			}
-		} else if (!duplicate) {
-			auto with_parents = accepted;
-			if (auto_missing_parents &&
-			    changes[i].operation == "write" &&
-			    err == "workspace path does not exist" &&
-			    stage_missing_proposal_parent(workspace,
-							  project_path, parent,
-							  with_parents, err)) {
-				accepted.swap(with_parents);
-			} else {
-				reject(err == "workspace path does not exist" ?
-					       "parent_missing" :
-				       err == "maximum accumulated changes exceeded by directory dependencies" ?
-					       "change_limit" :
-					       "parent_unavailable",
-				       parent, err);
-				continue;
-			}
-		}
+		if (!inspect_proposal_parent(workspace, project_path,
+		        changes[i], normalized, accepted, duplicate,
+		        auto_missing_parents, exists, reject))
+			continue;
 		std::string current;
 		bool truncated = false;
 		bool target_exists = false;
-		if (!target.empty()) {
-			const size_t target_slash = target.rfind('/');
-			const std::string target_parent =
-				target_slash == std::string::npos ?
-					"" :
-					target.substr(0, target_slash);
-			std::vector<webcool::ai::workspace_entry_t>
-				target_entries;
-			if (!workspace.list(target_parent, target_entries,
-					    err)) {
-				reject(err == "workspace path does not exist" ?
-					       "parent_missing" :
-					       "parent_unavailable",
-				       target_parent, err);
-				continue;
-			}
-			for (size_t j = 0; j < target_entries.size(); ++j) {
-				if (target_entries[j].path == target)
-					target_exists = true;
-			}
-		}
-		const bool source_required =
-			changes[i].operation == "delete" ||
-			changes[i].operation == "move" ||
-			changes[i].operation ==
-				"replace_empty_file_with_directory";
+		if (!inspect_proposal_target(
+		        workspace, target, target_exists, reject))
+			continue;
+		const bool source_required = changes[i].operation == "delete" ||
+		    changes[i].operation == "move" ||
+		    changes[i].operation == "replace_empty_file_with_directory";
 		if (duplicate) {
 			reject("duplicate_path", target, "");
 			continue;
@@ -305,8 +316,8 @@ inline size_t validate_change_proposals(
 		}
 		if ((changes[i].operation == "write" && exists) ||
 		    source_required) {
-			if (!workspace.read(normalized, current, truncated,
-					    err) ||
+			if (!workspace.read(
+			        normalized, current, truncated, err) ||
 			    truncated) {
 				reject("source_unreadable", "", err);
 				continue;
@@ -318,29 +329,28 @@ inline size_t validate_change_proposals(
 				reject("baseline_changed", "", "");
 				continue;
 			}
-			if (changes[i].operation == "write" &&
-			    current == changes[i].content) {
-				if (unchanged_paths != NULL)
-					unchanged_paths->push_back(normalized);
-				else
-					reject("unchanged_content", "", "");
-				continue;
-			}
 			if (changes[i].operation ==
-				    "replace_empty_file_with_directory" &&
+			        "replace_empty_file_with_directory" &&
 			    !current.empty()) {
 				reject("placeholder_not_empty", "", "");
 				continue;
 			}
 		}
+		if (changes[i].operation == "write" && exists &&
+		    current == changes[i].content) {
+			if (unchanged_paths != NULL)
+				unchanged_paths->push_back(normalized);
+			else
+				reject("unchanged_content", "", "");
+			continue;
+		}
 		changes[i].path = normalized;
 		changes[i].target_path = target;
 		changes[i].creates_file =
-			changes[i].operation == "write" && !exists;
+		    changes[i].operation == "write" && !exists;
 		changes[i].creates_directory =
-			changes[i].operation == "mkdir" ||
-			changes[i].operation ==
-				"replace_empty_file_with_directory";
+		    changes[i].operation == "mkdir" ||
+		    changes[i].operation == "replace_empty_file_with_directory";
 		if (changes[i].operation == "write" ||
 		    changes[i].operation == "delete" ||
 		    changes[i].operation == "move") {

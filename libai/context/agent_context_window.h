@@ -19,8 +19,8 @@ namespace ai
 class agent_read_context_t {
 public:
 	explicit agent_read_context_t(size_t budget)
-		: budget_(budget)
-		, bytes_(0)
+	        : budget_(budget)
+	        , bytes_(0)
 	{
 	}
 	void erase(const std::string &path)
@@ -31,11 +31,13 @@ public:
 		for (const auto &page : found->second.pages)
 			bytes_ -= page.second.size();
 		files_.erase(found);
-		for (auto i = order_.begin(); i != order_.end(); ++i)
-			if (*i == path) {
-				order_.erase(i);
-				break;
-			}
+		for (auto i = order_.begin(); i != order_.end(); ++i) {
+			if (!(*i == path))
+				continue;
+
+			order_.erase(i);
+			break;
+		}
 	}
 	void clear()
 	{
@@ -49,59 +51,15 @@ public:
 		priority_ = std::set<std::string>(paths.begin(), paths.end());
 	}
 	bool put(const std::string &path, const std::string &version,
-		 size_t offset, const std::string &record)
-	{
-		if (path.empty() || version.empty())
-			return false;
-		auto found = files_.find(path);
-		if (found != files_.end() && found->second.version != version)
-			erase(path);
-		if (record.size() > budget_) {
-			erase(path);
-			return false;
-		}
-		// Refresh recency at file granularity, never by pushing duplicate pages.
-		for (auto i = order_.begin(); i != order_.end(); ++i)
-			if (*i == path) {
-				order_.erase(i);
-				break;
-			}
-		order_.push_back(path);
-		file_t &file = files_[path];
-		file.version = version;
-		std::string &page = file.pages[offset];
-		bytes_ -= page.size();
-		page = record;
-		bytes_ += page.size();
-		while (bytes_ > budget_ && !order_.empty()) {
-			const auto victim = std::find_if(
-				order_.begin(), order_.end(),
-				[&](const std::string &candidate) {
-					return priority_.count(candidate) == 0;
-				});
-			erase(victim == order_.end() ? order_.front() :
-						       *victim);
-		}
-		return files_.find(path) != files_.end();
-	}
-	std::string records() const
-	{
-		std::string result = "[";
-		for (const auto &path : order_)
-			for (const auto &page : files_.at(path).pages) {
-				if (result.size() > 1)
-					result += ",";
-				result += page.second;
-			}
-		return result + "]";
-	}
+	    size_t offset, const std::string &record);
+	std::string records() const;
 	bool contains(const std::string &path, const std::string &version,
-		      size_t offset) const
+	    size_t offset) const
 	{
 		const auto found = files_.find(path);
 		return found != files_.end() &&
-		       found->second.version == version &&
-		       found->second.pages.count(offset) != 0;
+		    found->second.version == version &&
+		    found->second.pages.count(offset) != 0;
 	}
 	size_t bytes() const
 	{
@@ -130,13 +88,62 @@ private:
 	std::set<std::string> priority_;
 };
 
+inline bool agent_read_context_t::put(const std::string &path,
+    const std::string &version, size_t offset, const std::string &record)
+{
+	if (path.empty() || version.empty())
+		return false;
+	auto found = files_.find(path);
+	if (found != files_.end() && found->second.version != version)
+		erase(path);
+	if (record.size() > budget_) {
+		erase(path);
+		return false;
+	}
+	// Refresh recency at file granularity, never by pushing duplicate pages.
+	for (auto i = order_.begin(); i != order_.end(); ++i) {
+		if (!(*i == path))
+			continue;
+
+		order_.erase(i);
+		break;
+	}
+	order_.push_back(path);
+	file_t &file = files_[path];
+	file.version = version;
+	std::string &page = file.pages[offset];
+	bytes_ -= page.size();
+	page = record;
+	bytes_ += page.size();
+	while (bytes_ > budget_ && !order_.empty()) {
+		const auto victim = std::find_if(order_.begin(), order_.end(),
+		    [&](const std::string &candidate) {
+			return priority_.count(candidate) == 0;
+		});
+		erase(victim == order_.end() ? order_.front() : *victim);
+	}
+	return files_.find(path) != files_.end();
+}
+
+inline std::string agent_read_context_t::records() const
+{
+	std::string result = "[";
+	for (const auto &path : order_)
+		for (const auto &page : files_.at(path).pages) {
+			if (result.size() > 1)
+				result += ",";
+			result += page.second;
+		}
+	return result + "]";
+}
+
 // Retain complete recent exchanges, not just tool names. The low-water mark
 // leaves space for new observations after compaction. Never cut a JSON result.
 class agent_context_window_t {
 public:
 	explicit agent_context_window_t(size_t budget)
-		: budget_(budget)
-		, bytes_(0)
+	        : budget_(budget)
+	        , bytes_(0)
 	{
 	}
 	void append(const std::string &exchange)
@@ -152,7 +159,7 @@ public:
 	{
 		std::string result;
 		for (std::deque<std::string>::const_iterator i =
-			     exchanges_.begin();
+		         exchanges_.begin();
 		     i != exchanges_.end(); ++i)
 			result += *i;
 		return result;
@@ -165,27 +172,26 @@ public:
 	{
 		// Rewriting the prefix has a cache cost; require at least 20% reduction.
 		return current > 0 && candidate <= current - current / 5 &&
-		       candidate < current;
+		    candidate < current;
 	}
 	static size_t next_compaction_limit(size_t retained, size_t configured,
-					    size_t last_exchange,
-					    size_t hard_limit)
+	    size_t last_exchange, size_t hard_limit)
 	{
 		// Fit at least one batch like the last one after compaction. Doubling
 		// its size also leaves room for accompanying findings and diagnostics.
 		const size_t batch_room = last_exchange > hard_limit / 2 ?
-						  hard_limit :
-						  last_exchange * 2;
+		    hard_limit :
+		    last_exchange * 2;
 		const size_t room = std::max(configured / 2, batch_room);
 		const size_t available =
-			hard_limit - std::min(retained, hard_limit);
+		    hard_limit - std::min(retained, hard_limit);
 		return std::min(hard_limit,
-				std::max(configured,
-					 std::min(retained, hard_limit) +
-						 std::min(room, available)));
+		    std::max(configured,
+		        std::min(retained, hard_limit) +
+		            std::min(room, available)));
 	}
-	static bool needs_compaction(size_t current, size_t addition,
-				     size_t limit)
+	static bool needs_compaction(
+	    size_t current, size_t addition, size_t limit)
 	{
 		return current > limit || addition > limit - current;
 	}

@@ -13,8 +13,9 @@ bool has_binary_bytes(const std::string &content)
 {
 	const size_t probe = std::min<size_t>(content.size(), 8192);
 	for (size_t i = 0; i < probe; ++i) {
-		if (content[i] == '\0')
-			return true;
+		if (!(content[i] == '\0'))
+			continue;
+		return true;
 	}
 	return false;
 }
@@ -42,9 +43,9 @@ bool install_new_file(const std::string &temporary, const std::string &target)
 	std::wstring temporary_wide;
 	std::wstring target_wide;
 	return webcool_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
-	       webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
-	       MoveFileExW(temporary_wide.c_str(), target_wide.c_str(),
-			   MOVEFILE_WRITE_THROUGH) != 0;
+	    webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
+	    MoveFileExW(temporary_wide.c_str(), target_wide.c_str(),
+	        MOVEFILE_WRITE_THROUGH) != 0;
 #else
 	// link() fails with EEXIST and therefore gives create-if-absent semantics;
 	// rename() would silently replace a file created after preview.
@@ -55,7 +56,7 @@ bool install_new_file(const std::string &temporary, const std::string &target)
 }
 
 bool write_temporary_text(const std::string &target, const std::string &content,
-			  std::string &temporary, std::string &err)
+    std::string &temporary, std::string &err)
 {
 	const std::string id = random_hex_id();
 	if (id.empty()) {
@@ -66,12 +67,11 @@ bool write_temporary_text(const std::string &target, const std::string &content,
 	FILE *out = fopen(temporary.c_str(), "wb");
 	if (out == NULL) {
 		err = std::string("cannot create workspace temporary file: ") +
-		      strerror(errno);
+		    strerror(errno);
 		return false;
 	}
 	const bool wrote = content.empty() ||
-			   fwrite(content.data(), 1, content.size(), out) ==
-				   content.size();
+	    fwrite(content.data(), 1, content.size(), out) == content.size();
 	bool flushed = wrote && fflush(out) == 0;
 #ifdef _WIN32
 	if (flushed)
@@ -81,21 +81,20 @@ bool write_temporary_text(const std::string &target, const std::string &content,
 		flushed = fsync(fileno(out)) == 0;
 #endif
 	const bool closed = fclose(out) == 0;
-	if (!flushed || !closed) {
-		remove(temporary.c_str());
-		err = "cannot flush workspace temporary file";
-		return false;
-	}
-	return true;
+	if (!(!flushed || !closed))
+		return true;
+	remove(temporary.c_str());
+	err = "cannot flush workspace temporary file";
+	return false;
 }
 
 bool read_limited(const std::string &path, std::string &content,
-		  bool &truncated, std::string &err)
+    bool &truncated, std::string &err)
 {
 	FILE *fp = fopen(path.c_str(), "rb");
 	if (fp == NULL) {
 		err = std::string("cannot open workspace file: ") +
-		      strerror(errno);
+		    strerror(errno);
 		return false;
 	}
 	char buffer[16384];
@@ -114,25 +113,24 @@ bool read_limited(const std::string &path, std::string &content,
 			err = "binary files cannot be returned to the agent";
 			return false;
 		}
-		if (got < sizeof(buffer)) {
-			if (ferror(fp)) {
-				fclose(fp);
-				err = "cannot read workspace file";
-				return false;
-			}
-			break;
+		if (!(got < sizeof(buffer)))
+			continue;
+		if (ferror(fp)) {
+			fclose(fp);
+			err = "cannot read workspace file";
+			return false;
 		}
+		break;
 	}
 	fclose(fp);
 	if (content.size() > kMaxReadBytes) {
 		content.resize(kMaxReadBytes);
 		truncated = true;
 	}
-	if (has_binary_bytes(content)) {
-		err = "binary files cannot be returned to the agent";
-		return false;
-	}
-	return true;
+	if (!has_binary_bytes(content))
+		return true;
+	err = "binary files cannot be returned to the agent";
+	return false;
 }
 
 } // namespace workspace_detail
@@ -145,9 +143,8 @@ std::string agent_workspace_t::content_sha256(const std::string &content)
 	if (context == NULL)
 		return "";
 	const bool ok = EVP_DigestInit_ex(context, EVP_sha256(), NULL) == 1 &&
-			EVP_DigestUpdate(context, content.data(),
-					 content.size()) == 1 &&
-			EVP_DigestFinal_ex(context, digest, &digest_size) == 1;
+	    EVP_DigestUpdate(context, content.data(), content.size()) == 1 &&
+	    EVP_DigestFinal_ex(context, digest, &digest_size) == 1;
 	EVP_MD_CTX_free(context);
 	if (!ok)
 		return "";

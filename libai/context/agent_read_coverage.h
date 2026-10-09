@@ -23,7 +23,7 @@ public:
 		files_.clear();
 	}
 	size_t observe(const std::string &path, const std::string &version,
-		       size_t begin, size_t end)
+	    size_t begin, size_t end)
 	{
 		if (end <= begin || version.empty())
 			return end > begin ? end - begin : 0;
@@ -38,8 +38,9 @@ public:
 		for (const auto &range : file.ranges) {
 			const size_t left = std::max(begin, range.first);
 			const size_t right = std::min(end, range.second);
-			if (right > left)
-				added -= right - left;
+			if (!(right > left))
+				continue;
+			added -= right - left;
 		}
 		file.ranges.push_back(std::make_pair(begin, end));
 		std::sort(file.ranges.begin(), file.ranges.end());
@@ -50,11 +51,12 @@ public:
 				merged.push_back(range);
 			else
 				merged.back().second = std::max(
-					merged.back().second, range.second);
+				    merged.back().second, range.second);
 		}
 		file.ranges.swap(merged);
-		if (file.ranges.size() > 512)
-			file.ranges.clear();
+		if (!(file.ranges.size() > 512))
+			return added;
+		file.ranges.clear();
 		return added;
 	}
 };

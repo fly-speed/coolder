@@ -21,7 +21,7 @@ struct agent_project_symbol_t {
 	std::string text;
 
 	agent_project_symbol_t()
-		: line(0)
+	        : line(0)
 	{
 	}
 };
@@ -49,12 +49,12 @@ struct agent_project_index_snapshot_t {
 	std::vector<agent_project_index_entry_t> files;
 
 	agent_project_index_snapshot_t()
-		: revision(0)
-		, indexed_at(0)
-		, directory_count(0)
-		, skipped_directory_count(0)
-		, changed_file_count(0)
-		, truncated(false)
+	        : revision(0)
+	        , indexed_at(0)
+	        , directory_count(0)
+	        , skipped_directory_count(0)
+	        , changed_file_count(0)
+	        , truncated(false)
 	{
 	}
 };
@@ -66,21 +66,20 @@ public:
 	explicit agent_project_index_store_t(const std::string &user_root);
 
 	bool load(const agent_project_record_t &project,
-		  agent_project_index_snapshot_t &snapshot,
-		  std::string &err) const;
+	    agent_project_index_snapshot_t &snapshot, std::string &err) const;
 	bool refresh(const agent_project_record_t &project,
-		     agent_workspace_t &workspace,
-		     agent_project_index_snapshot_t &snapshot, std::string &err,
-		     const std::function<void(const char *)> &phase = {}) const;
+	    agent_workspace_t &workspace,
+	    agent_project_index_snapshot_t &snapshot, std::string &err,
+	    const std::function<void(const char *)> &phase = {}) const;
 	// Removes the generated metadata snapshot only, never project source files.
 	bool remove(const std::string &project_id, std::string &err) const;
 
 	// Creates a bounded model-facing file/symbol map. Module ownership,
 	// declarations and dependencies are retained, while exact file contents
 	// remain behind explicit read tools.
-	static std::string
-	prompt_summary(const agent_project_index_snapshot_t &snapshot,
-		       size_t byte_limit, bool chinese = false);
+	static std::string prompt_summary(
+	    const agent_project_index_snapshot_t &snapshot, size_t byte_limit,
+	    bool chinese = false);
 
 private:
 	std::string user_root_;

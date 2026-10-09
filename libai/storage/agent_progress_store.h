@@ -44,12 +44,11 @@ struct agent_progress_t {
 class agent_progress_store_t {
 public:
 	agent_progress_store_t(const std::string &user_root,
-			       const std::string &project_path,
-			       const std::string &session_id);
+	    const std::string &project_path, const std::string &session_id);
 
 	bool save(const agent_progress_t &progress, std::string &err) const;
-	bool load(agent_progress_t &progress, bool &found,
-		  std::string &err) const;
+	bool load(
+	    agent_progress_t &progress, bool &found, std::string &err) const;
 	// Cheap metadata probe used by the conversation list. It deliberately does
 	// not parse or return the private prompt/transcript stored in the checkpoint.
 	bool exists(bool &found, std::string &err) const;

@@ -9,28 +9,27 @@ namespace ai
 // Compare exact source bytes, including their JSON-escaped representations in
 // batch proposals and compact source records. Never infer freshness from path alone.
 inline bool contains_source_evidence(const std::string &evidence,
-				     const std::string &path,
-				     const std::string &content)
+    const std::string &path, const std::string &content)
 {
 	if (content.empty() || evidence.find(path) == std::string::npos)
 		return false;
 	for (const char *label :
-	     { "compiler diagnostic source", "current staged source" }) {
-		const std::string record = "--- " + path + " (" + label +
-					   ") ---\n" + content + "\n";
+	    { "compiler diagnostic source", "current staged source" }) {
+		const std::string record =
+		    "--- " + path + " (" + label + ") ---\n" + content + "\n";
 		const size_t at = evidence.find(record);
-		if (at != std::string::npos) {
-			const std::string tail =
-				evidence.substr(at + record.size());
-			if (tail.empty() || tail.find("--- ") == 0 ||
-			    tail.find("</repair_source_context>") == 0 ||
-			    tail.find("[remaining repair source ") == 0)
-				return true;
-		}
+		if (!(at != std::string::npos))
+			continue;
+		const std::string tail = evidence.substr(at + record.size());
+		if (!(tail.empty() || tail.find("--- ") == 0 ||
+		        tail.find("</repair_source_context>") == 0 ||
+		        tail.find("[remaining repair source ") == 0))
+			continue;
+		return true;
 	}
 	acl::json parsed(evidence.c_str());
 	const std::string normalized =
-		parsed.finish() ? parsed.to_string().c_str() : evidence;
+	    parsed.finish() ? parsed.to_string().c_str() : evidence;
 	acl::json source_json;
 	acl::json_node &source = source_json.create_node();
 	source.add_text("content", content.c_str());
@@ -52,8 +51,7 @@ inline bool contains_source_evidence(const std::string &evidence,
 }
 
 inline bool request_has_source(const completion_request_t &request,
-			       const std::string &path,
-			       const std::string &content)
+    const std::string &path, const std::string &content)
 {
 	if (contains_source_evidence(request.user_prompt, path, content))
 		return true;
@@ -61,18 +59,22 @@ inline bool request_has_source(const completion_request_t &request,
 	if (contains_source_evidence(request.turn_instructions, path, content))
 		return true;
 	for (const auto &exchange : request.tool_history) {
-		if (contains_source_evidence(exchange.preceding_instructions,
-					     path, content))
+		if (contains_source_evidence(
+		        exchange.preceding_instructions, path, content))
 			return true;
-		for (const auto &call : exchange.calls)
-			if ((call.path == path && call.content == content) ||
-			    contains_source_evidence(call.content, path,
-						     content))
-				return true;
-		for (const auto &output : exchange.outputs)
-			if (contains_source_evidence(output.output, path,
-						     content))
-				return true;
+		for (const auto &call : exchange.calls) {
+			if (!((call.path == path && call.content == content) ||
+			        contains_source_evidence(
+			            call.content, path, content)))
+				continue;
+			return true;
+		}
+		for (const auto &output : exchange.outputs) {
+			if (!contains_source_evidence(
+			        output.output, path, content))
+				continue;
+			return true;
+		}
 	}
 	return false;
 }

@@ -91,4 +91,15 @@
       <Filter>html</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="action\ai\ai_agent_run_status.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClCompile Include="action\ai\ai_sandbox_actions.cpp">
+      <Filter>action\ai</Filter>
+    </ClCompile>
+    <ClInclude Include="action\ai\ai_workspace_actions_internal.h">
+      <Filter>action\ai</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

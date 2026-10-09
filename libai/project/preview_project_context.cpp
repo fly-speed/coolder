@@ -19,8 +19,7 @@ namespace
 bool within(const std::string &root, const std::string &file)
 {
 	return file.size() > root.size() &&
-	       file.compare(0, root.size(), root) == 0 &&
-	       file[root.size()] == '/';
+	    file.compare(0, root.size(), root) == 0 && file[root.size()] == '/';
 }
 std::string json_text(acl::json_node &json)
 {
@@ -37,14 +36,15 @@ std::string failure(const std::string &message)
 	return json_text(root);
 }
 }
-std::string preview_project_directory(const std::string &user_root,
-				      const std::string &document, bool local)
+std::string preview_project_directory(
+    const std::string &user_root, const std::string &document, bool local)
 {
 	if (document.empty())
 		return "";
 	std::string normalized, err;
-	if (!local && !agent_workspace_t::normalize_path(document, normalized,
-							 false, err))
+	if (!local &&
+	    !agent_workspace_t::normalize_path(
+	        document, normalized, false, err))
 		return "";
 	std::vector<agent_project_record_t> projects;
 	if (!agent_project_store_t(user_root).list(50, projects, err))
@@ -54,19 +54,18 @@ std::string preview_project_directory(const std::string &user_root,
 			continue;
 		std::string physical;
 		if (!agent_workspace_t::resolve_project_root(
-			    user_root, project.project_path, physical, err))
+		        user_root, project.project_path, physical, err))
 			continue;
 		char root[PATH_MAX], file[PATH_MAX];
 		if (!realpath(physical.c_str(), root))
 			continue;
-		const std::string candidate =
-			local ? document :
-				physical + normalized.substr(
-						   project.project_path.size());
+		const std::string candidate = local ?
+		    document :
+		    physical + normalized.substr(project.project_path.size());
 		if (!realpath(candidate.c_str(), file) || !within(root, file))
 			continue;
 		const std::string relative =
-			std::string(file).substr(std::string(root).size() + 1);
+		    std::string(file).substr(std::string(root).size() + 1);
 		if (agent_workspace_t::path_is_sensitive(relative))
 			continue;
 		const std::string canonical(file);
@@ -77,20 +76,18 @@ std::string preview_project_directory(const std::string &user_root,
 bool preview_read_tool(const std::string &name)
 {
 	return name == "workspace.list" || name == "workspace.read" ||
-	       name == "workspace.search";
+	    name == "workspace.search";
 }
 std::string preview_project_read(const std::string &directory,
-				 const std::string &tool,
-				 const std::string &path,
-				 const std::string &query)
+    const std::string &tool, const std::string &path, const std::string &query)
 {
 	if (directory.empty() || !preview_read_tool(tool))
 		return failure(
-			"Only directory list, search and text reads are allowed.");
+		    "Only directory list, search and text reads are allowed.");
 	agent_workspace_t workspace(directory);
 	std::string err, resolved;
-	if (!agent_workspace_t::resolve_project_root(directory, path, resolved,
-						     err))
+	if (!agent_workspace_t::resolve_project_root(
+	        directory, path, resolved, err))
 		return failure(err);
 	if (resolved != directory && !within(directory, resolved))
 		return failure("Path is outside the preview directory.");
@@ -121,15 +118,13 @@ std::string preview_project_read(const std::string &directory,
 		const ai_admin_policy_t policy = ai_runtime_policy_get();
 		text_read_page_t page;
 		if (!read_text_page(content, query, page, err,
-				    policy.read_chunk_kib * 1024,
-				    policy.read_file_limit_kib * 1024))
+		        policy.read_chunk_kib * 1024,
+		        policy.read_file_limit_kib * 1024))
 			return failure(err);
 		root.add_text("content", page.content.c_str());
 		root.add_bool("eof", page.eof);
 		root.add_text("next_query",
-			      page.eof ?
-				      "" :
-				      std::to_string(page.next_offset).c_str());
+		    page.eof ? "" : std::to_string(page.next_offset).c_str());
 	} else {
 		std::vector<workspace_match_t> matches;
 		bool truncated = false;

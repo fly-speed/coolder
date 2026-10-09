@@ -66,26 +66,24 @@ bool parse_number(const std::string &value, long long &number)
 bool valid_status(const std::string &status)
 {
 	return status == "running" || status == "completed" ||
-	       status == "failed" || status == "cancelled";
+	    status == "failed" || status == "cancelled";
 }
 
 bool safe_record(const agent_run_record_t &record)
 {
 	return valid_id(record.id) && !record.agent_id.empty() &&
-	       record.agent_id.size() <= 64 &&
-	       record.agent_version.size() <= 32 &&
-	       valid_status(record.status) && record.provider_id.size() <= 64 &&
-	       record.model.size() <= 256 &&
-	       record.project_path.size() <= 2048 && record.started_at > 0 &&
-	       record.finished_at >= 0 && record.input_tokens >= 0 &&
-	       record.cached_input_tokens >= 0 && record.output_tokens >= 0 &&
-	       record.reasoning_tokens >= 0 && record.latency_ms >= 0 &&
-	       record.tool_calls >= 0 && record.proposed_changes >= 0 &&
-	       record.rejected_changes >= 0 &&
-	       record.provider_error_category.size() <= 64 &&
-	       record.provider_http_status >= 0 &&
-	       record.provider_http_status <= 599 &&
-	       record.error.size() <= kMaxErrorBytes;
+	    record.agent_id.size() <= 64 && record.agent_version.size() <= 32 &&
+	    valid_status(record.status) && record.provider_id.size() <= 64 &&
+	    record.model.size() <= 256 && record.project_path.size() <= 2048 &&
+	    record.started_at > 0 && record.finished_at >= 0 &&
+	    record.input_tokens >= 0 && record.cached_input_tokens >= 0 &&
+	    record.output_tokens >= 0 && record.reasoning_tokens >= 0 &&
+	    record.latency_ms >= 0 && record.tool_calls >= 0 &&
+	    record.proposed_changes >= 0 && record.rejected_changes >= 0 &&
+	    record.provider_error_category.size() <= 64 &&
+	    record.provider_http_status >= 0 &&
+	    record.provider_http_status <= 599 &&
+	    record.error.size() <= kMaxErrorBytes;
 }
 
 bool ensure_directory(const std::string &user_root, std::string &err)
@@ -113,12 +111,12 @@ bool ensure_directory(const std::string &user_root, std::string &err)
 	}
 #else
 	struct stat st;
-	if (lstat(directory.c_str(), &st) != 0) {
-		if (mkdir(directory.c_str(), 0700) != 0 ||
-		    lstat(directory.c_str(), &st) != 0) {
-			err = "cannot create agent run history directory";
-			return false;
-		}
+
+	if ((lstat(directory.c_str(), &st) != 0) &&
+	    (mkdir(directory.c_str(), 0700) != 0 ||
+	        lstat(directory.c_str(), &st) != 0)) {
+		err = "cannot create agent run history directory";
+		return false;
 	}
 	if (lstat(directory.c_str(), &st) != 0 || !S_ISDIR(st.st_mode) ||
 	    S_ISLNK(st.st_mode) || chmod(directory.c_str(), 0700) != 0) {
@@ -138,14 +136,13 @@ using ::webcool::ai::file_ops::replace_file;
 
 bool newer_run(const agent_run_record_t &left, const agent_run_record_t &right)
 {
-	if (left.started_at != right.started_at) {
-		return left.started_at > right.started_at;
-	}
-	return left.id > right.id;
+	if (!(left.started_at != right.started_at))
+		return left.id > right.id;
+	return left.started_at > right.started_at;
 }
 
 bool load_records(const std::string &user_root,
-		  std::vector<agent_run_record_t> &records, std::string &err)
+    std::vector<agent_run_record_t> &records, std::string &err)
 {
 	records.clear();
 	const std::string path = store_path(user_root);
@@ -164,7 +161,7 @@ bool load_records(const std::string &user_root,
 	}
 	if (attributes != INVALID_FILE_ATTRIBUTES &&
 	    ((attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
-	     (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)) {
+	        (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)) {
 		err = "agent run history is not a safe regular file";
 		return false;
 	}
@@ -222,12 +219,12 @@ bool load_records(const std::string &user_root,
 		if (version2) {
 			long long http_status = 0;
 			long long retryable = 0;
-			if (!parse_number(fields[16],
-					  record.cached_input_tokens) ||
-			    !parse_number(fields[17],
-					  record.reasoning_tokens) ||
-			    !hex_decode(fields[18],
-					record.provider_error_category) ||
+			if (!parse_number(
+			        fields[16], record.cached_input_tokens) ||
+			    !parse_number(
+			        fields[17], record.reasoning_tokens) ||
+			    !hex_decode(
+			        fields[18], record.provider_error_category) ||
 			    !parse_number(fields[19], http_status) ||
 			    !parse_number(fields[20], retryable) ||
 			    (retryable != 0 && retryable != 1)) {
@@ -235,7 +232,7 @@ bool load_records(const std::string &user_root,
 				return false;
 			}
 			record.provider_http_status =
-				static_cast<int>(http_status);
+			    static_cast<int>(http_status);
 			record.provider_error_retryable = retryable == 1;
 		}
 		if (!safe_record(record)) {
@@ -243,24 +240,23 @@ bool load_records(const std::string &user_root,
 			return false;
 		}
 		records.push_back(record);
-		if (records.size() > kMaxStoredRuns) {
-			err = "agent run history exceeds its record limit";
-			return false;
-		}
+		if (!(records.size() > kMaxStoredRuns))
+			continue;
+		err = "agent run history exceeds its record limit";
+		return false;
 	}
 	return true;
 }
 
 bool save_records(const std::string &user_root,
-		  const std::vector<agent_run_record_t> &records,
-		  std::string &err)
+    const std::vector<agent_run_record_t> &records, std::string &err)
 {
 	if (!ensure_directory(user_root, err))
 		return false;
 	const std::string path = store_path(user_root);
 	const std::string temporary = path + ".tmp";
 	std::ofstream out(temporary.c_str(),
-			  std::ios::out | std::ios::binary | std::ios::trunc);
+	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write agent run history";
 		return false;
@@ -306,27 +302,25 @@ bool save_records(const std::string &user_root,
 		return false;
 	}
 #endif
-	if (!replace_file(temporary, path)) {
-		remove(temporary.c_str());
-		err = std::string("cannot install agent run history: ") +
-		      strerror(errno);
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, path))
+		return true;
+	remove(temporary.c_str());
+	err =
+	    std::string("cannot install agent run history: ") + strerror(errno);
+	return false;
 }
 
 bool update_terminal(const std::string &user_root, const std::string &id,
-		     const std::string &status, long long input_tokens,
-		     long long output_tokens, long long cached_input_tokens,
-		     long long reasoning_tokens, long long latency_ms,
-		     long long tool_calls, long long proposed_changes,
-		     long long rejected_changes, const std::string &error,
-		     const std::string &provider_error_category,
-		     int provider_http_status, bool provider_error_retryable,
-		     std::string &err)
+    const std::string &status, long long input_tokens, long long output_tokens,
+    long long cached_input_tokens, long long reasoning_tokens,
+    long long latency_ms, long long tool_calls, long long proposed_changes,
+    long long rejected_changes, const std::string &error,
+    const std::string &provider_error_category, int provider_http_status,
+    bool provider_error_retryable, std::string &err)
 {
-	if (!valid_id(id) || (status != "completed" && status != "failed" &&
-			      status != "cancelled")) {
+	if (!valid_id(id) ||
+	    (status != "completed" && status != "failed" &&
+	        status != "cancelled")) {
 		err = "invalid agent run update";
 		return false;
 	}
@@ -363,12 +357,12 @@ bool update_terminal(const std::string &user_root, const std::string &id,
 } // namespace
 
 agent_run_store_t::agent_run_store_t(const std::string &user_root)
-	: user_root_(user_root)
+        : user_root_(user_root)
 {
 }
 
-bool agent_run_store_t::create(const agent_run_record_t &record,
-			       std::string &err) const
+bool agent_run_store_t::create(
+    const agent_run_record_t &record, std::string &err) const
 {
 	if (!safe_record(record) || record.status != "running" ||
 	    record.finished_at != 0) {
@@ -381,78 +375,66 @@ bool agent_run_store_t::create(const agent_run_record_t &record,
 		return ai_error("agent.run-store", "load-for-create", err);
 	}
 	for (size_t i = 0; i < records.size(); ++i) {
-		if (records[i].id == record.id) {
-			err = "agent run already exists";
-			return ai_error("agent.run-store", "check-duplicate",
-					err);
-		}
+		if (!(records[i].id == record.id))
+			continue;
+		err = "agent run already exists";
+		return ai_error("agent.run-store", "check-duplicate", err);
 	}
 	records.push_back(record);
 	std::sort(records.begin(), records.end(), newer_run);
 	if (records.size() > kMaxStoredRuns)
 		records.resize(kMaxStoredRuns);
-	if (!save_records(user_root_, records, err)) {
-		return ai_error("agent.run-store", "save-create", err);
-	}
-	return true;
+	if (save_records(user_root_, records, err))
+		return true;
+	return ai_error("agent.run-store", "save-create", err);
 }
 
 bool agent_run_store_t::complete(const std::string &id, long long input_tokens,
-				 long long cached_input_tokens,
-				 long long output_tokens,
-				 long long reasoning_tokens,
-				 long long latency_ms, long long tool_calls,
-				 long long proposed_changes,
-				 long long rejected_changes,
-				 std::string &err) const
+    long long cached_input_tokens, long long output_tokens,
+    long long reasoning_tokens, long long latency_ms, long long tool_calls,
+    long long proposed_changes, long long rejected_changes,
+    std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
-	if (!update_terminal(user_root_, id, "completed", input_tokens,
-			     output_tokens, cached_input_tokens,
-			     reasoning_tokens, latency_ms, tool_calls,
-			     proposed_changes, rejected_changes, "", "", 0,
-			     false, err)) {
-		return ai_error("agent.run-store", "complete", err);
-	}
-	return true;
+	if (update_terminal(user_root_, id, "completed", input_tokens,
+	        output_tokens, cached_input_tokens, reasoning_tokens,
+	        latency_ms, tool_calls, proposed_changes, rejected_changes, "",
+	        "", 0, false, err))
+		return true;
+	return ai_error("agent.run-store", "complete", err);
 }
 
-bool agent_run_store_t::fail(const std::string &id, const std::string &error,
-			     std::string &err) const
+bool agent_run_store_t::fail(
+    const std::string &id, const std::string &error, std::string &err) const
 {
 	return fail(id, error, "", 0, false, err);
 }
 
 bool agent_run_store_t::fail(const std::string &id, const std::string &error,
-			     const std::string &provider_error_category,
-			     int provider_http_status,
-			     bool provider_error_retryable,
-			     std::string &err) const
+    const std::string &provider_error_category, int provider_http_status,
+    bool provider_error_retryable, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
-	if (!update_terminal(user_root_, id, "failed", 0, 0, 0, 0, 0, 0, 0, 0,
-			     error, provider_error_category,
-			     provider_http_status, provider_error_retryable,
-			     err)) {
-		// Do not log `error`: it may originate from a model provider. Only log
-		// the metadata-store failure returned through `err`.
-		return ai_error("agent.run-store", "mark-failed", err);
-	}
-	return true;
+	if (update_terminal(user_root_, id, "failed", 0, 0, 0, 0, 0, 0, 0, 0,
+	        error, provider_error_category, provider_http_status,
+	        provider_error_retryable, err))
+		return true;
+	// Do not log `error`: it may originate from a model provider. Only log
+	// the metadata-store failure returned through `err`.
+	return ai_error("agent.run-store", "mark-failed", err);
 }
 
 bool agent_run_store_t::cancel(const std::string &id, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
-	if (!update_terminal(user_root_, id, "cancelled", 0, 0, 0, 0, 0, 0, 0,
-			     0, "", "cancelled", 0, false, err)) {
-		return ai_error("agent.run-store", "cancel", err);
-	}
-	return true;
+	if (update_terminal(user_root_, id, "cancelled", 0, 0, 0, 0, 0, 0, 0, 0,
+	        "", "cancelled", 0, false, err))
+		return true;
+	return ai_error("agent.run-store", "cancel", err);
 }
 
-bool agent_run_store_t::get(const std::string &id, agent_run_record_t &record,
-			    std::string &err) const
+bool agent_run_store_t::get(
+    const std::string &id, agent_run_record_t &record, std::string &err) const
 {
 	if (!valid_id(id)) {
 		err = "invalid agent run id";
@@ -464,18 +446,17 @@ bool agent_run_store_t::get(const std::string &id, agent_run_record_t &record,
 		return ai_error("agent.run-store", "load-for-get", err);
 	}
 	for (size_t i = 0; i < records.size(); ++i) {
-		if (records[i].id == id) {
-			record = records[i];
-			return true;
-		}
+		if (!(records[i].id == id))
+			continue;
+		record = records[i];
+		return true;
 	}
 	err = "agent run not found";
 	return ai_error("agent.run-store", "find-run", err);
 }
 
 bool agent_run_store_t::list(size_t limit,
-			     std::vector<agent_run_record_t> &records,
-			     std::string &err) const
+    std::vector<agent_run_record_t> &records, std::string &err) const
 {
 	if (limit == 0 || limit > kMaxStoredRuns)
 		limit = kMaxStoredRuns;
@@ -484,8 +465,9 @@ bool agent_run_store_t::list(size_t limit,
 		return ai_error("agent.run-store", "list", err);
 	}
 	std::sort(records.begin(), records.end(), newer_run);
-	if (records.size() > limit)
-		records.resize(limit);
+	if (!(records.size() > limit))
+		return true;
+	records.resize(limit);
 	return true;
 }
 

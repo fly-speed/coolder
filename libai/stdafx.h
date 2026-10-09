@@ -35,7 +35,7 @@
 	acl::log::fatal4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
 #define logger_debug(section, level, fmt, ...)                                \
 	acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, \
-		       __VA_ARGS__)
+	    __VA_ARGS__)
 #else
 #define logger acl::log::msg1
 #define logger_warn acl::log::warn1
@@ -52,9 +52,9 @@
 	acl::log::error4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
 #define logger_fatal(fmt, args...) \
 	acl::log::fatal4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-#define logger_debug(section, level, fmt, args...)                            \
-	acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, \
-		       ##args)
+#define logger_debug(section, level, fmt, args...) \
+	acl::log::msg6(                            \
+	    section, level, __FILE__, __LINE__, __FUNCTION__, fmt, ##args)
 #endif // !_WIN32 && !_WIN64
 
 #define DEBUG_MIN 200

@@ -87,16 +87,16 @@ bool move_file(const std::string &source, const std::string &target)
 	std::wstring source_wide;
 	std::wstring target_wide;
 	return webcool_utf8_path_to_wide(source.c_str(), source_wide) &&
-	       webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
-	       MoveFileExW(source_wide.c_str(), target_wide.c_str(),
-			   MOVEFILE_WRITE_THROUGH) != 0;
+	    webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
+	    MoveFileExW(source_wide.c_str(), target_wide.c_str(),
+	        MOVEFILE_WRITE_THROUGH) != 0;
 #else
 	return rename(source.c_str(), target.c_str()) == 0;
 #endif
 }
 
-bool ensure_store_directory(const std::string &user_root,
-			    std::string &directory, std::string &err)
+bool ensure_store_directory(
+    const std::string &user_root, std::string &directory, std::string &err)
 {
 	const std::string agent = join_path(user_root, ".webcool_agent");
 	directory = join_path(agent, "sandbox_plans");
@@ -130,21 +130,21 @@ sandbox_limits_t fixed_limits()
 bool same_command(const sandbox_command_t &left, const sandbox_command_t &right)
 {
 	return left.id == right.id && left.executable == right.executable &&
-	       left.fixed_arguments == right.fixed_arguments &&
-	       !left.allow_dynamic_arguments &&
-	       !right.allow_dynamic_arguments
-	       // Interactive one-shot execution plans never authorize a listening socket.
-	       // Loopback service validation uses a separate server-owned workflow.
-	       && !left.allow_loopback_network && !right.allow_loopback_network;
+	    left.fixed_arguments == right.fixed_arguments &&
+	    !left.allow_dynamic_arguments &&
+	    !right.allow_dynamic_arguments
+	    // Interactive one-shot execution plans never authorize a listening socket.
+	    // Loopback service validation uses a separate server-owned workflow.
+	    && !left.allow_loopback_network && !right.allow_loopback_network;
 }
 
 bool save_plan(const std::string &directory,
-	       const sandbox_execution_plan_t &plan, std::string &err)
+    const sandbox_execution_plan_t &plan, std::string &err)
 {
 	const std::string path = pending_path(directory);
 	const std::string temporary = path + ".tmp";
 	std::ofstream out(temporary.c_str(),
-			  std::ios::out | std::ios::binary | std::ios::trunc);
+	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write sandbox execution plan";
 		return false;
@@ -172,17 +172,16 @@ bool save_plan(const std::string &directory,
 		return false;
 	}
 #endif
-	if (!replace_file(temporary, path)) {
-		remove(temporary.c_str());
-		err = std::string("cannot install sandbox execution plan: ") +
-		      strerror(errno);
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, path))
+		return true;
+	remove(temporary.c_str());
+	err = std::string("cannot install sandbox execution plan: ") +
+	    strerror(errno);
+	return false;
 }
 
 bool load_plan_file(const std::string &path, const std::string &requested_id,
-		    sandbox_execution_plan_t &plan, std::string &err)
+    sandbox_execution_plan_t &plan, std::string &err)
 {
 	if (!valid_id(requested_id)) {
 		err = "invalid sandbox execution plan id";
@@ -217,7 +216,7 @@ bool load_plan_file(const std::string &path, const std::string &requested_id,
 	}
 	end = NULL;
 	const unsigned long argument_count =
-		strtoul(argument_count_text.c_str(), &end, 10);
+	    strtoul(argument_count_text.c_str(), &end, 10);
 	if (end == argument_count_text.c_str() || *end != '\0' ||
 	    argument_count > kMaxArguments) {
 		err = "invalid sandbox execution plan arguments";
@@ -243,24 +242,23 @@ bool load_plan_file(const std::string &path, const std::string &requested_id,
 }
 
 bool append_audit(const std::string &user_root,
-		  const sandbox_execution_plan_t &plan, const char *event,
-		  const sandbox_result_t *result, std::string &err)
+    const sandbox_execution_plan_t &plan, const char *event,
+    const sandbox_result_t *result, std::string &err)
 {
 	std::string directory;
 	if (!ensure_store_directory(user_root, directory, err))
 		return false;
 	const std::string path = join_path(
-		join_path(user_root, ".webcool_agent"), "sandbox_runs.v1");
+	    join_path(user_root, ".webcool_agent"), "sandbox_runs.v1");
 	std::vector<std::string> records;
 	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
-	if (in.good()) {
-		std::string line;
-		if (std::getline(in, line) && line == kAuditHeader) {
-			while (records.size() < kMaxAuditRecords &&
-			       std::getline(in, line)) {
-				if (!line.empty())
-					records.push_back(line);
-			}
+	std::string line;
+	if (in.good() && std::getline(in, line) && line == kAuditHeader) {
+		while (records.size() < kMaxAuditRecords &&
+		    std::getline(in, line)) {
+			if (line.empty())
+				continue;
+			records.push_back(line);
 		}
 	}
 	if (records.size() >= kMaxAuditRecords)
@@ -282,7 +280,7 @@ bool append_audit(const std::string &user_root,
 	records.push_back(record.str());
 	const std::string temporary = path + ".tmp";
 	std::ofstream out(temporary.c_str(),
-			  std::ios::out | std::ios::binary | std::ios::trunc);
+	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write sandbox execution audit";
 		return false;
@@ -308,16 +306,15 @@ bool append_audit(const std::string &user_root,
 		return false;
 	}
 #endif
-	if (!replace_file(temporary, path)) {
-		remove(temporary.c_str());
-		err = "cannot install sandbox execution audit";
-		return false;
-	}
-	return true;
+	if (replace_file(temporary, path))
+		return true;
+	remove(temporary.c_str());
+	err = "cannot install sandbox execution audit";
+	return false;
 }
 
 bool parse_integer(const std::string &text, long long minimum,
-		   long long maximum, long long &value)
+    long long maximum, long long &value)
 {
 	if (text.empty())
 		return false;
@@ -334,7 +331,7 @@ bool parse_integer(const std::string &text, long long minimum,
 using ::webcool::ai::record_codec::split_tabs;
 
 bool parse_audit_record(const std::string &line, long long &timestamp,
-			std::string &event, sandbox_run_history_t &run)
+    std::string &event, sandbox_run_history_t &run)
 {
 	std::vector<std::string> fields;
 	split_tabs(line, fields);
@@ -360,7 +357,7 @@ bool parse_audit_record(const std::string &line, long long &timestamp,
 	    !parse_integer(fields[9], 0, 1, truncated) ||
 	    !hex_decode(fields[10], run.error) ||
 	    (fields.size() == 12 &&
-	     !parse_integer(fields[11], 0, 1, cancelled)))
+	        !parse_integer(fields[11], 0, 1, cancelled)))
 		return false;
 	event = fields[1];
 	run.id = fields[2];
@@ -373,32 +370,31 @@ bool parse_audit_record(const std::string &line, long long &timestamp,
 	return true;
 }
 
-bool newer_history(const sandbox_run_history_t &left,
-		   const sandbox_run_history_t &right)
+bool newer_history(
+    const sandbox_run_history_t &left, const sandbox_run_history_t &right)
 {
 	const long long left_time =
-		left.finished_at > 0 ? left.finished_at : left.started_at;
+	    left.finished_at > 0 ? left.finished_at : left.started_at;
 	const long long right_time =
-		right.finished_at > 0 ? right.finished_at : right.started_at;
+	    right.finished_at > 0 ? right.finished_at : right.started_at;
 	return left_time > right_time;
 }
 
 } // namespace
 
 sandbox_execution_store_t::sandbox_execution_store_t(
-	const std::string &user_root)
-	: user_root_(user_root)
+    const std::string &user_root)
+        : user_root_(user_root)
 {
 }
 
 bool sandbox_execution_store_t::create(const std::string &project_path,
-				       const std::string &command_id,
-				       sandbox_execution_plan_t &plan,
-				       std::string &err) const
+    const std::string &command_id, sandbox_execution_plan_t &plan,
+    std::string &err) const
 {
 	std::string normalized;
-	if (!agent_workspace_t::normalize_path(project_path, normalized, true,
-					       err)) {
+	if (!agent_workspace_t::normalize_path(
+	        project_path, normalized, true, err)) {
 		return ai_error("sandbox.plan", "normalize-project", err);
 	}
 	project_toolchain_catalog_t catalog(user_root_);
@@ -408,14 +404,15 @@ bool sandbox_execution_store_t::create(const std::string &project_path,
 	}
 	const sandbox_command_t *selected = NULL;
 	for (size_t i = 0; i < toolchain.commands.size(); ++i) {
-		if (toolchain.commands[i].id == command_id) {
-			selected = &toolchain.commands[i];
-			break;
-		}
+		if (!(toolchain.commands[i].id == command_id))
+			continue;
+		selected = &toolchain.commands[i];
+		break;
 	}
 	if (selected == NULL || selected->allow_dynamic_arguments ||
 	    selected->allow_loopback_network) {
-		err = "sandbox command is not enabled by the fixed toolchain policy";
+		err =
+		    "sandbox command is not enabled by the fixed toolchain policy";
 		return ai_error("sandbox.plan", "select-fixed-command", err);
 	}
 	plan = sandbox_execution_plan_t();
@@ -433,15 +430,13 @@ bool sandbox_execution_store_t::create(const std::string &project_path,
 	if (!ensure_store_directory(user_root_, directory, err)) {
 		return ai_error("sandbox.plan", "prepare-private-store", err);
 	}
-	if (!save_plan(directory, plan, err)) {
-		return ai_error("sandbox.plan", "save", err);
-	}
-	return true;
+	if (save_plan(directory, plan, err))
+		return true;
+	return ai_error("sandbox.plan", "save", err);
 }
 
 bool sandbox_execution_store_t::consume(const std::string &plan_id,
-					sandbox_execution_plan_t &plan,
-					std::string &err) const
+    sandbox_execution_plan_t &plan, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
 	std::string directory;
@@ -455,7 +450,7 @@ bool sandbox_execution_store_t::consume(const std::string &plan_id,
 	// Rename before any expensive revalidation. This is the one-time consume
 	// point: another request can no longer load the pending authorization.
 	const std::string consumed =
-		join_path(directory, "consumed-" + plan_id);
+	    join_path(directory, "consumed-" + plan_id);
 	if (!move_file(pending, consumed)) {
 		err = "sandbox execution plan was already consumed";
 		return ai_error("sandbox.plan", "atomic-consume", err);
@@ -475,44 +470,39 @@ bool sandbox_execution_store_t::consume(const std::string &plan_id,
 	}
 	bool matched = false;
 	for (size_t i = 0; i < current.commands.size(); ++i) {
-		if (same_command(plan.command, current.commands[i])) {
-			matched = true;
-			break;
-		}
+		if (!same_command(plan.command, current.commands[i]))
+			continue;
+		matched = true;
+		break;
 	}
 	remove(consumed.c_str());
-	if (!matched) {
-		err = "sandbox toolchain changed after plan preview";
-		return ai_error("sandbox.plan", "compare-command-snapshot",
-				err);
-	}
-	return true;
+	if (matched)
+		return true;
+	err = "sandbox toolchain changed after plan preview";
+	return ai_error("sandbox.plan", "compare-command-snapshot", err);
 }
 
 bool sandbox_execution_store_t::audit_started(
-	const sandbox_execution_plan_t &plan, std::string &err) const
+    const sandbox_execution_plan_t &plan, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
-	if (!append_audit(user_root_, plan, "started", NULL, err)) {
-		return ai_error("sandbox.audit", "record-start", err);
-	}
-	return true;
+	if (append_audit(user_root_, plan, "started", NULL, err))
+		return true;
+	return ai_error("sandbox.audit", "record-start", err);
 }
 
 bool sandbox_execution_store_t::audit_finished(
-	const sandbox_execution_plan_t &plan, const sandbox_result_t &result,
-	std::string &err) const
+    const sandbox_execution_plan_t &plan, const sandbox_result_t &result,
+    std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
-	if (!append_audit(user_root_, plan, "finished", &result, err)) {
-		return ai_error("sandbox.audit", "record-finish", err);
-	}
-	return true;
+	if (append_audit(user_root_, plan, "finished", &result, err))
+		return true;
+	return ai_error("sandbox.audit", "record-finish", err);
 }
 
-bool sandbox_execution_store_t::list_history(
-	size_t limit, std::vector<sandbox_run_history_t> &runs,
-	std::string &err) const
+bool sandbox_execution_store_t::list_history(size_t limit,
+    std::vector<sandbox_run_history_t> &runs, std::string &err) const
 {
 	runs.clear();
 	if (limit < 1 || limit > kMaxAuditRecords) {
@@ -521,7 +511,7 @@ bool sandbox_execution_store_t::list_history(
 	}
 	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
 	const std::string path = join_path(
-		join_path(user_root_, ".webcool_agent"), "sandbox_runs.v1");
+	    join_path(user_root_, ".webcool_agent"), "sandbox_runs.v1");
 	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true; // A user who has never run a command has no history.
@@ -536,20 +526,21 @@ bool sandbox_execution_store_t::list_history(
 		if (line.empty())
 			continue;
 		if (++record_count > kMaxAuditRecords) {
-			err = "sandbox execution audit exceeds the record limit";
-			return ai_error("sandbox.audit", "read-history-size",
-					err);
+			err =
+			    "sandbox execution audit exceeds the record limit";
+			return ai_error(
+			    "sandbox.audit", "read-history-size", err);
 		}
 		long long timestamp = 0;
 		std::string event;
 		sandbox_run_history_t parsed;
 		if (!parse_audit_record(line, timestamp, event, parsed)) {
 			err = "invalid sandbox execution audit record";
-			return ai_error("sandbox.audit", "parse-history-record",
-					err);
+			return ai_error(
+			    "sandbox.audit", "parse-history-record", err);
 		}
 		std::map<std::string, size_t>::iterator position =
-			positions.find(parsed.id);
+		    positions.find(parsed.id);
 		if (position == positions.end()) {
 			positions[parsed.id] = runs.size();
 			runs.push_back(parsed);
@@ -569,16 +560,16 @@ bool sandbox_execution_store_t::list_history(
 			if (current.cancelled)
 				current.status = "cancelled";
 			else if (current.timed_out ||
-				 current.output_truncated ||
-				 !current.error.empty())
+			    current.output_truncated || !current.error.empty())
 				current.status = "failed";
 			else
 				current.status = "completed";
 		}
 	}
 	std::sort(runs.begin(), runs.end(), newer_history);
-	if (runs.size() > limit)
-		runs.resize(limit);
+	if (!(runs.size() > limit))
+		return true;
+	runs.resize(limit);
 	return true;
 }
 

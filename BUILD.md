@@ -42,3 +42,17 @@ cmake --build coolder/build --parallel 4
 ```
 
 Windows 的原生 VS 工程位于 `coolder/coolder.sln`，引用 `third-party/acl` 和 `third-party/zlib-1.2.11` 下的工程。OpenSSL 可使用 `third-party/build-openssl.bat` 构建（x64 Release）。详细步骤见 [第三方依赖说明](third-party/README.md) 和 [应用说明](coolder/README.md)。
+
+
+## C++ 代码结构检查
+
+`libai` 和 `coolder` 使用 Linux 内核风格的 8 列 Tab 缩进；每行最多 4 级结构缩进，换行参数使用空格续行对齐。函数（包括 lambda）最多 200 行，源码和头文件均最多 1000 行，行数包含注释和空行。超限时按职责提取函数或翻译单元。
+
+```sh
+python3 -m venv /tmp/coolder-style-venv
+/tmp/coolder-style-venv/bin/pip install -r coolder/tools/style-requirements.txt
+find libai coolder -type f \( -name '*.cpp' -o -name '*.h' \) -not -path '*/build/*' -print0 | xargs -0 /tmp/coolder-style-venv/bin/clang-format --dry-run --Werror
+/tmp/coolder-style-venv/bin/python coolder/tools/check_cpp_structure.py
+```
+
+结构检查使用 C++ 语法树计算函数范围，不代替编译。拆分 `.cpp` 后，CMake 会重新发现模块源码；同时需要维护对应的 `.vcxproj` 和 `.vcxproj.filters`。Windows 源码覆盖检查可用 `python3 coolder/tests/vs_project_test.py`，完整检查要求已初始化 ACL 子模块。

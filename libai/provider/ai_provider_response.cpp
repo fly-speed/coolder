@@ -9,23 +9,21 @@ namespace ai
 namespace provider_detail
 {
 
-bool parse_tool_arguments(acl::json_node *arguments,
-			  completion_tool_call_t &call)
+bool parse_tool_arguments(
+    acl::json_node *arguments, completion_tool_call_t &call)
 {
-	acl::json_node *object =
-		arguments && arguments->is_object() ?
-			arguments :
-			(arguments ? arguments->get_obj() : NULL);
+	acl::json_node *object = arguments && arguments->is_object() ?
+	    arguments :
+	    (arguments ? arguments->get_obj() : NULL);
 	if (object != NULL && object->is_object()) {
 		call.path = node_text((*object)["path"]);
 		call.query = node_text((*object)["query"]);
 		call.old_text = node_text((*object)["old_text"]);
 		call.target_path = node_text((*object)["target_path"]);
 		call.content_present = (*object)["content"] != NULL &&
-				       (*object)["content"]->is_string();
-		call.content = call.content_present ?
-				       node_text((*object)["content"]) :
-				       "";
+		    (*object)["content"]->is_string();
+		call.content =
+		    call.content_present ? node_text((*object)["content"]) : "";
 		return true;
 	}
 	const std::string encoded = node_text(arguments);
@@ -39,7 +37,7 @@ bool parse_tool_arguments(acl::json_node *arguments,
 	call.old_text = node_text(json["old_text"]);
 	call.target_path = node_text(json["target_path"]);
 	call.content_present =
-		json["content"] != NULL && json["content"]->is_string();
+	    json["content"] != NULL && json["content"]->is_string();
 	call.content = call.content_present ? node_text(json["content"]) : "";
 	return true;
 }
@@ -53,11 +51,10 @@ bool empty_tool_arguments(acl::json_node *arguments)
 		return array->first_child() == NULL;
 	std::string encoded = node_text(arguments);
 	encoded.erase(std::remove_if(encoded.begin(), encoded.end(),
-				     [](char c) {
-					     return c == ' ' || c == '\t' ||
-						    c == '\r' || c == '\n';
-				     }),
-		      encoded.end());
+	                  [](char c) {
+		return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+	}),
+	    encoded.end());
 	return encoded.empty() || encoded == "[]" || encoded == "null";
 }
 
@@ -76,22 +73,21 @@ void mirror_first_tool_call(completion_result_t &result)
 }
 
 void set_tool_call(const std::string &name, acl::json_node *arguments,
-		   completion_result_t &result, const std::string &id)
+    completion_result_t &result, const std::string &id)
 {
 	if (name.empty() || result.tool_calls.size() >= 32)
 		return;
 	completion_tool_call_t call;
 	call.id = id;
 	call.name = canonical_tool_name(name);
-	if (!parse_tool_arguments(arguments, call)) {
-		// A few compatible providers encode a parameterless function call as
-		// null, an empty string, or []. Accept that representation only for the
-		// genuinely parameterless validator; required-path tools still fail closed.
-		if (call.name != "workspace.validate" ||
-		    !empty_tool_arguments(arguments)) {
-			result.error_category = provider_error_protocol;
-			return;
-		}
+	// A few compatible providers encode a parameterless function call as
+	// null, an empty string, or []. Accept that representation only for the
+	// genuinely parameterless validator; required-path tools still fail closed.
+	if ((!parse_tool_arguments(arguments, call)) &&
+	    (call.name != "workspace.validate" ||
+	        !empty_tool_arguments(arguments))) {
+		result.error_category = provider_error_protocol;
+		return;
 	}
 	result.tool_calls.push_back(call);
 	mirror_first_tool_call(result);
@@ -134,20 +130,20 @@ std::string responses_reasoning_text(acl::json_node *item)
 	std::string result;
 	for (acl::json_node *part = content ? content->first_child() : NULL;
 	     part != NULL; part = content->next_child()) {
-		if (node_text(object_child(part, "type")) == "reasoning_text") {
-			result += node_text(object_child(part, "text"));
-		}
+		if (!(node_text(object_child(part, "type")) ==
+		        "reasoning_text"))
+			continue;
+		result += node_text(object_child(part, "text"));
 	}
 	return result;
 }
 
 std::string responses_terminal_error(acl::json_node *response,
-				     std::string &status,
-				     std::string &incomplete_reason)
+    std::string &status, std::string &incomplete_reason)
 {
 	status = node_text(object_child(response, "status"));
 	incomplete_reason = node_text(object_child(
-		object_child(response, "incomplete_details"), "reason"));
+	    object_child(response, "incomplete_details"), "reason"));
 	acl::json_node *error = object_child(response, "error");
 	std::string message = node_text(object_child(error, "message"));
 	std::string code = node_text(object_child(error, "code"));
@@ -160,276 +156,266 @@ std::string responses_terminal_error(acl::json_node *response,
 		out += ": " + incomplete_reason;
 	if (!message.empty())
 		out += ": " + message;
-	if (!code.empty())
-		out += " (code=" + code + ")";
+	if (code.empty())
+		return out;
+	out += " (code=" + code + ")";
 	return out;
 }
 
+static bool parse_response_output(
+    acl::json_node *item, completion_result_t &result)
+{
+
+	const std::string type = node_text(object_child(item, "type"));
+	if (type == "function_call") {
+		set_tool_call(node_text(object_child(item, "name")),
+		    object_child(item, "arguments"), result,
+		    node_text(object_child(item, "call_id")));
+	} else if (type == "reasoning") {
+		const std::string reasoning_text =
+		    responses_reasoning_text(item);
+		if (!reasoning_text.empty()) {
+			result.reasoning += reasoning_text;
+		} else {
+			// OpenAI may expose only a summary unless encrypted reasoning was
+			// requested. Preserve the former display fallback for that case.
+			acl::json_node *summary =
+			    array_value(object_child(item, "summary"));
+			for (acl::json_node *part =
+			         summary ? summary->first_child() : NULL;
+			     part != NULL; part = summary->next_child()) {
+				append_text(result.reasoning,
+				    node_text(object_child(part, "text")));
+			}
+		}
+	} else if (result.text.empty() && type == "message") {
+		acl::json_node *content =
+		    array_value(object_child(item, "content"));
+		for (acl::json_node *part = content ? content->first_child() :
+		                                      NULL;
+		     part != NULL; part = content->next_child()) {
+			std::string visible =
+			    node_text(object_child(part, "text"));
+			if (visible.empty()) {
+				visible =
+				    node_text(object_child(part, "refusal"));
+			}
+			append_text(result.text, visible);
+		}
+	}
+
+	return true;
+}
+
+static bool parse_responses_completion(
+    acl::json &json, completion_result_t &result, std::string &err)
+{
+	result.response_id = node_text(json["id"]);
+	result.response_status = node_text(json["status"]);
+	result.incomplete_reason =
+	    node_text(object_child(json["incomplete_details"], "reason"));
+	std::string terminal_error;
+	if (result.response_status == "failed" ||
+	    result.response_status == "cancelled" ||
+	    result.response_status == "incomplete") {
+		terminal_error =
+		    "AI provider response " + result.response_status;
+		if (!result.incomplete_reason.empty()) {
+			terminal_error += ": " + result.incomplete_reason;
+		}
+		const std::string message =
+		    node_text(object_child(json["error"], "message"));
+		const std::string code =
+		    node_text(object_child(json["error"], "code"));
+		if (!message.empty())
+			terminal_error += ": " + message;
+		if (!code.empty())
+			terminal_error += " (code=" + code + ")";
+	}
+	if (!terminal_error.empty()) {
+		err = terminal_error;
+		return false;
+	}
+	result.text = node_text(json["output_text"]);
+	acl::json_node *output = array_value(json["output"]);
+	for (acl::json_node *item = output ? output->first_child() : NULL;
+	     item != NULL; item = output->next_child()) {
+		if (!parse_response_output(item, result))
+			break;
+	}
+	acl::json_node *usage = json["usage"];
+	result.input_tokens = node_number(object_child(usage, "input_tokens"));
+	result.output_tokens =
+	    node_number(object_child(usage, "output_tokens"));
+	result.cached_input_tokens = node_number(object_child(
+	    object_child(usage, "input_tokens_details"), "cached_tokens"));
+	result.reasoning_tokens = node_number(object_child(
+	    object_child(usage, "output_tokens_details"), "reasoning_tokens"));
+	return true;
+}
+
 bool parse_completion_json(const provider_config_t &provider, acl::json &json,
-			   completion_result_t &result, std::string &err)
+    completion_result_t &result, std::string &err)
 {
 	if (provider.protocol == "openai_responses") {
-		result.response_id = node_text(json["id"]);
-		result.response_status = node_text(json["status"]);
-		result.incomplete_reason = node_text(
-			object_child(json["incomplete_details"], "reason"));
-		std::string terminal_error;
-		if (result.response_status == "failed" ||
-		    result.response_status == "cancelled" ||
-		    result.response_status == "incomplete") {
-			terminal_error = "AI provider response " +
-					 result.response_status;
-			if (!result.incomplete_reason.empty()) {
-				terminal_error +=
-					": " + result.incomplete_reason;
-			}
-			const std::string message = node_text(
-				object_child(json["error"], "message"));
-			const std::string code =
-				node_text(object_child(json["error"], "code"));
-			if (!message.empty())
-				terminal_error += ": " + message;
-			if (!code.empty())
-				terminal_error += " (code=" + code + ")";
-		}
-		if (!terminal_error.empty()) {
-			err = terminal_error;
+		if (!parse_responses_completion(json, result, err))
 			return false;
-		}
-		result.text = node_text(json["output_text"]);
-		acl::json_node *output = array_value(json["output"]);
-		for (acl::json_node *item = output ? output->first_child() :
-						     NULL;
-		     item != NULL; item = output->next_child()) {
-			const std::string type =
-				node_text(object_child(item, "type"));
-			if (type == "function_call") {
-				set_tool_call(
-					node_text(object_child(item, "name")),
-					object_child(item, "arguments"), result,
-					node_text(
-						object_child(item, "call_id")));
-			} else if (type == "reasoning") {
-				const std::string reasoning_text =
-					responses_reasoning_text(item);
-				if (!reasoning_text.empty()) {
-					result.reasoning += reasoning_text;
-				} else {
-					// OpenAI may expose only a summary unless encrypted reasoning was
-					// requested. Preserve the former display fallback for that case.
-					acl::json_node *summary = array_value(
-						object_child(item, "summary"));
-					for (acl::json_node *part =
-						     summary ?
-							     summary->first_child() :
-							     NULL;
-					     part != NULL;
-					     part = summary->next_child()) {
-						append_text(
-							result.reasoning,
-							node_text(object_child(
-								part, "text")));
-					}
-				}
-			} else if (result.text.empty() && type == "message") {
-				acl::json_node *content = array_value(
-					object_child(item, "content"));
-				for (acl::json_node *part =
-					     content ? content->first_child() :
-						       NULL;
-				     part != NULL;
-				     part = content->next_child()) {
-					std::string visible = node_text(
-						object_child(part, "text"));
-					if (visible.empty()) {
-						visible =
-							node_text(object_child(
-								part,
-								"refusal"));
-					}
-					append_text(result.text, visible);
-				}
-			}
-		}
-		acl::json_node *usage = json["usage"];
-		result.input_tokens =
-			node_number(object_child(usage, "input_tokens"));
-		result.output_tokens =
-			node_number(object_child(usage, "output_tokens"));
-		result.cached_input_tokens = node_number(object_child(
-			object_child(usage, "input_tokens_details"),
-			"cached_tokens"));
-		result.reasoning_tokens = node_number(object_child(
-			object_child(usage, "output_tokens_details"),
-			"reasoning_tokens"));
 	} else if (provider.protocol == "anthropic_messages") {
 		acl::json_node *content = array_value(json["content"]);
 		for (acl::json_node *item = content ? content->first_child() :
-						      NULL;
+		                                      NULL;
 		     item != NULL; item = content->next_child()) {
 			const std::string type =
-				node_text(object_child(item, "type"));
+			    node_text(object_child(item, "type"));
 			if (type == "tool_use") {
 				set_tool_call(
-					node_text(object_child(item, "name")),
-					object_child(item, "input"), result,
-					node_text(object_child(item, "id")));
+				    node_text(object_child(item, "name")),
+				    object_child(item, "input"), result,
+				    node_text(object_child(item, "id")));
 			} else if (type == "thinking") {
 				append_text(result.reasoning,
-					    node_text(object_child(
-						    item, "thinking")));
+				    node_text(object_child(item, "thinking")));
 			} else if (type == "text") {
-				append_text(
-					result.text,
-					node_text(object_child(item, "text")));
+				append_text(result.text,
+				    node_text(object_child(item, "text")));
 			}
 		}
 		acl::json_node *usage = json["usage"];
 		result.input_tokens =
-			node_number(object_child(usage, "input_tokens"));
+		    node_number(object_child(usage, "input_tokens"));
 		result.output_tokens =
-			node_number(object_child(usage, "output_tokens"));
-		result.cached_input_tokens = node_number(
-			object_child(usage, "cache_read_input_tokens"));
+		    node_number(object_child(usage, "output_tokens"));
+		result.cached_input_tokens =
+		    node_number(object_child(usage, "cache_read_input_tokens"));
 	} else if (provider.protocol == "gemini_native") {
 		acl::json_node *candidate =
-			first_array_item(json["candidates"]);
+		    first_array_item(json["candidates"]);
 		acl::json_node *content = object_child(candidate, "content");
 		acl::json_node *parts =
-			array_value(object_child(content, "parts"));
+		    array_value(object_child(content, "parts"));
 		for (acl::json_node *part = parts ? parts->first_child() : NULL;
 		     part != NULL; part = parts->next_child()) {
 			acl::json_node *call =
-				object_child(part, "functionCall");
+			    object_child(part, "functionCall");
 			if (call != NULL) {
 				set_tool_call(
-					node_text(object_child(call, "name")),
-					object_child(call, "args"), result,
-					node_text(object_child(call, "id")));
+				    node_text(object_child(call, "name")),
+				    object_child(call, "args"), result,
+				    node_text(object_child(call, "id")));
 			}
 			if (node_bool(object_child(part, "thought"))) {
-				append_text(
-					result.reasoning,
-					node_text(object_child(part, "text")));
+				append_text(result.reasoning,
+				    node_text(object_child(part, "text")));
 			} else {
-				append_text(
-					result.text,
-					node_text(object_child(part, "text")));
+				append_text(result.text,
+				    node_text(object_child(part, "text")));
 			}
 		}
 		acl::json_node *usage = json["usageMetadata"];
 		result.input_tokens =
-			node_number(object_child(usage, "promptTokenCount"));
-		result.output_tokens = node_number(
-			object_child(usage, "candidatesTokenCount"));
-		result.cached_input_tokens = node_number(
-			object_child(usage, "cachedContentTokenCount"));
+		    node_number(object_child(usage, "promptTokenCount"));
+		result.output_tokens =
+		    node_number(object_child(usage, "candidatesTokenCount"));
+		result.cached_input_tokens =
+		    node_number(object_child(usage, "cachedContentTokenCount"));
 	} else {
 		acl::json_node *choice = first_array_item(json["choices"]);
 		const std::string finish_reason =
-			node_text(object_child(choice, "finish_reason"));
+		    node_text(object_child(choice, "finish_reason"));
 		if (finish_reason == "length" ||
 		    finish_reason == "max_tokens") {
 			result.incomplete_reason = "max_output_tokens";
 		}
-		acl::json_node *message =
-			provider.protocol == "ollama" ?
-				(json["message"] ? json["message"]->get_obj() :
-						   NULL) :
-				object_child(choice, "message");
+		acl::json_node *message = provider.protocol == "ollama" ?
+		    (json["message"] ? json["message"]->get_obj() : NULL) :
+		    object_child(choice, "message");
 		result.text =
-			message_content_text(object_child(message, "content"));
+		    message_content_text(object_child(message, "content"));
 		if (result.text.empty()) {
 			result.text =
-				node_text(object_child(message, "refusal"));
+			    node_text(object_child(message, "refusal"));
 		}
 		result.reasoning =
-			node_text(object_child(message, "reasoning_content"));
+		    node_text(object_child(message, "reasoning_content"));
 		if (result.reasoning.empty()) {
 			result.reasoning =
-				node_text(object_child(message, "reasoning"));
+			    node_text(object_child(message, "reasoning"));
 		}
 		if (result.reasoning.empty()) {
 			result.reasoning =
-				node_text(object_child(message, "thinking"));
+			    node_text(object_child(message, "thinking"));
 		}
 		acl::json_node *calls =
-			array_value(object_child(message, "tool_calls"));
+		    array_value(object_child(message, "tool_calls"));
 		for (acl::json_node *call = calls ? calls->first_child() : NULL;
 		     call != NULL; call = calls->next_child()) {
 			acl::json_node *function =
-				object_child(call, "function");
-			if (function != NULL) {
-				set_tool_call(
-					node_text(
-						object_child(function, "name")),
-					object_child(function, "arguments"),
-					result,
-					node_text(object_child(call, "id")));
-			}
+			    object_child(call, "function");
+			if (!(function != NULL))
+				continue;
+			set_tool_call(node_text(object_child(function, "name")),
+			    object_child(function, "arguments"), result,
+			    node_text(object_child(call, "id")));
 		}
 		if (provider.protocol == "ollama") {
 			result.input_tokens =
-				node_number(json["prompt_eval_count"]);
+			    node_number(json["prompt_eval_count"]);
 			result.output_tokens = node_number(json["eval_count"]);
 		} else {
 			acl::json_node *usage = json["usage"];
-			result.input_tokens = node_number(
-				object_child(usage, "prompt_tokens"));
+			result.input_tokens =
+			    node_number(object_child(usage, "prompt_tokens"));
 			result.output_tokens = node_number(
-				object_child(usage, "completion_tokens"));
+			    object_child(usage, "completion_tokens"));
 			result.cached_input_tokens = node_number(object_child(
-				object_child(usage, "prompt_tokens_details"),
-				"cached_tokens"));
+			    object_child(usage, "prompt_tokens_details"),
+			    "cached_tokens"));
 			result.reasoning_tokens = node_number(object_child(
-				object_child(usage,
-					     "completion_tokens_details"),
-				"reasoning_tokens"));
+			    object_child(usage, "completion_tokens_details"),
+			    "reasoning_tokens"));
 		}
 	}
 	if (result.error_category == provider_error_protocol) {
 		result.tool_calls.clear();
 		result.native_tool_call = false;
-		err = "AI provider returned invalid tool arguments (expected JSON object)";
+		err =
+		    "AI provider returned invalid tool arguments (expected JSON object)";
 		return false;
 	}
 	// A background Responses create/retrieve call legitimately has no output
 	// while it is queued or running.  Its opaque ID and status are the useful
 	// result; rejecting it here would prevent the caller from entering the
 	// bounded polling loop or resuming that response after a service restart.
-	const bool pending_response =
-		provider.protocol == "openai_responses" &&
-		(result.response_status == "queued" ||
-		 result.response_status == "in_progress") &&
-		!result.response_id.empty();
+	const bool pending_response = provider.protocol == "openai_responses" &&
+	    (result.response_status == "queued" ||
+	        result.response_status == "in_progress") &&
+	    !result.response_id.empty();
 	if (result.text.empty() && !result.native_tool_call &&
 	    !pending_response) {
-		err = "AI provider response contains no text output or tool call";
+		err =
+		    "AI provider response contains no text output or tool call";
 		return false;
 	}
 	if (result.text.size() > kMaxCompletionBytes) {
 		err = "AI provider response exceeds 4 MiB";
 		return false;
 	}
-	if (result.reasoning.size() > kMaxCompletionBytes) {
-		err = "AI provider reasoning exceeds 4 MiB";
-		return false;
-	}
-	return true;
+	if (!(result.reasoning.size() > kMaxCompletionBytes))
+		return true;
+	err = "AI provider reasoning exceeds 4 MiB";
+	return false;
 }
 
 // Recorded responses and streaming fallbacks still enter as strings. Keep this
 // narrow adapter so the normal HTTP path can parse directly into acl::json.
 bool parse_completion(const provider_config_t &provider,
-		      const std::string &body, completion_result_t &result,
-		      std::string &err)
+    const std::string &body, completion_result_t &result, std::string &err)
 {
 	acl::json json(body.c_str());
-	if (!json.finish()) {
-		err = "AI provider returned invalid JSON";
-		return false;
-	}
-	return parse_completion_json(provider, json, result, err);
+	if (json.finish())
+		return parse_completion_json(provider, json, result, err);
+	err = "AI provider returned invalid JSON";
+	return false;
 }
 
 void copy_usage(const completion_result_t &source, completion_result_t &target)
@@ -447,9 +433,8 @@ void copy_usage(const completion_result_t &source, completion_result_t &target)
 }
 
 void adopt_completed_stream_result(const completion_result_t &completed,
-				   completion_result_t &result,
-				   std::string &text_delta,
-				   std::string &reasoning_delta)
+    completion_result_t &result, std::string &text_delta,
+    std::string &reasoning_delta)
 {
 	if (result.response_id.empty())
 		result.response_id = completed.response_id;
@@ -469,12 +454,12 @@ void adopt_completed_stream_result(const completion_result_t &completed,
 		if (result.reasoning.empty()) {
 			reasoning_delta = completed.reasoning;
 		} else if (completed.reasoning.compare(0,
-						       result.reasoning.size(),
-						       result.reasoning) == 0) {
+		               result.reasoning.size(),
+		               result.reasoning) == 0) {
 			// The terminal Responses event is authoritative. Append only a tail
 			// that was absent from the incremental stream, avoiding duplication.
-			reasoning_delta = completed.reasoning.substr(
-				result.reasoning.size());
+			reasoning_delta =
+			    completed.reasoning.substr(result.reasoning.size());
 		}
 	}
 	if (!result.native_tool_call && completed.native_tool_call) {
@@ -489,8 +474,8 @@ void adopt_completed_stream_result(const completion_result_t &completed,
 using namespace provider_detail;
 
 bool provider_client_t::parse_completion_response(
-	const provider_config_t &provider, const std::string &body,
-	completion_result_t &result, std::string &err)
+    const provider_config_t &provider, const std::string &body,
+    completion_result_t &result, std::string &err)
 {
 	result.text.clear();
 	result.response_id.clear();
@@ -514,17 +499,14 @@ bool provider_client_t::parse_completion_response(
 	result.tool_target_path.clear();
 	result.tool_content.clear();
 	err.clear();
-	if (!parse_completion(provider, body, result, err)) {
-		result.error_category =
-			result.incomplete_reason == "max_output_tokens" ?
-				provider_error_response_limit :
-				(result.response_status == "cancelled" ?
-					 provider_error_cancelled :
-					 provider_error_protocol);
-		return ai_error("provider.client", "parse-recorded-completion",
-				err);
-	}
-	return true;
+	if (parse_completion(provider, body, result, err))
+		return true;
+	result.error_category =
+	    result.incomplete_reason == "max_output_tokens" ?
+	    provider_error_response_limit :
+	    (result.response_status == "cancelled" ? provider_error_cancelled :
+	                                             provider_error_protocol);
+	return ai_error("provider.client", "parse-recorded-completion", err);
 }
 
 } // namespace ai

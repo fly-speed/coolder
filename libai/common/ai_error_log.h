@@ -20,8 +20,8 @@ inline std::string safe_error_for_log(const std::string &error)
 	const size_t kMaxLoggedErrorBytes = 512;
 	std::string safe;
 	safe.reserve(error.size() < kMaxLoggedErrorBytes ?
-			     error.size() :
-			     kMaxLoggedErrorBytes);
+	        error.size() :
+	        kMaxLoggedErrorBytes);
 	for (size_t i = 0;
 	     i < error.size() && safe.size() < kMaxLoggedErrorBytes; ++i) {
 		const unsigned char ch = static_cast<unsigned char>(error[i]);
@@ -36,20 +36,20 @@ inline std::string safe_error_for_log(const std::string &error)
 // Log at the point where a C++ operation decides to propagate a failure.
 // Returning false makes the common `return ai_error(...)` pattern concise and
 // keeps the UI-facing error string unchanged.
-inline bool ai_error(const char *component, const char *operation,
-		     const std::string &error)
+inline bool ai_error(
+    const char *component, const char *operation, const std::string &error)
 {
 	const std::string safe = safe_error_for_log(error);
 	logger_error("AI component=%s operation=%s error=%s",
-		     component ? component : "unknown",
-		     operation ? operation : "unknown", safe.c_str());
+	    component ? component : "unknown",
+	    operation ? operation : "unknown", safe.c_str());
 	return false;
 }
 
 // Some asynchronous operations cannot return false from their current scope.
 // Use the void form for exception handlers and background-task finalization.
-inline void ai_log_error(const char *component, const char *operation,
-			 const std::string &error)
+inline void ai_log_error(
+    const char *component, const char *operation, const std::string &error)
 {
 	(void)ai_error(component, operation, error);
 }

@@ -29,8 +29,9 @@ std::string normalize_agent_resource_path(const std::string &path)
 		if (part.empty() || part == ".")
 			continue;
 		if (part == "..") {
-			if (!parts.empty())
-				parts.pop_back();
+			if (parts.empty())
+				continue;
+			parts.pop_back();
 		} else
 			parts.push_back(part);
 	}
@@ -48,43 +49,43 @@ namespace
 bool within_project(const std::string &path, const std::string &project)
 {
 	return project.empty() || path == project ||
-	       (path.size() > project.size() &&
-		path.compare(0, project.size(), project) == 0 &&
-		(project[project.size() - 1] == '/' ||
-		 path[project.size()] == '/'));
+	    (path.size() > project.size() &&
+	        path.compare(0, project.size(), project) == 0 &&
+	        (project[project.size() - 1] == '/' ||
+	            path[project.size()] == '/'));
 }
 }
 
-bool agent_run_scopes_conflict(const agent_run_scope_t &left,
-			       const agent_run_scope_t &right)
+bool agent_run_scopes_conflict(
+    const agent_run_scope_t &left, const agent_run_scope_t &right)
 {
 	if (left.user_root != right.user_root)
 		return false;
 	const bool left_document =
-		left.tool_free && !left.document_path.empty();
+	    left.tool_free && !left.document_path.empty();
 	const bool right_document =
-		right.tool_free && !right.document_path.empty();
+	    right.tool_free && !right.document_path.empty();
 	const bool left_chat = left.tool_free && !left_document;
 	const bool right_chat = right.tool_free && !right_document;
 	if (left_chat || right_chat) {
 		return left_chat && right_chat &&
-		       !left.conversation_id.empty() &&
-		       left.conversation_id == right.conversation_id;
+		    !left.conversation_id.empty() &&
+		    left.conversation_id == right.conversation_id;
 	}
 	if (left_document && right_document)
 		return left.document_path == right.document_path;
 	if (left_document)
 		return within_project(left.document_path, right.project_path);
-	if (right_document)
-		return within_project(right.document_path, left.project_path);
-	return within_project(left.project_path, right.project_path) ||
-	       within_project(right.project_path, left.project_path) ||
-	       (!left.session_id.empty() &&
-		left.session_id == right.session_id);
+	if (!right_document)
+		return within_project(left.project_path, right.project_path) ||
+		    within_project(right.project_path, left.project_path) ||
+		    (!left.session_id.empty() &&
+		        left.session_id == right.session_id);
+	return within_project(right.document_path, left.project_path);
 }
 
 std::string select_next_agent_run(const std::vector<agent_run_slot_t> &runs,
-				  size_t global_limit, size_t per_user_limit)
+    size_t global_limit, size_t per_user_limit)
 {
 	if (global_limit == 0 || per_user_limit == 0)
 		return "";
@@ -104,8 +105,9 @@ std::string select_next_agent_run(const std::vector<agent_run_slot_t> &runs,
 		if (run.done || run.admitted || run.cancelled || run.paused ||
 		    active_by_user[run.user_scope] >= per_user_limit)
 			continue;
-		if (selected == NULL || run.sequence < selected->sequence)
-			selected = &run;
+		if (!(selected == NULL || run.sequence < selected->sequence))
+			continue;
+		selected = &run;
 	}
 	return selected == NULL ? "" : selected->key;
 }

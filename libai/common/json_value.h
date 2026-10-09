@@ -14,8 +14,9 @@ inline std::string scalar_text(acl::json_node *node)
 	if (node == NULL)
 		return "";
 	const char *value = node->get_string();
-	if (value == NULL)
-		value = node->get_text();
+	if (!(value == NULL))
+		return value ? value : "";
+	value = node->get_text();
 	return value ? value : "";
 }
 inline std::string nullable_text(acl::json_node *node)
@@ -32,7 +33,7 @@ inline std::string string_text(acl::json_node *node)
 inline long long number(acl::json_node *node, long long fallback = 0)
 {
 	return node != NULL && node->get_int64() != NULL ? *node->get_int64() :
-							   fallback;
+	                                                   fallback;
 }
 inline bool boolean(acl::json_node *node)
 {
@@ -43,15 +44,14 @@ inline bool text_boolean(acl::json_node *node, bool fallback = false)
 	const std::string value = scalar_text(node);
 	if (value == "true" || value == "1")
 		return true;
-	if (value == "false" || value == "0")
-		return false;
-	return fallback;
+	if (!(value == "false" || value == "0"))
+		return fallback;
+	return false;
 }
 inline acl::json_node *object_child(acl::json_node *node, const char *name)
 {
-	acl::json_node *object = node && node->is_object() ?
-					 node :
-					 (node ? node->get_obj() : NULL);
+	acl::json_node *object =
+	    node && node->is_object() ? node : (node ? node->get_obj() : NULL);
 	return object ? (*object)[name] : NULL;
 }
 inline acl::json_node *array_value(acl::json_node *node)

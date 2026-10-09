@@ -8,29 +8,28 @@ namespace agent_detail
 {
 
 coding_tool_loop_t::coding_tool_loop_t(const coding_loop_arguments_t &arguments)
-	: coding_loop_arguments_t(arguments)
-	, preparation("prepare_tool_loop")
-	, chinese(runtime_task->ui_language != "en")
-	, progress_store(runtime_task->user_root, project_path,
-			 runtime_task->session_id)
-	, progress_supervisor(max_no_progress_tool_calls)
-	, recent_exchanges(tool_context_compaction_bytes / 2)
-	, read_context(96 * 1024)
-	, compaction_trigger_bytes(tool_context_compaction_bytes)
-	, recent_findings(8 * 1024)
-	, executed_tool_calls(initial_completed_tool_calls)
-	, effective_tool_call_limit(initial_completed_tool_calls +
-				    max_tool_calls)
+        : coding_loop_arguments_t(arguments)
+        , preparation("prepare_tool_loop")
+        , chinese(runtime_task->ui_language != "en")
+        , progress_store(
+              runtime_task->user_root, project_path, runtime_task->session_id)
+        , progress_supervisor(max_no_progress_tool_calls)
+        , recent_exchanges(tool_context_compaction_bytes / 2)
+        , read_context(96 * 1024)
+        , compaction_trigger_bytes(tool_context_compaction_bytes)
+        , recent_findings(8 * 1024)
+        , executed_tool_calls(initial_completed_tool_calls)
+        , effective_tool_call_limit(
+              initial_completed_tool_calls + max_tool_calls)
 {
 	browser_debug_report_threshold =
-		webcool::ai::ai_runtime_policy_get()
-			.browser_debug_report_threshold;
-	browser_evidence.enabled =
-		!runtime_task->text_preview && !runtime_task->assistant_chat &&
-		webcool::ai::browser_repair_evidence_t::requests_debug(
-			original_prompt) &&
-		!webcool::ai::read_only_analysis_task(original_prompt) &&
-		!webcool::ai::verification_only_task(original_prompt);
+	    webcool::ai::ai_runtime_policy_get().browser_debug_report_threshold;
+	browser_evidence.enabled = !runtime_task->text_preview &&
+	    !runtime_task->assistant_chat &&
+	    webcool::ai::browser_repair_evidence_t::requests_debug(
+	        original_prompt) &&
+	    !webcool::ai::read_only_analysis_task(original_prompt) &&
+	    !webcool::ai::verification_only_task(original_prompt);
 }
 
 bool coding_tool_loop_t::run_impl()
@@ -70,17 +69,16 @@ bool coding_tool_loop_t::run_impl()
 		if (executed_tool_calls != turn.call)
 			non_tool_turns = 0;
 		else if (++non_tool_turns >= 6) {
-			err = "模型连续 6 轮未执行工具，已停止协议/策略重试；实际工具额度未被扣除，断点已保存。";
+			err =
+			    "模型连续 6 轮未执行工具，已停止协议/策略重试；实际工具额度未被扣除，断点已保存。";
 			std::string save_error;
 			if (coding_loop_detail::save_coding_progress(
-				    progress_store, provider, runtime_task,
-				    project_path, original_prompt,
-				    persistent_transcript,
-				    accumulated_reasoning, err,
-				    executed_tool_calls, save_error)) {
-				mark_runtime_recovery_available(
-					runtime_task,
-					progress_store.relative_path());
+			        progress_store, provider, runtime_task,
+			        project_path, original_prompt,
+			        persistent_transcript, accumulated_reasoning,
+			        err, executed_tool_calls, save_error)) {
+				mark_runtime_recovery_available(runtime_task,
+				    progress_store.relative_path());
 			} else
 				err += " " + save_error;
 			return false;
@@ -122,9 +120,9 @@ coding_tool_loop_t::step_t coding_tool_loop_t::run_turn(coding_turn_t &turn)
 	result = check_progress_limit(turn);
 	if (result != step_t::proceed)
 		return result;
-	if (!compact_and_checkpoint(turn))
-		return step_t::failed;
-	return step_t::proceed;
+	if (compact_and_checkpoint(turn))
+		return step_t::proceed;
+	return step_t::failed;
 }
 
 } // namespace agent_detail

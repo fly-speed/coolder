@@ -10,4 +10,15 @@
       <Filter>sandbox</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="sandbox\sandbox_helper_linux.cpp">
+      <Filter>sandbox</Filter>
+    </ClCompile>
+    <ClInclude Include="sandbox\sandbox_helper_main_internal.h">
+      <Filter>sandbox</Filter>
+    </ClInclude>
+    <ClCompile Include="sandbox\sandbox_helper_probe.cpp">
+      <Filter>sandbox</Filter>
+    </ClCompile>
+  </ItemGroup>
 </Project>

@@ -30,8 +30,8 @@ std::string discover_go_executable(const std::string &configured_path);
 // Resolves any persisted language-tool path with the same trusted fallback
 // rules used by project discovery. Supported names are node, python, javac,
 // java, go, cargo, make, swift, dotnet, kotlinc, php, and dmd.
-std::string discover_language_executable(const std::string &name,
-					 const std::string &configured_path);
+std::string discover_language_executable(
+    const std::string &name, const std::string &configured_path);
 
 // Startup and project discovery use the same local capability check.
 bool browser_debug_available(std::string &reason);
@@ -45,9 +45,9 @@ public:
 	explicit project_toolchain_catalog_t(const std::string &user_root);
 
 	bool discover(const std::string &project_path,
-		      project_toolchain_t &result, std::string &err) const;
+	    project_toolchain_t &result, std::string &err) const;
 	bool is_git_repository(const std::string &project_path, bool &result,
-			       std::string &err) const;
+	    std::string &err) const;
 
 private:
 	std::string user_root_;
