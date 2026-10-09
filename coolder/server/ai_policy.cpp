@@ -155,11 +155,10 @@ bool AdminAiPolicyAction::run(
 			json_error(res, 400, "invalid JSON body", req.isKeepAlive());
 			return true;
 		}
-		for (const char* key : {"allow_browser_debug", "allow_users_shared_projects",
-				 "allow_users_local_projects"}) {
+		for (const char* key : {"allow_browser_debug", "allow_users_shared_projects"}) {
 			if (node_bool((*body)[key], false)) {
 				json_error(res, 400,
-					"coolder 尚未接入浏览器调试、共享目录或本地磁盘模块",
+					"coolder 尚未接入浏览器调试或共享目录模块",
 					req.isKeepAlive());
 				return true;
 			}
@@ -278,7 +277,6 @@ bool AdminAiPolicyAction::run(
 			* 1024UL;
 		policy.allow_browser_debug = false;
 		policy.allow_users_shared_projects = false;
-		policy.allow_users_local_projects = false;
 		if (!store.save(policy, err)) {
 			json_error(res, 400, err.c_str(), req.isKeepAlive());
 			return true;

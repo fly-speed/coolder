@@ -1128,6 +1128,61 @@ $('new-session').onclick = task(async () => {
 
 $('new-project').onclick = () => $('project-dialog').showModal();
 
+let projectDirectory = '', projectDirectoryParent = '', directoryRequest = 0;
+
+async function browseProjectDirectory(path = '') {
+  const requestId = ++directoryRequest;
+  $('project-directory-select').disabled = true;
+  $('project-directory-up').disabled = true;
+  $('project-directory-list').replaceChildren();
+  $('project-directory-list').setAttribute('aria-busy', 'true');
+  uiText($('project-directory-status'), () => t('正在读取目录…'));
+  $('project-directory-status').classList.remove('error');
+  try {
+    const data = await api('/projects/directories?path=' + encodeURIComponent(path));
+    if (requestId !== directoryRequest) return;
+    projectDirectory = data.path;
+    projectDirectoryParent = data.parent;
+    $('project-directory-path').value = data.path;
+    $('project-directory-up').disabled = !data.parent || data.parent === data.path;
+    $('project-directory-select').disabled = false;
+    for (const entry of data.entries) {
+      const button = node('button', '📁 ' + entry.name);
+      button.type = 'button';
+      button.onclick = () => browseProjectDirectory(entry.path);
+      $('project-directory-list').append(button);
+    }
+    uiText($('project-directory-status'), () => data.truncated
+      ? t('目录较多，仅显示部分内容；可输入完整路径打开目录。')
+      : data.entries.length ? '' : t('此目录下没有子目录。'));
+  } catch (error) {
+    if (requestId !== directoryRequest) return;
+    uiText($('project-directory-status'), () => t('无法读取目录，请检查路径和访问权限。'));
+    $('project-directory-status').classList.add('error');
+  } finally {
+    if (requestId === directoryRequest)
+      $('project-directory-list').setAttribute('aria-busy', 'false');
+  }
+}
+
+$('project-browse').onclick = () => {
+  $('project-directory-dialog').showModal();
+  // Start from the last successfully browsed directory, or the workspace.
+  $('project-directory-path').value = projectDirectory;
+  browseProjectDirectory(projectDirectory);
+};
+$('project-directory-dialog').addEventListener('close', () => ++directoryRequest);
+$('project-directory-go').onsubmit = e => {
+  e.preventDefault();
+  browseProjectDirectory($('project-directory-path').value.trim());
+};
+$('project-directory-up').onclick = () => browseProjectDirectory(projectDirectoryParent);
+$('project-directory-select').onclick = () => {
+  $('new-project-path').value = projectDirectory;
+  $('project-directory-dialog').close();
+  $('new-project-path').focus();
+};
+
 $('project-form').onsubmit = task(async () => {
   const f = new FormData($('project-form')),
     operation = f.get('operation');
@@ -1137,8 +1192,7 @@ $('project-form').onsubmit = task(async () => {
       path: f.get('path'),
       language: f.get('language'),
       platform: 'cross-platform',
-      confirm: true,
-      storage_scope: 'personal'
+      confirm: true
     }
   );
   $('project-dialog').close();

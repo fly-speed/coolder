@@ -247,7 +247,8 @@ bool AiAgentProjectImportGitAction::run(request_t& req, response_t& res) {
 		return true;
 	}
 	std::string storage_scope = json_text((*body)["storage_scope"]);
-	if (storage_scope.empty()) storage_scope = "personal";
+	if (storage_scope.empty()) storage_scope =
+		absolute_project_path(json_text((*body)["path"])) ? "local" : "personal";
 	std::string permission_err;
 	if (!project_location_allowed(req, storage_scope, permission_err)) {
 		json_error(res, permission_err == "authentication required" ? 401 : 403,
@@ -379,11 +380,24 @@ bool AiAgentProjectEnsureAction::run(request_t& req, response_t& res) {
 		json_error(res, 400, "invalid JSON body", req.isKeepAlive());
 		return true;
 	}
+	const std::string requested_path = json_text((*body)["path"]);
+	std::string storage_scope = json_text((*body)["storage_scope"]);
+	if (storage_scope.empty()) storage_scope =
+		absolute_project_path(requested_path) ? "local" : "personal";
 	std::string path;
+	std::string physical;
 	std::string err;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
-		json_text((*body)["path"]), path, false, err))
-	{
+	if (!project_location_allowed(req, storage_scope, err)) {
+		json_error(res, 403, err.c_str(), req.isKeepAlive());
+		return true;
+	}
+	if (storage_scope == "local") {
+		if (!local_project_location(requested_path, path, physical, err)) {
+			json_error(res, 400, err.c_str(), req.isKeepAlive());
+			return true;
+		}
+	} else if (!webcool::ai::agent_workspace_t::normalize_path(
+		requested_path, path, false, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
 	}
@@ -403,6 +417,12 @@ bool AiAgentProjectEnsureAction::run(request_t& req, response_t& res) {
 	// Registration never creates or modifies source files. Require the selected
 	// workspace directory to exist and pass the same symlink/reparse checks used
 	// by model tools.
+	if (storage_scope == "local"
+		&& !webcool::ai::agent_workspace_t::register_project_root(user_root,
+			path, physical, err)) {
+		json_error(res, 400, err.c_str(), req.isKeepAlive());
+		return true;
+	}
 	webcool::ai::agent_workspace_t workspace(user_root);
 	std::vector<webcool::ai::workspace_entry_t> entries;
 	if (!workspace.list(path, entries, err)) {

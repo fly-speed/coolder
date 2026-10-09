@@ -2092,3 +2092,29 @@ html[data-ui-theme='ocean'] {
 #source-file-tabs .preview-tab {
   font-style: italic;
 }
+
+.project-path-row {
+  display: flex;
+  gap: 8px;
+}
+.project-path-row input {
+  flex: 1;
+  min-width: 0;
+}
+.project-path-row button {
+  flex-shrink: 0;
+}
+#project-directory-up {
+  margin-top: 12px;
+}
+.project-directory-list {
+  display: grid;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+.project-directory-list button {
+  text-align: left;
+  overflow-wrap: anywhere;
+}

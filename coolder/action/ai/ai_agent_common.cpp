@@ -21,11 +21,21 @@ void ai_agent_json_error(response_t& res, int status, const char* message,
 // the run status describes model execution, not whether a generation can be
 // accepted. Running generations are immutable by generation/hash and are safe to
 // review; a later model edit receives a new pending generation.
+bool absolute_project_path(const std::string& path) {
+#ifdef _WIN32
+	return (path.size() >= 3 && path[1] == ':'
+		&& (path[2] == '/' || path[2] == '\\'))
+		|| (path.size() >= 2 && path[0] == '\\' && path[1] == '\\');
+#else
+	return !path.empty() && path[0] == '/';
+#endif
+}
+
 bool project_location_allowed(request_t& req, const std::string& scope,
 	std::string& err)
 {
-	if (scope != "personal") {
-		err = "coolder supports the configured workspace only";
+	if (scope == "shared") {
+		err = "shared scope is disabled in coolder";
 		return false;
 	}
 

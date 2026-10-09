@@ -218,16 +218,16 @@ bool auth_send_required(const request_t&, response_t& res) {
 	return coolder::reply(res, 401, "{\"error\":\"authentication required\"}");
 }
 
-bool local_disk_access_allowed(const std::string&, bool, std::string& err) {
-	err = "use --workspace to select the authorized workspace";
-	return false;
+bool local_disk_access_allowed(const std::string&, bool, std::string&) {
+	// Project endpoints enforce authentication and the local-project role policy.
+	return true;
 }
 
 bool local_dir_lock_path_allows(const std::string&, const std::string&,
-	const std::string&, bool& allowed, std::string&, std::string& err) {
-	allowed = false;
-	err = "external directories are disabled";
-	return false;
+	const std::string&, bool& allowed, std::string&, std::string&) {
+	// coolder has no separate directory-password lock service.
+	allowed = true;
+	return true;
 }
 
 const char* shared_folder_name() {

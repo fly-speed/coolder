@@ -756,10 +756,7 @@
             <label class="account-password-label"
               ><input
                 id="admin-ai-allow-users-local-projects"
-                disabled
-                title="coolder 尚未接入此目录权限模块"
                 type="checkbox"
-                data-i18n-title="coolder 尚未接入此目录权限模块"
               /><span
                 ><span data-i18n="允许普通用户在本地磁盘创建或导入项目"
                   >允许普通用户在本地磁盘创建或导入项目</span
@@ -1481,17 +1478,18 @@
           ><span data-i18n="方式">方式</span
           ><select name="operation">
             <option value="create">创建新项目</option>
-            <option value="ensure">导入工作区内已有目录</option>
-            <option value="import-git">导入工作区内 Git 仓库</option>
+            <option value="ensure">导入已有目录</option>
+            <option value="import-git">导入 Git 仓库</option>
           </select>
         </label>
-        <label
-          ><span data-i18n="项目路径">项目路径</span
-          ><input name="path" placeholder="projects/hello-world" required />
-        </label>
+        <label for="new-project-path"><span data-i18n="项目路径">项目路径</span></label>
+        <div class="project-path-row">
+          <input id="new-project-path" name="path" placeholder="projects/hello-world" required />
+          <button id="project-browse" type="button"><span data-i18n="选择目录">选择目录</span></button>
+        </div>
         <p class="muted">
-          <span data-i18n="路径相对于启动参数 --workspace 指定的工作区；默认 var/workspace。"
-            >路径相对于启动参数 --workspace 指定的工作区；默认 var/workspace。</span
+          <span data-i18n="支持服务器上的绝对目录路径；相对路径基于 --workspace 指定的工作区（默认 var/workspace）。"
+            >支持服务器上的绝对目录路径；相对路径基于 --workspace 指定的工作区（默认 var/workspace）。</span
           >
         </p>
         <label
@@ -1508,6 +1506,26 @@
         </label>
         <button class="primary"><span data-i18n="添加项目">添加项目</span></button>
       </form>
+    </dialog>
+    <dialog id="project-directory-dialog" aria-labelledby="project-directory-title">
+      <div class="dialog-title">
+        <h2 id="project-directory-title" data-i18n="选择目录">选择目录</h2>
+        <button type="button" data-close><span data-i18n="取消">取消</span></button>
+      </div>
+      <p class="muted" data-i18n="选择运行 coolder 的电脑上的目录。新项目可选择空目录，或选择父目录后在项目路径中追加新目录名。">选择运行 coolder 的电脑上的目录。新项目可选择空目录，或选择父目录后在项目路径中追加新目录名。</p>
+      <form id="project-directory-go">
+        <label for="project-directory-path" data-i18n="目录路径">目录路径</label>
+        <div class="project-path-row">
+          <input id="project-directory-path" autocomplete="off" />
+          <button type="submit"><span data-i18n="打开目录">打开目录</span></button>
+        </div>
+      </form>
+      <button id="project-directory-up" type="button" disabled><span data-i18n="上一级目录">上一级目录</span></button>
+      <p id="project-directory-status" role="status" aria-live="polite"></p>
+      <div id="project-directory-list" class="project-directory-list" aria-busy="false"></div>
+      <div class="actions">
+        <button id="project-directory-select" type="button" class="primary" disabled><span data-i18n="选择当前目录">选择当前目录</span></button>
+      </div>
     </dialog>
     <dialog id="detail-dialog">
       <div class="dialog-title">

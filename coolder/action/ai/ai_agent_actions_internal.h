@@ -4,6 +4,7 @@
 #include "action/actions.h"
 #include "action/action_util.h"
 namespace action { namespace agent_detail {
+bool absolute_project_path(const std::string& path);
 bool project_location_allowed(request_t& req, const std::string& scope,
 	std::string& err);
 void ai_agent_json_error(response_t& res, int status, const char* message,

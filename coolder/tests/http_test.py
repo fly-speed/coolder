@@ -15,6 +15,7 @@ import sys
 import tempfile
 import threading
 import time
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 requests = []
@@ -743,7 +744,6 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         for field in [
             'allow_browser_debug',
             'allow_users_shared_projects',
-            'allow_users_local_projects',
         ]:
             call('/api/v1/admin/ai-policy', {field: True}, status=400)
         call('/api/v1/admin/ai-policy', {'sandbox_memory_mib': 1}, status=400)
@@ -754,6 +754,55 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         )
         unchanged, _ = call('/api/v1/admin/ai-policy')
         assert all(unchanged[key] == value for key, value in policy_changes.items())
+        # Absolute paths register bounded external roots, independent of workspace.
+        directories, _ = call('/api/v1/ai/projects/directories?path=' + quote(temp))
+        assert directories['path'] == str(Path(temp).resolve())
+        assert any(entry['name'] == 'data' for entry in directories['entries'])
+        call('/api/v1/ai/projects/directories?path=relative', status=400)
+        call('/api/v1/ai/projects/directories?path=' + quote(str(Path(temp) / 'missing')), status=400)
+        call('/api/v1/ai/projects/directories', status=401, auth=False)
+        external = Path(temp) / 'external project'
+        created, _ = call('/api/v1/ai/workspace/project/create', {
+            'path': str(external), 'language': 'python', 'confirm': True,
+        })
+        assert created['storage_scope'] == 'local' and created['planning_available']
+        assert (external / 'README.md').is_file()
+        external_read = '/api/v1/ai/workspace/read?path=' + quote(created['path'] + '/README.md')
+        call(external_read)
+        preview, _ = call('/api/v1/ai/workspace/patch/preview', {
+            'path': created['path'] + '/README.md', 'content': '# external edit\n',
+        })
+        call('/api/v1/ai/workspace/patch/apply', {'patch_id': preview['patch_id']})
+        assert (external / 'README.md').read_text() == '# external edit\n'
+        call('/api/v1/ai/workspace/project/create', {
+            'path': str(external), 'confirm': True,
+        }, status=409)
+        existing = Path(temp) / 'existing project'
+        existing.mkdir()
+        (existing / 'main.py').write_text('print("existing")')
+        imported, _ = call('/api/v1/ai/projects/ensure', {'path': str(existing), 'language': 'python', 'platform': 'cross-platform'})
+        assert (existing / 'main.py').read_text() == 'print("existing")'
+        (existing / '.git').mkdir()
+        call('/api/v1/ai/projects/import-git', {'path': str(existing), 'language': 'python', 'platform': 'cross-platform'})
+        call('/api/v1/ai/projects/ensure', {'path': str(existing / 'missing')}, status=400)
+        if os.name != 'nt':
+            (external / 'escape').symlink_to(existing / 'main.py')
+            call('/api/v1/ai/workspace/read?path=' + quote(created['path'] + '/escape'), status=400)
+        _, h = call('/api/v1/auth/login', {
+            'username': 'alice', 'password': 'alice-third-password',
+        }, auth=False)
+        alice_cookie = h['Set-Cookie'].split(';')[0]
+        cookie = alice_cookie
+        call('/api/v1/ai/projects/directories', status=403)
+        for endpoint in ['workspace/project/create', 'projects/ensure', 'projects/import-git']:
+            call('/api/v1/ai/' + endpoint, {'path': str(existing), 'confirm': True}, status=403)
+        cookie = admin_cookie
+        call('/api/v1/admin/ai-policy', {'allow_users_local_projects': True})
+        cookie = alice_cookie
+        call('/api/v1/ai/projects/directories?path=' + quote(str(existing)))
+        call('/api/v1/ai/projects/ensure', {'path': str(existing), 'language': 'python', 'platform': 'cross-platform'})
+        cookie = admin_cookie
+        call('/api/v1/admin/ai-policy', {'allow_users_local_projects': False})
         process.terminate()
         process.wait(timeout=10)
         process = subprocess.Popen(command, stdout=log, stderr=log)
@@ -766,6 +815,8 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         call('/api/health', status=401)
         _, h = call('/api/v1/auth/login', credentials, auth=False)
         cookie = h['Set-Cookie'].split(';')[0]
+        call(external_read)
+        call('/api/v1/ai/projects?id=' + created['project_id'])
         saved_sessions, _ = call(
             '/api/v1/ai/sessions?project_id=' + project['project_id']
         )

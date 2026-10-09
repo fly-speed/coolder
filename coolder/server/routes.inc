@@ -19,6 +19,7 @@
 		{"POST /api/v1/ai/sandbox/plan", &action::AiSandboxPlanAction::run},
 		{"POST /api/v1/ai/sandbox/execute", &action::AiSandboxExecuteAction::run},
 		{"POST /api/v1/ai/sandbox/runs/cancel", &action::AiSandboxRunCancelAction::run},
+		{"GET /api/v1/ai/projects/directories", &action::AiProjectDirectoriesAction::run},
 		{"POST /api/v1/ai/workspace/project/create", &action::AiWorkspaceProjectCreateAction::run},
 		{"POST /api/v1/ai/workspace/directory/create", &action::AiWorkspaceDirectoryCreateAction::run},
 		{"POST /api/v1/ai/workspace/patch/preview", &action::AiWorkspacePatchPreviewAction::run},

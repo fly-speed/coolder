@@ -19,10 +19,14 @@ public:
 	static bool run(request_t& req, response_t& res);
 };
 
+class AiProjectDirectoriesAction {
+public:
+	static bool run(request_t& req, response_t& res);
+};
+
 class AiWorkspaceProjectCreateAction {
 public:
-	// Creates one explicitly confirmed project directory relative to the
-	// authenticated user's virtual-disk root; absolute paths are never accepted.
+	// Creates a confirmed project in the workspace or an authorized local directory.
 	static bool run(request_t& req, response_t& res);
 };
 

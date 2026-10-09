@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "libai/workspace/agent_change_limits.h"
 #include "ai_workspace_actions.h"
+#include "ai_agent_actions_internal.h"
 #include "action/actions.h"
 #include "action/action_util.h"
 #include "libai/workspace/agent_workspace.h"
@@ -19,6 +20,8 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <filesystem>
+#include <algorithm>
 #include <ctime>
 #include <map>
 #include <memory>
@@ -84,43 +87,6 @@ bool json_bool(acl::json_node* node, bool fallback) {
 	return fallback;
 }
 
-bool external_project_allowed(request_t& req, const std::string& scope,
-	std::string& err)
-{
-	if (scope != "personal") {
-		err = "coolder supports the configured workspace only";
-		return false;
-	}
-
-	if (scope == "personal") return true;
-	if (scope != "shared" && scope != "local") {
-		err = "unsupported project storage scope";
-		return false;
-	}
-	std::string username;
-	bool admin = false;
-	const std::string upload_root = runtime_upload_dir_get();
-	if (!auth_current_user(req, upload_root, username, admin)) {
-		err = "authentication required";
-		return false;
-	}
-	const webcool::ai::ai_admin_policy_t policy =
-		webcool::ai::ai_runtime_policy_get();
-	if (!admin && ((scope == "shared" && !policy.allow_users_shared_projects)
-		|| (scope == "local" && !policy.allow_users_local_projects)))
-	{
-		err = scope == "shared"
-			? "administrator has disabled shared-directory projects"
-			: "administrator has disabled local-disk projects";
-		return false;
-	}
-	if (scope == "local" && !local_disk_access_allowed(upload_root, admin, err)) {
-		if (err.empty()) err = "local disk access is disabled";
-		return false;
-	}
-	return true;
-}
-
 bool split_local_project_path(const std::string& input, std::string& parent,
 	std::string& name, std::string& logical, std::string& err)
 {
@@ -141,6 +107,9 @@ bool split_local_project_path(const std::string& input, std::string& parent,
 	}
 	parent = raw.substr(0, slash);
 	if (parent.empty()) parent = "/";
+#ifdef _WIN32
+	if (parent.size() == 2 && parent[1] == ':') parent += "/";
+#endif
 	name = raw.substr(slash + 1);
 	if (name == "." || name == "..") {
 		err = "invalid local project directory name";
@@ -380,7 +349,7 @@ bool AiWorkspaceListAction::run(request_t& req, response_t& res) {
 			req.isKeepAlive());
 		return true;
 	}
-	if (!external_project_allowed(req, storage_scope, err)) {
+	if (!agent_detail::project_location_allowed(req, storage_scope, err)) {
 		json_error(res, err == "authentication required" ? 401 : 403,
 			err.c_str(), req.isKeepAlive());
 		return true;
@@ -464,6 +433,61 @@ bool AiWorkspaceSearchAction::run(request_t& req, response_t& res) {
 	return sendJson(res, 200, root, req.isKeepAlive());
 }
 
+bool AiProjectDirectoriesAction::run(request_t& req, response_t& res) {
+	std::string user_root;
+	if (!current_workspace(req, res, user_root)) return true;
+	std::string err;
+	if (!agent_detail::project_location_allowed(req, "local", err)) {
+		json_error(res, 403, err.c_str(), req.isKeepAlive());
+		return true;
+	}
+	namespace fs = std::filesystem;
+	const std::string input = request_text(req, "path");
+	if (!input.empty() && (!agent_detail::absolute_project_path(input)
+		|| input.find('\0') != std::string::npos)) {
+		json_error(res, 400, "directory path must be absolute", req.isKeepAlive());
+		return true;
+	}
+	std::error_code ec;
+	const fs::path path = fs::canonical(fs::u8path(input.empty() ? user_root : input), ec);
+	if (ec || !fs::is_directory(path, ec)) {
+		json_error(res, 400, "directory does not exist or is inaccessible", req.isKeepAlive());
+		return true;
+	}
+	fs::directory_iterator it(path, ec), end;
+	if (ec) {
+		json_error(res, 403, "cannot browse this directory", req.isKeepAlive());
+		return true;
+	}
+	std::vector<std::string> names;
+	size_t inspected = 0;
+	for (; it != end && inspected < 10000; it.increment(ec), ++inspected) {
+		if (ec) break;
+		std::error_code entry_error;
+		if (it->is_directory(entry_error) && !entry_error)
+			names.push_back(it->path().filename().u8string());
+	}
+	if (ec) {
+		json_error(res, 403, "cannot browse this directory", req.isKeepAlive());
+		return true;
+	}
+	std::sort(names.begin(), names.end());
+	acl::json json;
+	acl::json_node& root = json.create_node();
+	root.add_bool("ok", true);
+	root.add_text("path", path.generic_u8string().c_str());
+	root.add_text("parent", path.parent_path().generic_u8string().c_str());
+	root.add_bool("truncated", it != end);
+	acl::json_node& entries = json.create_array();
+	root.add_child("entries", entries);
+	for (const auto& name : names) {
+		acl::json_node& entry = entries.add_child(false, true);
+		entry.add_text("name", name.c_str());
+		entry.add_text("path", (path / fs::u8path(name)).generic_u8string().c_str());
+	}
+	return sendJson(res, 200, root, req.isKeepAlive());
+}
+
 bool AiWorkspaceProjectCreateAction::run(request_t& req, response_t& res) {
 	std::string user_root;
 	if (!current_workspace(req, res, user_root)) return true;
@@ -474,7 +498,8 @@ bool AiWorkspaceProjectCreateAction::run(request_t& req, response_t& res) {
 	}
 	const std::string path = json_text((*body)["path"]);
 	std::string storage_scope = json_text((*body)["storage_scope"]);
-	if (storage_scope.empty()) storage_scope = "personal";
+	if (storage_scope.empty()) storage_scope =
+		agent_detail::absolute_project_path(path) ? "local" : "personal";
 	const std::string requested_language = json_text((*body)["language"]);
 	const std::string requested_platform = json_text((*body)["platform"]);
 	// Defaults preserve compatibility with clients released before language and
@@ -490,7 +515,7 @@ bool AiWorkspaceProjectCreateAction::run(request_t& req, response_t& res) {
 	}
 
 	std::string permission_err;
-	if (!external_project_allowed(req, storage_scope, permission_err)) {
+	if (!agent_detail::project_location_allowed(req, storage_scope, permission_err)) {
 		json_error(res, permission_err == "authentication required" ? 401 : 403,
 			permission_err.c_str(), req.isKeepAlive());
 		return true;
@@ -654,7 +679,7 @@ bool AiWorkspaceDirectoryCreateAction::run(request_t& req, response_t& res) {
 			req.isKeepAlive());
 		return true;
 	}
-	if (!external_project_allowed(req, storage_scope, err)) {
+	if (!agent_detail::project_location_allowed(req, storage_scope, err)) {
 		json_error(res, err == "authentication required" ? 401 : 403,
 			err.c_str(), req.isKeepAlive());
 		return true;
