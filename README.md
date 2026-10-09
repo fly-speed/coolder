@@ -8,7 +8,7 @@
 
 Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订，在隔离草稿中尝试构建和修复，再由用户审核并写入正式项目。应用采用 **C++17 + ACL 协程 HTTP 服务 + 原生 Web 前端**，核心编程能力由可独立复用的 **libai** 静态库提供。
 
-**阅读导航：** [运行截图](#运行截图) · [架构设计](#架构设计) · [推理机制](#智能体推理机制) · [功能组成](#功能组成) · [快速开始](#快速开始) · [任务实践](#任务实践) · [常见问题](#常见问题) · [开发文档](#开发验证与文档)
+**阅读导航：** [运行截图](#运行截图) · [架构设计](#架构设计) · [推理机制](#智能体推理机制) · [功能组成](#功能组成) · [快速开始](#快速开始) · [任务实践](#任务实践) · [常见问题](#常见问题) · [第三方集成](#第三方应用集成-libai) · [开发文档](#开发验证与文档)
 
 ## 核心特点
 
@@ -410,6 +410,136 @@ libai 公开聚合头文件为 `<libai/coding.h>`，推荐链接 CMake 目标 `l
 
 前端源脚本由 CMake 自动合并为 `coolder/html/coolder.js`，请修改原始脚本，不要直接编辑生成文件。详细集成方式见 [libai 文档](libai/README.md)。
 
+## 第三方应用集成 libai
+
+第三方桌面应用、命令行工具或后台服务可以直接链接 libai，复用模型适配、工作区工具和编程运行时，不必启动 Coolder 的 HTTP 服务或复用其前端。当前集成接口为 C++，聚合头文件为 `<libai/coding.h>`，CMake 目标为 `libai::ai`。
+
+### 选择集成层次
+
+| 需求 | 接入方式 | 应用需要负责 |
+| --- | --- | --- |
+| 代码问答、解释或自定义业务助手 | `provider_client_t` 与请求/响应类型 | 上下文、业务流程、模型配置、凭据和结果展示 |
+| 自定义工具型 Agent | 模型客户端、工具 schema 与应用自己的调度循环 | 工具参数校验、授权、执行、结果回传、预算与停止条件 |
+| 完整编程 Agent | `webcool::ai::coding` 运行时、工作区、存储及审核接口 | 任务初始化、身份与路径授权、ACL/fiber 生命周期、策略、事件展示和审核入口 |
+
+建议先验证库链接，再完成一次模型调用，最后接入工具和持久化。直接调用模型不会自动获得文件修改、验证、恢复或变更审核流程。
+
+### 1. 构建并安装 SDK
+
+以下为 macOS/Linux 的源码构建流程，所有 `/absolute/...` 路径均需替换为实际路径：
+
+```sh
+# Run from the Coolder repository root.
+git submodule update --init --recursive
+make -C third-party
+cmake -S libai -B libai/build -DCMAKE_BUILD_TYPE=Release \
+  -DAI_CODING_BUILD_TESTS=ON
+cmake --build libai/build --parallel 4
+ctest --test-dir libai/build --output-on-failure
+cmake --install libai/build --prefix /absolute/libai-sdk
+```
+
+ACL/fiber、OpenSSL 等依赖不会全部合并进 `libai.a`，消费应用仍须能找到对应头文件和库。使用同一编译器、目标架构和兼容运行库构建应用与依赖；Windows 可设置 `ACL_LIBRARY_DIRS` 指向预编译 ACL 库目录，Linux 的 io_uring 依赖按前述说明配置。详细平台步骤见 [libai 构建说明](libai/README.md) 和 [依赖说明](third-party/README.md)。
+
+### 2. 创建最小应用并验证链接
+
+新建应用目录，保存以下 `CMakeLists.txt`：
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(my_agent LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(libai CONFIG REQUIRED)
+add_executable(my_agent main.cpp)
+target_link_libraries(my_agent PRIVATE libai::ai)
+```
+
+保存以下 `main.cpp`。此程序读取内置 Agent 定义，用于验证头文件与链接，不调用模型、不需要 API Key：
+
+```cpp
+#include <libai/coding.h>
+#include <iostream>
+
+int main()
+{
+    const auto* agent = webcool::ai::agent_registry_t::instance().find("coding");
+    if (!agent) return 1;
+    std::cout << "Agent: " << agent->id
+              << "\nTools: " << agent->tools.size() << '\n';
+    return agent->tools.empty() ? 2 : 0;
+}
+```
+
+配置并运行：
+
+```sh
+cmake -S /absolute/my-agent -B /absolute/my-agent/build \
+  -DCMAKE_PREFIX_PATH=/absolute/libai-sdk \
+  -DACL_PATH=/absolute/coolder/third-party/acl \
+  -DOPENSSL_PATH=/absolute/coolder/third-party/openssl
+cmake --build /absolute/my-agent/build --parallel 4
+/absolute/my-agent/build/my_agent
+```
+
+正常运行会输出 `Agent: coding` 及工具数量。仓库已有等价的 [独立链接示例](libai/examples/minimal/main.cpp) 和 [CMake 文件](libai/examples/minimal/CMakeLists.txt)。在同一源码树中集成时，可用 `add_subdirectory(/absolute/coolder/libai libai-build)` 替代 `find_package`；两种方式都链接 `libai::ai`。
+
+### 3. 接入模型请求
+
+下面的函数展示实际模型接口，可加入已初始化的应用 worker；它是调用片段，不是完整服务入口：
+
+```cpp
+#include <libai/coding.h>
+
+// Call from an initialized host worker; credentials remain host-owned.
+bool ask_model(const webcool::ai::provider_config_t& provider,
+               const std::string& api_key,
+               const std::string& question,
+               std::string& answer,
+               std::string& error)
+{
+    webcool::ai::completion_request_t request{};
+    request.system_prompt = "You are a coding assistant. Explain assumptions clearly.";
+    request.user_prompt = question;
+    request.ui_language = "en";
+    request.max_output_tokens = 4096;
+    request.transport_session =
+        webcool::ai::provider_client_t::create_transport_session();
+
+    webcool::ai::completion_result_t result{};
+    if (!webcool::ai::provider_client_t::complete(
+            provider, api_key, request, result, error)) return false;
+    answer = result.text;
+    return true;
+}
+```
+
+宿主提供的 `provider_config_t` 至少应配置匹配服务的 `protocol`、`base_url` 和 `model`；API Key 作为单独参数传入，不要写入源码或日志。需要保存配置时可使用 [Provider 存储接口](libai/provider/ai_provider_store.h)。应用仍须决定哪些项目内容可发送，低层客户端调用不会代替宿主的用户授权流程。
+
+发起网络请求前，参考 [Coolder 入口](coolder/main.cpp) 初始化 `acl::acl_cpp_init()` 和 TLS（`acl::openssl_conf::load()`；动态库非标准位置可先调用 `set_libpath`）。参照现有宿主在 ACL/fiber worker 中执行请求并管理调度器，不要直接阻塞桌面 UI 线程。需要流式输出时，实现 `completion_stream_observer_t` 的 `on_text_delta`，按需处理取消和推理摘要，再作为 `complete` 的最后一个参数传入；回调向 UI 投递事件时遵循应用的线程规则。
+
+### 4. 接入完整编程 Agent
+
+运行时入口包括同步执行函数 `webcool::ai::coding::run_coding_tool_loop(...)`，以及执行已注册任务的 `run_async_coding_task(...)`。后者仍需宿主调度 worker，不能仅凭函数名假定它会自行创建后台线程。接口声明与生命周期约束见 [coding_runtime.h](libai/runtime/coding_runtime.h)。
+
+| 接入步骤 | 宿主需要完成的工作 | 实现参考 |
+| --- | --- | --- |
+| 初始化 | 准备受保护的存储、用户工作区、模型配置、执行策略与沙盒限制 | [服务入口](coolder/main.cpp)、[策略接口](libai/agent/ai_admin_policy.h) |
+| 建立任务 | 校验身份、项目路径和模型权限，生成任务/会话标识，设置预算并登记 `agent_runtime_task_t` | [任务启动适配](coolder/action/ai/ai_agent_actions.cpp) |
+| 调度执行 | 传入原始需求、初始上下文、凭据、工作区与持久化状态，在 worker 中运行循环 | [运行时 worker](libai/runtime/ai_agent_worker.cpp) |
+| 展示与控制 | 展示状态和工具记录，通过运行时接口处理暂停与取消；退出前协调 worker 生命周期 | [运行时接口](libai/runtime/coding_runtime.h) |
+| 审核交付 | 显示待审核修订，调用审核/应用逻辑并保留版本冲突检查，不能直接覆盖项目文件 | [审核适配](coolder/action/ai/ai_agent_reviews.cpp)、[工作区变更集](libai/workspace/workspace_change_set.h) |
+
+这些文件是可参考的宿主适配实现，不需要把 Coolder 的 HTTP 路由整体复制进第三方应用。运行时包含进程级策略和任务状态；集成时应统一管理，并在同一源码版本下构建宿主与库。
+
+需要构建或运行项目时，还须部署 `webcool-sandbox-helper` 到宿主可执行文件旁，并提供相应语言工具链。该 helper 名称是兼容约定；仅安装 libai SDK 不会自动安装它。可从 Coolder 构建目标获得 helper，或参照 [helper 入口](coolder/sandbox/sandbox_helper_main.cpp) 及 [应用 CMake](coolder/CMakeLists.txt) 构建部署。
+
+### 自定义工具与其他语言应用
+
+当前 `agent_registry_t` 提供只读定义查询，没有通用的动态工具注册 API。自定义工具可在应用自己的模型循环中声明 schema 并进行受控分发；若要进入内置编程循环，还需扩展工具定义、参数解析、执行分派和策略检查。只添加工具名称不会自动接通执行能力。参见 [Agent 工具定义](libai/agent/agent_registry.h)、[模型协议类型](libai/provider/ai_provider_client.h) 和 [工具执行入口](libai/runtime/ai_agent_tools.cpp)。
+
+当前仓库没有提供 Python、JavaScript、Java 或稳定 C ABI 的官方绑定。其他语言应用可以自行提供 C++ 服务桥接或封装 C ABI，并明确字符串/缓冲区所有权、错误处理、取消及生命周期。此类封装属于应用侧开发，不应视为现成 SDK 功能。
+
 ## 开发验证与文档
 
 完成构建后，可从仓库根目录运行已注册的 HTTP 与账户集成测试；配置时需要能够找到 Python 3：
@@ -452,7 +582,7 @@ Coolder 使用 [MIT License](LICENSE)。ACL、OpenSSL、zlib 和 Monaco Editor �
 
 Coolder reads and searches source files, proposes changes across multiple files, and attempts builds and repairs in an isolated draft. You review the changes before applying them to the project. The application uses **C++17, an ACL coroutine HTTP server, and a native web frontend**, with its core coding capabilities provided by **libai**, a reusable static library.
 
-**On this page:** [Screenshots](#screenshots) · [Architecture](#architecture) · [Reasoning](#agent-reasoning-mechanism) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Task workflow](#task-workflow) · [Troubleshooting](#troubleshooting) · [Development](#development-checks-and-documentation)
+**On this page:** [Screenshots](#screenshots) · [Architecture](#architecture) · [Reasoning](#agent-reasoning-mechanism) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Task workflow](#task-workflow) · [Troubleshooting](#troubleshooting) · [Integration](#integrating-libai-into-third-party-applications) · [Development](#development-checks-and-documentation)
 
 ## Key Features
 
@@ -853,6 +983,136 @@ libai exposes the aggregate header `<libai/coding.h>` and the recommended CMake 
 The library retains namespaces such as `webcool::ai`, internal `.webcool_*` storage formats, and the helper name `webcool-sandbox-helper` for compatibility. Coolder builds and runs independently without building the webcool application.
 
 CMake bundles frontend source scripts into `coolder/html/coolder.js`. Edit the original scripts rather than the generated file. See the [libai guide](libai/README.md) for integration details.
+
+## Integrating libai into Third-Party Applications
+
+Desktop applications, CLI tools, and backend services can link libai directly to reuse model adapters, workspace tools, and the coding runtime without starting Coolder's HTTP server or using its frontend. The current integration interface is C++, with `<libai/coding.h>` as the aggregate header and `libai::ai` as the CMake target.
+
+### Choose an Integration Level
+
+| Need | Integration | Application responsibilities |
+| --- | --- | --- |
+| Code Q&A, explanations, or a custom business assistant | `provider_client_t` and request/response types | Context, workflow, model configuration, credentials, and presentation |
+| An agent with custom tools | Model client, tool schemas, and an application-owned loop | Argument validation, authorization, dispatch, result replay, budgets, and stopping conditions |
+| A complete coding agent | `webcool::ai::coding` runtime, workspace, storage, and review interfaces | Task initialization, identity and path authorization, ACL/fiber lifecycle, policy, events, and review UI |
+
+Start with linking, then make a model request, and finally integrate tools and persistence. Calling a model directly does not automatically provide file changes, validation, recovery, or revision review.
+
+### 1. Build and Install the SDK
+
+The following source-build workflow targets macOS/Linux. Replace every `/absolute/...` path with an actual path:
+
+```sh
+# Run from the Coolder repository root.
+git submodule update --init --recursive
+make -C third-party
+cmake -S libai -B libai/build -DCMAKE_BUILD_TYPE=Release \
+  -DAI_CODING_BUILD_TESTS=ON
+cmake --build libai/build --parallel 4
+ctest --test-dir libai/build --output-on-failure
+cmake --install libai/build --prefix /absolute/libai-sdk
+```
+
+Dependencies such as ACL/fiber and OpenSSL are not all merged into `libai.a`; consumers still need their headers and libraries. Build the application and dependencies with compatible compilers, architectures, and runtimes. Windows consumers can set `ACL_LIBRARY_DIRS` for prebuilt ACL libraries; configure Linux io_uring dependencies as described earlier. See the [libai build guide](libai/README.md) and [dependency guide](third-party/README.md) for platform details.
+
+### 2. Create a Minimal Application and Verify Linking
+
+Create an application directory with this `CMakeLists.txt`:
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(my_agent LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(libai CONFIG REQUIRED)
+add_executable(my_agent main.cpp)
+target_link_libraries(my_agent PRIVATE libai::ai)
+```
+
+Save the following `main.cpp`. It queries the built-in agent definition to verify headers and linking; it does not call a model or require an API key:
+
+```cpp
+#include <libai/coding.h>
+#include <iostream>
+
+int main()
+{
+    const auto* agent = webcool::ai::agent_registry_t::instance().find("coding");
+    if (!agent) return 1;
+    std::cout << "Agent: " << agent->id
+              << "\nTools: " << agent->tools.size() << '\n';
+    return agent->tools.empty() ? 2 : 0;
+}
+```
+
+Configure and run:
+
+```sh
+cmake -S /absolute/my-agent -B /absolute/my-agent/build \
+  -DCMAKE_PREFIX_PATH=/absolute/libai-sdk \
+  -DACL_PATH=/absolute/coolder/third-party/acl \
+  -DOPENSSL_PATH=/absolute/coolder/third-party/openssl
+cmake --build /absolute/my-agent/build --parallel 4
+/absolute/my-agent/build/my_agent
+```
+
+A successful run prints `Agent: coding` and the tool count. The repository includes an equivalent [standalone example](libai/examples/minimal/main.cpp) and [CMake file](libai/examples/minimal/CMakeLists.txt). For a shared source tree, replace `find_package` with `add_subdirectory(/absolute/coolder/libai libai-build)`; both approaches link `libai::ai`.
+
+### 3. Make Model Requests
+
+This function demonstrates the actual model interface for an initialized application worker. It is a call fragment, not a complete service entry point:
+
+```cpp
+#include <libai/coding.h>
+
+// Call from an initialized host worker; credentials remain host-owned.
+bool ask_model(const webcool::ai::provider_config_t& provider,
+               const std::string& api_key,
+               const std::string& question,
+               std::string& answer,
+               std::string& error)
+{
+    webcool::ai::completion_request_t request{};
+    request.system_prompt = "You are a coding assistant. Explain assumptions clearly.";
+    request.user_prompt = question;
+    request.ui_language = "en";
+    request.max_output_tokens = 4096;
+    request.transport_session =
+        webcool::ai::provider_client_t::create_transport_session();
+
+    webcool::ai::completion_result_t result{};
+    if (!webcool::ai::provider_client_t::complete(
+            provider, api_key, request, result, error)) return false;
+    answer = result.text;
+    return true;
+}
+```
+
+The host-supplied `provider_config_t` should at least specify the service's `protocol`, `base_url`, and `model`. Pass the API key separately and keep it out of source and logs. Use the [provider store](libai/provider/ai_provider_store.h) when configuration persistence is needed. The application must still authorize which project content can be sent; the low-level client does not replace host authorization.
+
+Before network requests, follow the [Coolder entry point](coolder/main.cpp) to initialize `acl::acl_cpp_init()` and TLS with `acl::openssl_conf::load()`; use `set_libpath` first for dynamic libraries in nonstandard locations. Follow the existing host's ACL/fiber worker and scheduler lifecycle rather than blocking a desktop UI thread. For streaming, implement `completion_stream_observer_t::on_text_delta`, optionally handle cancellation and reasoning summaries, and pass the observer as the last argument to `complete`. Dispatch callback events to the UI according to the application's threading rules.
+
+### 4. Integrate the Complete Coding Runtime
+
+Entry points include the synchronous `webcool::ai::coding::run_coding_tool_loop(...)` and `run_async_coding_task(...)`, which executes an already registered task. The latter still requires host worker scheduling; its name does not imply that it creates a background thread automatically. See [coding_runtime.h](libai/runtime/coding_runtime.h) for declarations and lifecycle contracts.
+
+| Step | Host responsibilities | Reference |
+| --- | --- | --- |
+| Initialize | Prepare protected storage, user workspaces, model configuration, execution policy, and sandbox limits | [Service entry point](coolder/main.cpp), [policy interface](libai/agent/ai_admin_policy.h) |
+| Create a task | Validate identity, project paths, and model permissions; assign task/session IDs, set budgets, and register `agent_runtime_task_t` | [Task startup adapter](coolder/action/ai/ai_agent_actions.cpp) |
+| Schedule execution | Supply the original request, initial context, credentials, workspace, and persistent state; execute the loop in a worker | [Runtime worker](libai/runtime/ai_agent_worker.cpp) |
+| Present and control | Display status and tool records, use runtime pause/cancel interfaces, and coordinate worker shutdown | [Runtime interfaces](libai/runtime/coding_runtime.h) |
+| Review and deliver | Present pending revisions, use review/application logic, and preserve version conflict checks instead of directly overwriting files | [Review adapter](coolder/action/ai/ai_agent_reviews.cpp), [workspace change sets](libai/workspace/workspace_change_set.h) |
+
+These files are host-adapter references; third-party applications do not need to copy Coolder's HTTP routing layer. The runtime includes process-wide policy and task state, which the host should manage centrally. Build the host and library against the same source revision.
+
+Building or running projects also requires `webcool-sandbox-helper` alongside the host executable and the appropriate language toolchains. The helper name is a compatibility convention; installing the libai SDK alone does not install it. Obtain it from the Coolder build target or use the [helper entry point](coolder/sandbox/sandbox_helper_main.cpp) and [application CMake](coolder/CMakeLists.txt) as build and deployment references.
+
+### Custom Tools and Applications in Other Languages
+
+The current `agent_registry_t` exposes read-only definition queries, not a general dynamic tool-registration API. Applications can declare tool schemas and dispatch tools in their own controlled model loop. Integrating tools into the built-in coding loop also requires extending definitions, argument parsing, execution dispatch, and policy checks; adding a tool name alone does not make it executable. See [agent tool definitions](libai/agent/agent_registry.h), [model protocol types](libai/provider/ai_provider_client.h), and [tool execution](libai/runtime/ai_agent_tools.cpp).
+
+The repository currently provides no official Python, JavaScript, Java, or stable C ABI bindings. Applications in other languages can implement a C++ service bridge or a C ABI wrapper with explicit string/buffer ownership, error handling, cancellation, and lifecycle contracts. Such wrappers are application development work, not existing SDK features.
 
 ## Development Checks and Documentation
 
