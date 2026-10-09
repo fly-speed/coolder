@@ -8,9 +8,11 @@
 
 Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订，在隔离草稿中尝试构建和修复，再由用户审核并写入正式项目。应用采用 **C++17 + ACL 协程 HTTP 服务 + 原生 Web 前端**，核心编程能力由可独立复用的 **libai** 静态库提供。
 
+**阅读导航：** [运行截图](#运行截图) · [架构设计](#架构设计) · [推理机制](#智能体推理机制) · [功能组成](#功能组成) · [快速开始](#快速开始) · [任务实践](#任务实践) · [常见问题](#常见问题) · [开发文档](#开发验证与文档)
+
 ## 核心特点
 
-- **面向真实项目**：创建项目脚手架，或导入授权工作区内已有目录与 Git 仓库，结合项目索引、计划和会话持续开发。
+- **面向真实项目**：创建项目脚手架，或导入工作区内或已授权的本地目录与 Git 仓库，结合项目索引、计划和会话持续开发。
 - **模型与工具协同**：智能体根据任务调用文件读取、搜索、代码大纲、补丁和验证工具，依据执行结果继续推进。
 - **构建反馈驱动修复**：增量修订在隔离草稿中进行构建检查，编译诊断反馈给模型，支持“修改—验证—修复”循环。
 - **变更可审查**：AI 修订先保存在修订区，支持差异预览、逐项接受或拒绝，以及批量接受并写入项目。
@@ -178,7 +180,7 @@ flowchart TD
 
 ### 项目管理与规划
 
-- 创建项目脚手架，或按工作区内相对路径导入已有目录与 Git 仓库。
+- 创建项目脚手架，或导入已有目录与 Git 仓库；支持工作区相对路径，以及经权限检查的本地绝对路径。
 - 浏览项目文件，读取和搜索源码，刷新项目索引。
 - 生成模块与任务计划，保存计划版本并更新任务状态。
 - 围绕项目组织会话和历史运行，支持继续会话与导出会话。
@@ -206,6 +208,12 @@ flowchart TD
 - 手动编辑先预览差异、确认后保存；AI 修改支持逐个接受或拒绝，也可批量写入。
 - 保存与审核使用版本校验，检测并发修改；关闭未保存文件时会提示确认。
 - 编辑器资源与语言 Worker 均从本机加载，无需 CDN；当前未接入外部 LSP。
+
+### 界面语言与个人设置
+
+在“个人设置”中选择中文、English、日本語或 한국어，并调整配色与字号。偏好按账户保存；应用界面保存后切换，Monaco 内置菜单语言在首次加载时确定，切换后刷新页面生效。语言设置不会翻译项目源码、用户输入和已有模型输出。
+
+语言包通过 JSON 模板与清单扩展，详见 [界面国际化说明](coolder/html/i18n/README.md)。本页中英文部分分别使用对应语言的运行截图；截图记录演示时的界面，后续版本布局和选项可能有所变化。
 
 ### 会话与附件
 
@@ -282,7 +290,7 @@ Windows 原生 VS 2022 工程位于 `coolder/coolder.sln`，依赖 `third-party/
 2. 打开“管理控制台 → 大模型厂商”，配置协议、端点、模型和 API Key。
 3. 勾选“启用此模型”和“允许向此模型发送项目代码”，保存并测试连接。
 4. 在“智能体设置”中检查可用工具链、权限、任务额度和超时。
-5. 创建项目，或导入当前账户工作区内的已有项目。
+5. 创建项目，或导入工作区内及已授权本地目录中的已有项目。
 6. 提交任务，查看进展与验证结果，在“变更”中审核并接受修改。
 
 ### 4. 指定数据与工作区目录
@@ -301,7 +309,64 @@ Windows 原生 VS 2022 工程位于 `coolder/coolder.sln`，依赖 `third-party/
 | `--workspace` | 管理员授权的项目工作区 | 数据目录下的 `workspace/` |
 | `--html` | 前端静态资源目录 | 使用程序发现的前端资源；独立安装时可显式指定 |
 
-普通用户的工作区位于数据目录下的 `users/<账户 ID>/workspace/`。导入已有项目时填写工作区内相对路径，例如工作区为 `/work`、项目为 `/work/myapp` 时填写 `myapp`。自定义管理员工作区必须遵循数据目录与账户目录的路径隔离要求，建议使用专用项目目录。
+普通用户的默认工作区位于数据目录下的 `users/<账户 ID>/workspace/`。项目位置可按以下方式指定：
+
+| 方式 | 示例与行为 |
+| --- | --- |
+| 工作区相对路径 | 工作区为 `/work`、项目为 `/work/myapp` 时填写 `myapp` |
+| 本地绝对路径 | 填写 `/absolute/projects/myapp`，可位于默认工作区外 |
+| 选择目录 | 浏览运行 Coolder 的电脑上的目录并回填路径；新项目可选择空目录，或在父目录后追加新目录名 |
+
+管理员可以使用外部项目目录，普通用户需要管理员启用本地目录项目权限。外部目录中的代码仍由操作系统文件权限约束，不会因为导入自动获得独立副本。自定义管理员工作区须遵循数据与账户目录的隔离要求。
+
+### 5. 安装与停止服务
+
+在仓库根目录执行：
+
+```sh
+cmake --install coolder/build --prefix /absolute/coolder-install
+/absolute/coolder-install/bin/coolder \
+  --data /absolute/coolder-data \
+  --html /absolute/coolder-install/share/coolder/html
+```
+
+安装会将主程序与 `webcool-sandbox-helper` 放入同一 `bin/` 目录，并部署前端资源。运行目标项目所需的语言工具链仍需单独安装。用 `Ctrl+C` 停止前台服务；POSIX 平台也支持 `SIGTERM`。运行多个实例时使用不同端口和数据目录。
+
+Linux 上若使用启用了 io_uring 的 ACL 静态库，还需要对应的 liburing 开发库。可通过 `-DHAS_IO_URING=ON` 要求 CMake 检查依赖，或用 `-DAI_URING_LIBRARY=/absolute/path/to/liburing.a` 指定库。更多构建与代码规范说明见 [BUILD.md](BUILD.md)。
+
+## 任务实践
+
+一次任务尽量聚焦一个可验证目标，说明需要保持的接口、允许修改的范围和验收条件。例如：
+
+```text
+目标：给命令行程序增加可选的姓名参数。
+范围：修改参数解析、帮助信息和相关测试，保持无参数调用兼容。
+约束：不引入新的运行时依赖，不修改无关模块。
+验收：无参数时使用默认名称；空名称或多余参数返回非零退出码。
+交付：生成待审核修订，说明修改内容、执行的检查和未验证项。
+```
+
+阅读项目时可明确要求“只分析、不修改文件”；修复问题时提供复现步骤、实际结果、预期结果及日志。任务规模较大时先使用项目计划拆分模块，再逐项实现和验收。
+
+| 看到的结果 | 下一步 |
+| --- | --- |
+| 生成完成，但仍有待审核修订 | 查看差异后接受修改，才会写入正式项目 |
+| 构建通过 | 继续检查测试和具体需求；编译成功不能证明交互或业务行为正确 |
+| 验证未执行或环境不可用 | 检查工具链与策略，补齐环境后再验证 |
+| 文件版本冲突 | 对照当前源码重新审核，避免覆盖任务期间的外部编辑 |
+| 预算耗尽或任务中断 | 查看已保存成果与具体错误，有恢复入口时继续，必要时缩小任务范围 |
+
+## 常见问题
+
+| 问题 | 检查与处理 |
+| --- | --- |
+| 启动后页面打不开 | 查看进程是否仍在运行及启动日志；使用实际端口的 `http://127.0.0.1:端口`，不要替换为局域网地址 |
+| 提示找不到前端资源 | 显式传入 `--html`，指向构建源码的 `coolder/html` 或安装后的 `share/coolder/html` |
+| 模型列表为空或不能发送代码 | 由管理员配置并启用模型，同时允许发送项目代码；普通用户不能自行管理厂商配置 |
+| 外部目录不能创建或导入 | 检查绝对路径是否属于运行 Coolder 的电脑，以及本地目录项目权限和操作系统访问权限 |
+| 能生成源码但无法构建 | 确认相应工具链已安装、策略允许执行，并查看验证报告；必要时检查 helper 是否与主程序同目录 |
+| 修改前端脚本后页面没有变化 | 重新运行 `cmake --build coolder/build` 生成合并脚本，再刷新页面；不要直接修改 `coolder.js` |
+| 切换语言后编辑器菜单仍是原语言 | 刷新页面以重新加载 Monaco；未保存编辑请先完成保存 |
 
 ## 数据、权限与当前边界
 
@@ -310,10 +375,10 @@ Windows 原生 VS 2022 工程位于 `coolder/coolder.sln`，依赖 `third-party/
 - **登录与密钥**：登录使用 HttpOnly、SameSite=Strict Cookie；密码采用加盐 PBKDF2-HMAC-SHA256 保存；模型密钥加密存储。
 - **执行边界**：文件操作受授权目录约束，构建和运行复用 libai 沙盒能力；不开放任意 shell API。可执行语言与验证效果取决于本机环境。
 - **持久化与恢复**：服务重启后保留账户、策略、模型配置、项目、会话和运行记录，浏览器需要重新登录；检查点恢复不意味着所有中断任务都能无条件续跑，历史工具输出也受保留期限制。
-- **能力范围**：当前应用未接入共享目录、任意本地磁盘、邮件、文件备份或浏览器调试扩展；相关禁用设置不代表已提供这些能力。
-- **备份范围**：应备份整个数据目录、管理员外置工作区以及 libai 加密密钥文件；重要项目建议保留 Git 提交。
+- **能力范围**：当前应用支持受权限控制的本地项目目录；共享目录、邮件、文件备份和浏览器调试扩展尚未接入。libai 内部能力不等同于 Coolder 已开放的功能。
+- **备份范围**：应备份整个数据目录、所有账户使用的外部项目目录以及 libai 加密密钥文件；重要项目建议保留 Git 提交。
 
-当前仓库应用文档记录了 macOS 编译、本地模拟模型 HTTP 集成测试及部分浏览器验收；尚未记录 Linux/Windows 实际构建运行及真实外部模型的完整验证。跨平台构建配置和模型协议适配不等同于所有环境已完成验收。
+仓库包含 macOS/Linux 构建配置、Windows VS 工程及本地模拟模型测试。应用文档记录了 macOS 编译与部分浏览器验收，但没有覆盖所有平台、工具链和外部模型组合的统一验收报告。部署时应在目标环境运行验证；构建配置或协议适配本身不代表测试通过。
 
 ## 仓库结构与二次开发
 
@@ -364,6 +429,7 @@ node coolder/tests/run_progress_test.js
 
 这些 HTTP 集成测试使用临时目录与本地模拟模型，不需要真实 API Key。测试命令及覆盖范围说明不代表当前检出版本已在所有平台完成验证。
 
+- [构建与贡献规范](BUILD.md)：依赖构建、C++ 格式、函数与文件规模、接口注释检查。
 - [应用使用与部署说明](coolder/README.md)：账户、API、编辑器、附件、Windows 构建和安装细节。
 - [libai 独立库说明](libai/README.md)：模块边界、SDK 构建、安装与集成。
 - [libai 设计文档索引](libai/docs/README.md)：运行时、工作区、验证及重构记录；部分文档保留原宿主路径，应结合当前仓库结构阅读。
@@ -386,9 +452,11 @@ Coolder 使用 [MIT License](LICENSE)。ACL、OpenSSL、zlib 和 Monaco Editor �
 
 Coolder reads and searches source files, proposes changes across multiple files, and attempts builds and repairs in an isolated draft. You review the changes before applying them to the project. The application uses **C++17, an ACL coroutine HTTP server, and a native web frontend**, with its core coding capabilities provided by **libai**, a reusable static library.
 
+**On this page:** [Screenshots](#screenshots) · [Architecture](#architecture) · [Reasoning](#agent-reasoning-mechanism) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Task workflow](#task-workflow) · [Troubleshooting](#troubleshooting) · [Development](#development-checks-and-documentation)
+
 ## Key Features
 
-- **Work with real projects**: Create a project scaffold or import existing directories and Git repositories within an authorized workspace. Use project indexes, plans, and sessions to continue development.
+- **Work with real projects**: Create a project scaffold or import existing directories and Git repositories from a workspace or an authorized local path. Use project indexes, plans, and sessions to continue development.
 - **Models working with tools**: The agent reads files, searches code, inspects outlines, proposes patches, and invokes validation tools, then uses their results to guide subsequent steps.
 - **Build feedback and repair**: Incremental revisions are checked in an isolated draft. Compiler diagnostics feed back into the model to support an edit–validate–repair loop.
 - **Reviewable changes**: AI revisions are staged for diff review. Accept or reject individual changes, or accept and apply all pending changes together.
@@ -556,7 +624,7 @@ This description reflects the current source implementation; it is not a compara
 
 ### Project Management and Planning
 
-- Create project scaffolds or import existing directories and Git repositories using paths relative to the workspace.
+- Create project scaffolds or import existing directories and Git repositories using workspace-relative paths or local absolute paths subject to permission checks.
 - Browse project files, read and search source code, and refresh the project index.
 - Generate module and task plans, save plan versions, and update task status.
 - Organize sessions and historical runs by project, continue conversations, and export sessions.
@@ -584,6 +652,12 @@ On macOS/Linux, a project-root `build.sh` can run in the sandbox when an authori
 - Manual edits require a diff preview and confirmation before saving. AI changes can be accepted or rejected individually, or applied together.
 - Saving and review check file versions to detect concurrent changes. Closing a file with unsaved edits prompts for confirmation.
 - Editor resources and language workers are served locally without a CDN. External LSP integration is not currently provided.
+
+### Interface Language and Personal Settings
+
+Open Personal settings to select 中文, English, 日本語, or 한국어 and adjust colors and font size. Preferences are saved per account. Application labels change after saving; Monaco's built-in menu language is selected when the editor first loads, so refresh the page after switching languages. Language settings do not translate source files, user input, or existing model output.
+
+Language packs can be extended using JSON templates and a manifest; see the [internationalization guide](coolder/html/i18n/README.md). The Chinese and English sections of this page use screenshots in their respective languages. Screenshots show the demo interface at capture time; layouts and options may change in later versions.
 
 ### Conversations and Attachments
 
@@ -660,7 +734,7 @@ The native Visual Studio 2022 solution is `coolder/coolder.sln`, with dependenci
 2. Open the model provider settings in the administration console and configure the protocol, endpoint, model, and API key.
 3. Enable the model and allow project code to be sent to it, then save and test the connection.
 4. Review available toolchains, permissions, task quotas, and timeouts in the agent settings.
-5. Create a project or import an existing project within the current account's workspace.
+5. Create a project or import an existing project from the workspace or an authorized local directory.
 6. Submit a task, inspect progress and validation results, then review and accept revisions in the changes view.
 
 ### 4. Set Data and Workspace Directories
@@ -679,7 +753,64 @@ The native Visual Studio 2022 solution is `coolder/coolder.sln`, with dependenci
 | `--workspace` | Authorized project workspace for the administrator | `workspace/` under the data directory |
 | `--html` | Frontend static assets | Uses discovered frontend assets; can be set explicitly for a standalone installation |
 
-Regular users have workspaces under `users/<account ID>/workspace/` in the data directory. Import projects using a workspace-relative path: for workspace `/work` and project `/work/myapp`, enter `myapp`. A custom administrator workspace must satisfy the path isolation requirements for data and account directories; a dedicated project directory is recommended.
+Regular users have default workspaces under `users/<account ID>/workspace/` in the data directory. Project locations support these options:
+
+| Method | Example and behavior |
+| --- | --- |
+| Workspace-relative path | For workspace `/work` and project `/work/myapp`, enter `myapp` |
+| Local absolute path | Enter `/absolute/projects/myapp`, which may be outside the default workspace |
+| Directory picker | Browse directories on the computer running Coolder and populate the path; for a new project, choose an empty directory or append a new directory name to a parent path |
+
+Administrators can use external project directories. Regular users need the administrator to enable local-directory project access. Operating-system file permissions still apply, and importing an external directory does not create an isolated copy of its source files. Custom administrator workspaces must satisfy data and account directory isolation requirements.
+
+### 5. Install and Stop the Service
+
+Run from the repository root:
+
+```sh
+cmake --install coolder/build --prefix /absolute/coolder-install
+/absolute/coolder-install/bin/coolder \
+  --data /absolute/coolder-data \
+  --html /absolute/coolder-install/share/coolder/html
+```
+
+Installation places the executable and `webcool-sandbox-helper` in the same `bin/` directory and deploys frontend assets. Language toolchains for target projects must still be installed separately. Use `Ctrl+C` to stop the foreground service; POSIX platforms also support `SIGTERM`. Use separate ports and data directories for multiple instances.
+
+On Linux, an ACL static library built with io_uring requires the corresponding liburing development library. Use `-DHAS_IO_URING=ON` to require a CMake dependency check, or `-DAI_URING_LIBRARY=/absolute/path/to/liburing.a` to specify a library. See [BUILD.md](BUILD.md) for further build instructions and code conventions.
+
+## Task Workflow
+
+Keep each task focused on a verifiable goal. Specify interfaces to preserve, the allowed scope, and acceptance criteria. For example:
+
+```text
+Goal: Add an optional name argument to the command-line program.
+Scope: Update argument parsing, help text, and related tests; preserve no-argument usage.
+Constraints: Add no runtime dependencies and leave unrelated modules unchanged.
+Acceptance: Use a default name without arguments; return a nonzero exit code for an empty name or extra arguments.
+Delivery: Produce revisions for review and explain changes, executed checks, and unverified items.
+```
+
+For code exploration, explicitly request analysis without file changes. For a defect, provide reproduction steps, actual and expected behavior, and logs. For larger tasks, use project planning to split modules before implementing and verifying them individually.
+
+| Observed result | Next step |
+| --- | --- |
+| Generation finished with pending revisions | Inspect diffs and accept changes before they are written to the project |
+| Build passed | Check tests and specific requirements; compilation does not establish correct interaction or business behavior |
+| Validation did not run or the environment is unavailable | Check toolchains and policy, prepare the environment, and validate again |
+| File version conflict | Review against current source to avoid overwriting external edits made during the task |
+| Budget exhausted or task interrupted | Inspect saved work and the specific error, resume when available, or narrow the task scope |
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| The page will not open after startup | Check the process and startup log; use `http://127.0.0.1:port` with the actual port rather than a LAN address |
+| Frontend assets cannot be found | Set `--html` to the source tree's `coolder/html` or the installed `share/coolder/html` directory |
+| No models are listed or code cannot be sent | An administrator must configure and enable a model and permit project code transmission; regular users cannot manage provider settings |
+| An external directory cannot be created or imported | Check that the absolute path is on the computer running Coolder, local-directory project access is allowed, and OS permissions permit access |
+| Code generation works but builds do not | Check the installed toolchain, execution policy, and validation report; verify that the helper is alongside the executable when needed |
+| Frontend source edits are not visible | Run `cmake --build coolder/build` to regenerate the bundled script and refresh the page; do not edit `coolder.js` directly |
+| Editor menus remain in the previous language | Refresh the page to reload Monaco; save pending edits first |
 
 ## Data, Permissions, and Current Limitations
 
@@ -688,10 +819,10 @@ Regular users have workspaces under `users/<account ID>/workspace/` in the data 
 - **Authentication and secrets**: Login uses HttpOnly, SameSite=Strict cookies. Passwords use salted PBKDF2-HMAC-SHA256, and model API keys are encrypted at rest.
 - **Execution boundaries**: File operations stay within authorized directories. Builds and execution use libai's sandbox capabilities; there is no arbitrary shell API. Language execution and validation depend on the local environment.
 - **Persistence and recovery**: Accounts, policies, model configuration, projects, sessions, and run records persist across restarts. Browser sessions require a new login. Checkpoints do not guarantee recovery of every interrupted task, and historical tool output is subject to retention limits.
-- **Application scope**: Shared directories, arbitrary local disks, email, file backup, and browser debugging extensions are not integrated into this application. Disabled settings do not indicate available capabilities.
-- **Backups**: Back up the entire data directory, any external administrator workspace, and libai encryption key files. Keep Git commits for important projects.
+- **Application scope**: Local project directories are supported with permission checks. Shared directories, email, file backup, and browser debugging extensions are not integrated. Internal libai capabilities do not necessarily represent features exposed by Coolder.
+- **Backups**: Back up the entire data directory, external project directories used by all accounts, and libai encryption key files. Keep Git commits for important projects.
 
-The application documentation records macOS builds, HTTP integration tests with local mock models, and some browser acceptance checks. It does not yet record actual Linux/Windows build and runtime verification or complete validation with real external models. Cross-platform build configuration and protocol adapters do not establish that all environments have been validated.
+The repository includes macOS/Linux build configuration, a Windows Visual Studio solution, and local mock-model tests. Application documentation records macOS builds and some browser acceptance checks, but there is no unified acceptance report covering every platform, toolchain, and external model combination. Validate in the target environment; configuration and protocol support alone do not establish a passing test result.
 
 ## Repository Layout and Integration
 
@@ -744,6 +875,7 @@ The HTTP integration tests use temporary directories and local mock models witho
 
 The following supporting documents are currently in Chinese:
 
+- [Build and contribution conventions](BUILD.md): Dependency builds, C++ formatting, function and file size limits, and interface comment checks.
 - [Application and deployment guide](coolder/README.md): Accounts, APIs, editor, attachments, Windows builds, and installation.
 - [libai library guide](libai/README.md): Module boundaries, SDK builds, installation, and integration.
 - [libai design documentation](libai/docs/README.md): Runtime, workspaces, validation, and refactoring notes. Some documents retain original host paths; interpret them in the context of the current repository layout.
