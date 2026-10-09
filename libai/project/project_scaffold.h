@@ -3,8 +3,10 @@
 #include <string>
 #include <vector>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 class agent_workspace_t;
 
@@ -21,10 +23,12 @@ struct project_scaffold_result_t {
 // Creates a minimal project without invoking npm, pip, Maven, Gradle or any
 // other external package manager. The selected language runtime is needed only
 // when the user later builds or runs the generated project.
-bool create_project_scaffold(agent_workspace_t& workspace,
-	const std::string& project_path, const std::string& language,
-	const std::string& platform, project_scaffold_result_t& result,
-	std::string& err);
+bool create_project_scaffold(agent_workspace_t &workspace,
+			     const std::string &project_path,
+			     const std::string &language,
+			     const std::string &platform,
+			     project_scaffold_result_t &result,
+			     std::string &err);
 
 } // namespace ai
 } // namespace webcool

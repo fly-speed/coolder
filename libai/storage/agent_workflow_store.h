@@ -4,8 +4,10 @@
 #include <string>
 #include <vector>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 struct agent_workflow_diagnostic_t {
 	std::string path;
@@ -29,19 +31,21 @@ struct agent_workflow_checkpoint_t {
 
 class agent_workflow_store_t {
 public:
-	explicit agent_workflow_store_t(const std::string& user_root);
-	bool save(const agent_workflow_checkpoint_t& checkpoint,
-		std::string& err) const;
-	bool load(const std::string& project_id, const std::string& session_id,
-		const std::string& task_id, agent_workflow_checkpoint_t& checkpoint,
-		bool& found, std::string& err) const;
-	bool remove(const std::string& project_id, const std::string& session_id,
-		const std::string& task_id, std::string& err) const;
+	explicit agent_workflow_store_t(const std::string &user_root);
+	bool save(const agent_workflow_checkpoint_t &checkpoint,
+		  std::string &err) const;
+	bool load(const std::string &project_id, const std::string &session_id,
+		  const std::string &task_id,
+		  agent_workflow_checkpoint_t &checkpoint, bool &found,
+		  std::string &err) const;
+	bool remove(const std::string &project_id,
+		    const std::string &session_id, const std::string &task_id,
+		    std::string &err) const;
 	// Removes orphanable AI metadata only. Project source is never touched.
-	bool remove_for_project(const std::string& project_id, size_t& removed,
-		std::string& err) const;
-	bool remove_for_session(const std::string& session_id, size_t& removed,
-		std::string& err) const;
+	bool remove_for_project(const std::string &project_id, size_t &removed,
+				std::string &err) const;
+	bool remove_for_session(const std::string &session_id, size_t &removed,
+				std::string &err) const;
 
 private:
 	std::string user_root_;

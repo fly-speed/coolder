@@ -5,8 +5,10 @@
 #include <string>
 #include <vector>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 enum agent_progress_decision_t {
 	agent_progress_continue,
@@ -21,20 +23,23 @@ class agent_progress_supervisor_t {
 public:
 	explicit agent_progress_supervisor_t(size_t max_no_progress_calls);
 
-	agent_progress_decision_t observe(const std::string& signature,
-		bool tool_succeeded, bool draft_changed);
-	agent_progress_decision_t observe_many(const std::vector<std::string>& signatures,
-		bool tool_succeeded, bool draft_changed);
+	agent_progress_decision_t observe(const std::string &signature,
+					  bool tool_succeeded,
+					  bool draft_changed);
+	agent_progress_decision_t
+	observe_many(const std::vector<std::string> &signatures,
+		     bool tool_succeeded, bool draft_changed);
 	// Legacy recovery entry point; resets rather than guessing prior stagnation.
 	void prime_recovered_read_only_loop();
 	// Stop on the second occurrence of an unresolved proposal precondition.
 	// Reads do not repair preconditions; a changed draft or external review resets them.
-	bool observe_proposal_failures(const std::vector<std::string>& causes, bool draft_changed);
+	bool observe_proposal_failures(const std::vector<std::string> &causes,
+				       bool draft_changed);
 	// A user review can update the formal workspace while a provider request is
 	// in flight. Begin a fresh observation window after rebasing that draft.
 	void reset_after_external_progress();
 	// Compaction may evict source pages; rereading those is useful evidence.
-	void retain_read_observations(const std::vector<std::string>& retained);
+	void retain_read_observations(const std::vector<std::string> &retained);
 	size_t consecutive_no_progress() const;
 	// Counts actual native calls, independently of new observations/compaction.
 	void observe_investigation(size_t tool_calls, bool draft_changed);

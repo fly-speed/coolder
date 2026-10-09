@@ -4,8 +4,10 @@
 
 #include <string>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 // Server-wide policy controlled only by an administrator. It deliberately
 // contains no provider credentials and is shared by every agent type.
@@ -78,10 +80,10 @@ struct ai_admin_policy_t {
 
 class ai_admin_policy_store_t {
 public:
-	explicit ai_admin_policy_store_t(const std::string& upload_root);
-	bool load(ai_admin_policy_t& policy, std::string& err) const;
-	bool save(const ai_admin_policy_t& policy, std::string& err) const;
-	static bool validate(const ai_admin_policy_t& policy, std::string& err);
+	explicit ai_admin_policy_store_t(const std::string &upload_root);
+	bool load(ai_admin_policy_t &policy, std::string &err) const;
+	bool save(const ai_admin_policy_t &policy, std::string &err) const;
+	static bool validate(const ai_admin_policy_t &policy, std::string &err);
 
 private:
 	std::string upload_root_;
@@ -90,13 +92,13 @@ private:
 // The HTTP permission gate refreshes this process snapshot from disk. Lower
 // layers use it without depending on HTTP/action code, so future agents inherit
 // the same policy mechanism.
-void ai_runtime_policy_set(const ai_admin_policy_t& policy);
+void ai_runtime_policy_set(const ai_admin_policy_t &policy);
 ai_admin_policy_t ai_runtime_policy_get();
-bool ai_agent_access_allowed(const ai_admin_policy_t& policy, bool admin);
-bool ai_language_tool_enabled(const std::string& language);
-bool ai_extra_sensitive_path(const std::string& normalized_path);
-unsigned long ai_tool_call_limit_for_mode(const ai_admin_policy_t& policy,
-	const std::string& mode);
+bool ai_agent_access_allowed(const ai_admin_policy_t &policy, bool admin);
+bool ai_language_tool_enabled(const std::string &language);
+bool ai_extra_sensitive_path(const std::string &normalized_path);
+unsigned long ai_tool_call_limit_for_mode(const ai_admin_policy_t &policy,
+					  const std::string &mode);
 
 } // namespace ai
 } // namespace webcool

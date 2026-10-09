@@ -2,8 +2,10 @@
 
 #include <string>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 struct workspace_patch_preview_t {
 	// Random one-time plan ID; hashes bind the preview to both file versions.
@@ -26,13 +28,13 @@ struct workspace_patch_result_t {
 // directly: the browser first creates a diff preview, then confirms its ID.
 class workspace_patch_store_t {
 public:
-	explicit workspace_patch_store_t(const std::string& user_root);
+	explicit workspace_patch_store_t(const std::string &user_root);
 
-	bool create(const std::string& relative_file,
-		const std::string& proposed_content,
-		workspace_patch_preview_t& preview, std::string& err) const;
-	bool apply(const std::string& patch_id,
-		workspace_patch_result_t& result, std::string& err) const;
+	bool create(const std::string &relative_file,
+		    const std::string &proposed_content,
+		    workspace_patch_preview_t &preview, std::string &err) const;
+	bool apply(const std::string &patch_id,
+		   workspace_patch_result_t &result, std::string &err) const;
 
 private:
 	std::string user_root_;

@@ -5,8 +5,10 @@
 #include <string>
 #include <vector>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 struct sandbox_limits_t {
 	// Independent wall-clock limit enforced by the broker.
@@ -77,41 +79,41 @@ struct sandbox_result_t {
 // server never performs complex sandbox setup between fork and exec.
 class program_sandbox_t {
 public:
-	program_sandbox_t(const std::string& user_root,
-		const std::string& project_path,
-		const std::vector<sandbox_command_t>& commands,
-		const sandbox_limits_t& limits = sandbox_limits_t(),
-		const std::string& helper_executable = "",
-        const std::vector<std::string>& readonly_roots = {});
+	program_sandbox_t(const std::string &user_root,
+			  const std::string &project_path,
+			  const std::vector<sandbox_command_t> &commands,
+			  const sandbox_limits_t &limits = sandbox_limits_t(),
+			  const std::string &helper_executable = "",
+			  const std::vector<std::string> &readonly_roots = {});
 
-	bool validate(const sandbox_request_t& request, std::string& err) const;
-	bool execute(const sandbox_request_t& request,
-		sandbox_result_t& result,
-		const std::atomic<bool>* cancel_requested = NULL,
-        const std::function<bool()>& should_cancel = {}) const;
+	bool validate(const sandbox_request_t &request, std::string &err) const;
+	bool execute(const sandbox_request_t &request, sandbox_result_t &result,
+		     const std::atomic<bool> *cancel_requested = NULL,
+		     const std::function<bool()> &should_cancel = {}) const;
 
 	// Fail-closed capability probe. A false result must never fall back to an
 	// ordinary child process.
-	static bool backend_available(std::string& reason);
+	static bool backend_available(std::string &reason);
 
 	// Read-only check of the trusted browser distribution beside the helper
 	// on POSIX, or beside the application on Windows.
 	// An empty engine directory is not an installed runtime. No browser starts.
-	static bool browser_runtime_available(std::string& reason,
-		const std::string& helper_executable = "");
+	static bool
+	browser_runtime_available(std::string &reason,
+				  const std::string &helper_executable = "");
 
 private:
-	bool resolve_request(const sandbox_request_t& request,
-		std::string& project_root, std::string& workdir,
-		const sandbox_command_t*& command,
-		std::string& err) const;
+	bool resolve_request(const sandbox_request_t &request,
+			     std::string &project_root, std::string &workdir,
+			     const sandbox_command_t *&command,
+			     std::string &err) const;
 
 	std::string user_root_;
 	std::string project_path_;
 	std::vector<sandbox_command_t> commands_;
 	sandbox_limits_t limits_;
 	std::string helper_executable_;
-    std::vector<std::string> readonly_roots_;
+	std::vector<std::string> readonly_roots_;
 };
 
 } // namespace ai

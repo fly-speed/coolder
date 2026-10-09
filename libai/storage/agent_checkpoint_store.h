@@ -2,8 +2,10 @@
 
 #include <string>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 struct agent_checkpoint_t {
 	std::string response_state_mode = "auto";
@@ -28,14 +30,15 @@ struct agent_checkpoint_t {
 
 class agent_checkpoint_store_t {
 public:
-	agent_checkpoint_store_t(const std::string& upload_root,
-		const std::string& user_root, const std::string& username);
+	agent_checkpoint_store_t(const std::string &upload_root,
+				 const std::string &user_root,
+				 const std::string &username);
 
-	bool save(const agent_checkpoint_t& checkpoint, std::string& err) const;
-	bool load(const std::string& run_id, agent_checkpoint_t& checkpoint,
-		std::string& err) const;
-	bool remove(const std::string& run_id, std::string& err) const;
-	bool exists(const std::string& run_id) const;
+	bool save(const agent_checkpoint_t &checkpoint, std::string &err) const;
+	bool load(const std::string &run_id, agent_checkpoint_t &checkpoint,
+		  std::string &err) const;
+	bool remove(const std::string &run_id, std::string &err) const;
+	bool exists(const std::string &run_id) const;
 
 private:
 	std::string upload_root_;

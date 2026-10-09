@@ -3,8 +3,10 @@
 #include <string>
 #include <vector>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 struct agent_session_message_t {
 	std::string role;
@@ -44,37 +46,44 @@ struct agent_session_record_t {
 };
 
 // First nonempty sentence, bounded to the title storage limit (UTF-8 safe).
-std::string agent_session_task_title(const std::string& prompt);
+std::string agent_session_task_title(const std::string &prompt);
 
 class agent_session_store_t {
 public:
-	explicit agent_session_store_t(const std::string& user_root);
+	explicit agent_session_store_t(const std::string &user_root);
 
-	bool create(const std::string& title, const std::string& agent_id,
-		const std::string& provider_id, const std::string& project_path,
-		agent_session_record_t& record, std::string& err) const;
-	bool update_after_run(const std::string& id, const std::string& title,
-		const std::string& summary,
-		const std::string& last_run_id, const std::string& user_prompt,
-		const std::string& assistant_reply, const std::string& assistant_state,
-		const std::string& assistant_reasoning,
-		const std::string& completion_summary, long long duration_ms,
-		long long input_tokens, long long cached_input_tokens,
-		long long output_tokens, long long reasoning_tokens,
-		std::string& err) const;
-	bool get(const std::string& id, agent_session_record_t& record,
-		std::string& err) const;
-	bool list(size_t limit, std::vector<agent_session_record_t>& records,
-		std::string& err) const;
+	bool create(const std::string &title, const std::string &agent_id,
+		    const std::string &provider_id,
+		    const std::string &project_path,
+		    agent_session_record_t &record, std::string &err) const;
+	bool update_after_run(const std::string &id, const std::string &title,
+			      const std::string &summary,
+			      const std::string &last_run_id,
+			      const std::string &user_prompt,
+			      const std::string &assistant_reply,
+			      const std::string &assistant_state,
+			      const std::string &assistant_reasoning,
+			      const std::string &completion_summary,
+			      long long duration_ms, long long input_tokens,
+			      long long cached_input_tokens,
+			      long long output_tokens,
+			      long long reasoning_tokens,
+			      std::string &err) const;
+	bool get(const std::string &id, agent_session_record_t &record,
+		 std::string &err) const;
+	bool list(size_t limit, std::vector<agent_session_record_t> &records,
+		  std::string &err) const;
 	// Supplies the project-memory layer from recent conversations without ever
 	// crossing project or user boundaries. The caller still decides how much of
 	// each already-bounded summary enters a model prompt.
-	bool list_for_project(const std::string& project_path,
-		const std::string& exclude_session_id, size_t limit,
-		std::vector<agent_session_record_t>& records, std::string& err) const;
-	bool remove(const std::string& id, std::string& err) const;
-	bool remove_for_project(const std::string& project_path,
-		size_t& removed_count, std::string& err) const;
+	bool list_for_project(const std::string &project_path,
+			      const std::string &exclude_session_id,
+			      size_t limit,
+			      std::vector<agent_session_record_t> &records,
+			      std::string &err) const;
+	bool remove(const std::string &id, std::string &err) const;
+	bool remove_for_project(const std::string &project_path,
+				size_t &removed_count, std::string &err) const;
 
 private:
 	std::string user_root_;

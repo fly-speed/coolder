@@ -3,8 +3,10 @@
 #include <string>
 #include <vector>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 // Provider-independent tool request produced by either native function calling
 // or the fallback JSON protocol. Paths are relative to the authenticated user's
@@ -21,7 +23,8 @@ struct agent_tool_request_t {
 	// Used by workspace.create/workspace.propose. The latter only creates a
 	// review proposal and never overwrites the formal project file directly.
 	std::string content;
-	bool content_present = false; // Explicit JSON string, including an intentional empty deletion.
+	bool content_present =
+		false; // Explicit JSON string, including an intentional empty deletion.
 };
 
 // A model proposal remains outside the formal project until server-side
@@ -79,8 +82,8 @@ struct agent_protocol_message_t {
 
 // Returns false when the model did not emit the structured WebCool protocol.
 // Callers may safely treat that output as a plain final response.
-bool parse_agent_protocol_message(const std::string& raw,
-	agent_protocol_message_t& message);
+bool parse_agent_protocol_message(const std::string &raw,
+				  agent_protocol_message_t &message);
 
 } // namespace ai
 } // namespace webcool

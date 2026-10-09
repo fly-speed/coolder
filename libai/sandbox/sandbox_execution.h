@@ -4,8 +4,10 @@
 
 #include <string>
 
-namespace webcool {
-namespace ai {
+namespace webcool
+{
+namespace ai
+{
 
 struct sandbox_execution_plan_t {
 	// 128-bit random ID. The command and limits are a server-created snapshot.
@@ -42,24 +44,26 @@ struct sandbox_run_history_t {
 // API keys or stdout/stderr.
 class sandbox_execution_store_t {
 public:
-	explicit sandbox_execution_store_t(const std::string& user_root);
+	explicit sandbox_execution_store_t(const std::string &user_root);
 
-	bool create(const std::string& project_path,
-		const std::string& command_id,
-		sandbox_execution_plan_t& plan, std::string& err) const;
+	bool create(const std::string &project_path,
+		    const std::string &command_id,
+		    sandbox_execution_plan_t &plan, std::string &err) const;
 	// consume() atomically removes authorization before revalidation, so failed
 	// or interrupted execution cannot replay a previously confirmed plan.
-	bool consume(const std::string& plan_id,
-		sandbox_execution_plan_t& plan, std::string& err) const;
-	bool audit_started(const sandbox_execution_plan_t& plan,
-		std::string& err) const;
-	bool audit_finished(const sandbox_execution_plan_t& plan,
-		const sandbox_result_t& result, std::string& err) const;
+	bool consume(const std::string &plan_id, sandbox_execution_plan_t &plan,
+		     std::string &err) const;
+	bool audit_started(const sandbox_execution_plan_t &plan,
+			   std::string &err) const;
+	bool audit_finished(const sandbox_execution_plan_t &plan,
+			    const sandbox_result_t &result,
+			    std::string &err) const;
 	// Reconstructs newest-first run metadata. A started record without a matching
 	// finish record is reported as interrupted after the process-local task is
 	// gone (for example, following a service restart).
 	bool list_history(size_t limit,
-		std::vector<sandbox_run_history_t>& runs, std::string& err) const;
+			  std::vector<sandbox_run_history_t> &runs,
+			  std::string &err) const;
 
 	static long long lifetime_seconds();
 

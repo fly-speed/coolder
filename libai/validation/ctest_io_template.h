@@ -1,7 +1,11 @@
 #pragma once
-namespace webcool { namespace ai {
-inline const char* ctest_registration_template() {
-    return R"WEBCOOL(# Fixed registration for webcool_io_test.cmake. Requires CMake 3.16.
+namespace webcool
+{
+namespace ai
+{
+inline const char *ctest_registration_template()
+{
+	return R"WEBCOOL(# Fixed registration for webcool_io_test.cmake. Requires CMake 3.16.
 include_guard(GLOBAL)
 set(_WEBCOOL_IO_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/webcool_io_test.cmake")
 function(webcool_add_io_test)
@@ -35,8 +39,9 @@ function(webcool_add_io_test)
 endfunction()
 )WEBCOOL";
 }
-inline const char* ctest_io_template() {
-    return R"WEBCOOL(# Reusable CTest stdin/stdout check; no shell or nested CMake process.
+inline const char *ctest_io_template()
+{
+	return R"WEBCOOL(# Reusable CTest stdin/stdout check; no shell or nested CMake process.
 # add_test(NAME cli_io COMMAND "${CMAKE_COMMAND}"
 #   "-DAPP=$<TARGET_FILE:your_target>"
 #   "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/input.txt"
@@ -129,4 +134,5 @@ if(verification_failed)
 endif()
 )WEBCOOL";
 }
-} }
+}
+}
