@@ -174,6 +174,16 @@ void build_project_plan_template(const std::string &project_path,
 {
 	modules.clear();
 	tasks.clear();
+	if (language == "html") {
+		goal = "使用 HTML、CSS 和 JavaScript 开发可直接在浏览器打开的静态页面，无需后端或构建工具。";
+		modules.push_back(module("page", "静态页面", "presentation", project_path));
+		agent_project_task_t page = task("implement-page", "实现页面结构、样式与交互", "page");
+		page.acceptance_criteria.push_back("index.html 正确引用 style.css 和 script.js");
+		page.acceptance_criteria.push_back("页面在桌面与窄屏下均可使用，交互支持键盘操作");
+		page.test_plan.push_back("直接用浏览器打开 index.html，验证样式、按钮交互和控制台错误");
+		tasks.push_back(page);
+		return;
+	}
 	goal = "以" + language + "开发可模块化、可测试、可调试且可预测的" +
 	    platform + "项目；每次只推进一个有明确验收标准的任务。";
 

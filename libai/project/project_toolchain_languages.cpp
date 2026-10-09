@@ -55,6 +55,18 @@ void discover_javascript_commands(agent_workspace_t &workspace,
     const ai_admin_policy_t &policy, project_toolchain_t &result,
     bool http_service)
 {
+	if (has_name(entries, normalized, "index.html")) {
+		add_language(result.detected_languages, "html");
+		if (has_relative_file(workspace, normalized, "script.js")
+			&& !has_name(entries, normalized, "package.json")) {
+			add_language(result.detected_languages, "javascript");
+			if (language_tool_enabled("javascript")) {
+				add_fixed_command(result, "javascript.syntax-check",
+					discover_language_executable("node", policy.node_executable_path),
+					std::vector<std::string>{"--check", "script.js"});
+			}
+		}
+	}
 	if (has_name(entries, normalized, "package.json")) {
 		add_language(result.detected_languages, "javascript");
 		result.unavailable_tools.push_back(

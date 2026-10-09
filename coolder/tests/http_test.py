@@ -157,6 +157,8 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         str(data),
         '--html',
         str(ROOT / 'html'),
+        '--log-file',
+        str(Path(temp) / 'server.log'),
     ]
     process = subprocess.Popen(command, stdout=log, stderr=log)
     try:
@@ -754,6 +756,31 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         )
         unchanged, _ = call('/api/v1/admin/ai-policy')
         assert all(unchanged[key] == value for key, value in policy_changes.items())
+        # Static pages work in both the workspace and an external directory.
+        for requested, physical in [
+            ('static-page', data / 'workspace/static-page'),
+            (str(Path(temp) / 'external page'), Path(temp) / 'external page'),
+        ]:
+            page, _ = call('/api/v1/ai/workspace/project/create', {
+                'path': requested, 'language': 'html', 'confirm': True,
+            })
+            assert page['language'] == 'html' and page['planning_available']
+            assert page['plan_seeded']
+            assert {p.name for p in physical.iterdir()} == {
+                'index.html', 'style.css', 'script.js', 'README.md',
+            }
+            html = (physical / 'index.html').read_text()
+            assert 'href="style.css"' in html and 'src="script.js"' in html
+            assert 'id="greeting-button"' in html and 'id="greeting"' in html
+            assert 'addEventListener' in (physical / 'script.js').read_text()
+            call('/api/v1/ai/workspace/read?path=' + quote(page['path'] + '/index.html'))
+            manifest, _ = call('/api/v1/ai/projects?id=' + page['project_id'])
+            assert manifest['language'] == 'html'
+            assert manifest['modules'][0]['path'] == page['path']
+            call('/api/v1/ai/workspace/project/create', {
+                'path': requested, 'language': 'html', 'confirm': True,
+            }, status=409)
+            assert (physical / 'index.html').read_text() == html
         # Absolute paths register bounded external roots, independent of workspace.
         directories, _ = call('/api/v1/ai/projects/directories?path=' + quote(temp))
         assert directories['path'] == str(Path(temp).resolve())

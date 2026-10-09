@@ -6,6 +6,12 @@
 #include <filesystem>
 #include <iostream>
 #include <csignal>
+#include <cstdio>
+#include <cerrno>
+#include <cstring>
+#ifdef _WIN32
+#include <io.h>
+#endif
 #ifndef _WIN32
 #include <sys/file.h>
 #include <fcntl.h>
@@ -109,14 +115,17 @@ static void accept_connections(acl::server_socket &server)
 	}
 }
 
-static bool parse_server_options(int argc, char **argv, unsigned &port)
+static bool parse_server_options(int argc, char **argv, unsigned &port,
+    std::string &log_file)
 {
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
 		if (arg == "--help") {
 			std::cout
 			    << "coolder [--port 18095] [--data DIR] [--workspace DIR] "
-			       "[--html DIR]\nMulti-user browser AI coding workspace.\n";
+			       "[--html DIR] [--log-file FILE]\n"
+			       "Multi-user browser AI coding workspace.\n"
+			       "Logs append to FILE (default: ./coolder.log in the current working directory).\n";
 			return false;
 		}
 		if (i + 1 >= argc) {
@@ -135,6 +144,8 @@ static bool parse_server_options(int argc, char **argv, unsigned &port)
 			coolder::data_dir = value;
 		} else if (arg == "--workspace") {
 			coolder::workspace_dir = value;
+		} else if (arg == "--log-file") {
+			log_file = value;
 		} else if (arg == "--html") {
 			coolder::html_dir = value;
 		} else {
@@ -145,14 +156,53 @@ static bool parse_server_options(int argc, char **argv, unsigned &port)
 	return true;
 }
 
+// Route ACL messages and standard output/error to the same append-only file.
+static void open_server_log(const std::string &filename)
+{
+	if (filename.empty() || filename.find('|') != std::string::npos)
+		throw std::runtime_error("invalid log file path");
+	const auto path = std::filesystem::absolute(std::filesystem::u8path(filename));
+#ifdef _WIN32
+	FILE *file = _wfopen(path.c_str(), L"a");
+#else
+	FILE *file = std::fopen(path.c_str(), "a");
+#endif
+	if (!file)
+		throw std::runtime_error("cannot open log file " + path.u8string() +
+		    ": " + std::strerror(errno));
+	std::cout.flush();
+	std::cerr.flush();
+	std::fflush(stdout);
+	std::fflush(stderr);
+#ifdef _WIN32
+	const int out = _dup2(_fileno(file), _fileno(stdout));
+	const int error = _dup2(_fileno(file), _fileno(stderr));
+#else
+	const int out = dup2(fileno(file), STDOUT_FILENO);
+	const int error = dup2(fileno(file), STDERR_FILENO);
+#endif
+	const int saved_errno = errno;
+	std::fclose(file);
+	if (out < 0 || error < 0)
+		throw std::runtime_error("cannot redirect output to log file: " +
+		    std::string(std::strerror(saved_errno)));
+	std::setvbuf(stdout, nullptr, _IOLBF, 0);
+	std::setvbuf(stderr, nullptr, _IONBF, 0);
+	logger_open(path.u8string().c_str(), "coolder");
+	logger("Logging to %s", path.u8string().c_str());
+}
+
 int main(int argc, char **argv)
 {
 	try {
 		unsigned port = 18095;
+		std::string log_file = "coolder.log";
 		coolder::data_dir = "var";
 		coolder::html_dir = COOLDER_HTML_DIR;
-		if (!parse_server_options(argc, argv, port))
+		if (!parse_server_options(argc, argv, port, log_file))
 			return 0;
+
+		open_server_log(log_file);
 
 		namespace fs = std::filesystem;
 		fs::create_directories(coolder::data_dir);
@@ -193,7 +243,7 @@ int main(int argc, char **argv)
 		std::signal(SIGINT, stop);
 		std::signal(SIGTERM, stop);
 		acl::acl_cpp_init();
-		acl::log::stdout_open(true);
+		acl::log::stdout_open(false);
 
 		// ACL dynamically resolves TLS; optional overrides support nonstandard
 		// installations.

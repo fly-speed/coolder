@@ -16,14 +16,14 @@ inline bool supported_project_language(const std::string &value)
 	    value == "python" || value == "java" || value == "go" ||
 	    value == "rust" || value == "objective-c" || value == "swift" ||
 	    value == "csharp" || value == "kotlin" || value == "php" ||
-	    value == "d";
+	    value == "d" || value == "html";
 }
 
 // Recognize a language toolchain supported by administrator configuration.
 inline bool supported_configurable_language_tool(const std::string &value)
 {
 	return supported_project_language(value) && value != "cpp" &&
-	    value != "c";
+	    value != "c" && value != "html";
 }
 
 // Recognize a supported project target platform.

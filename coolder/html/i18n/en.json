@@ -369,5 +369,6 @@
   "请选择用户": "Choose a user",
   "已加入项目": "Already a member",
   "没有匹配的用户": "No matching users",
-  "选择用户并设置权限。已加入项目或已停用的用户不可重复添加。": "Select a user and set their access. Existing members and disabled accounts cannot be added."
+  "选择用户并设置权限。已加入项目或已停用的用户不可重复添加。": "Select a user and set their access. Existing members and disabled accounts cannot be added.",
+  "静态页面（HTML/CSS/JS）": "Static page (HTML/CSS/JS)"
 }

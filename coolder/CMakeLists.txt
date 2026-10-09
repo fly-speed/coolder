@@ -57,6 +57,10 @@ install(DIRECTORY html/ DESTINATION share/coolder/html)
 enable_testing()
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+	add_test(NAME coolder_logging
+		COMMAND "${Python3_EXECUTABLE}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/tests/logging_test.py"
+			"$<TARGET_FILE:coolder>")
 	add_test(NAME coolder_project_sharing
 		COMMAND "${Python3_EXECUTABLE}"
 			"${CMAKE_CURRENT_SOURCE_DIR}/tests/project_sharing_test.py"

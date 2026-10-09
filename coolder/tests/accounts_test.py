@@ -19,7 +19,7 @@ def server(data, *options):
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
-    with tempfile.TemporaryFile(mode='w+') as log:
+    with tempfile.NamedTemporaryFile(mode='w+') as log:
         process = subprocess.Popen(
             [
                 sys.argv[1],
@@ -29,6 +29,8 @@ def server(data, *options):
                 str(port),
                 '--html',
                 str(ROOT / 'html'),
+                '--log-file',
+                log.name,
                 *options,
             ],
             stdout=log,
@@ -204,13 +206,15 @@ with tempfile.TemporaryDirectory(prefix='coolder-accounts-') as temp:
 
     # A damaged account database must never reopen public administrator setup.
     (legacy / 'auth/accounts.v1').write_text('corrupt database')
+    error_log = root / 'startup-errors.log'
     failed = subprocess.run(
-        [sys.argv[1], '--data', str(legacy), '--html', str(ROOT / 'html')],
+        [sys.argv[1], '--data', str(legacy), '--html', str(ROOT / 'html'),
+         '--log-file', str(error_log)],
         capture_output=True,
         text=True,
         timeout=10,
     )
-    assert failed.returncode != 0 and 'invalid account store' in failed.stderr
+    assert failed.returncode != 0 and 'invalid account store' in error_log.read_text()
     overlap = root / 'overlap'
     failed = subprocess.run(
         [
@@ -219,6 +223,8 @@ with tempfile.TemporaryDirectory(prefix='coolder-accounts-') as temp:
             str(overlap),
             '--workspace',
             str(overlap / 'users'),
+            '--log-file',
+            str(error_log),
             '--html',
             str(ROOT / 'html'),
         ],
@@ -227,7 +233,7 @@ with tempfile.TemporaryDirectory(prefix='coolder-accounts-') as temp:
         timeout=10,
     )
     assert (
-        failed.returncode != 0 and 'overlaps private account storage' in failed.stderr
+        failed.returncode != 0 and 'overlaps private account storage' in error_log.read_text()
     )
 
 print(
