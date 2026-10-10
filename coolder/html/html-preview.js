@@ -1,9 +1,17 @@
 'use strict';
 
 const htmlPreview = { version: 0, file: null, project: null, links: [] };
+// Window state belongs to the selected project, never the host application's storage.
+const htmlPreviewWindowStates = new WeakMap();
+function rememberHtmlPreviewWindowState(data) {
+  if (typeof data.windowName === 'string' && data.windowName.length <= 65536 && htmlPreview.project)
+    htmlPreviewWindowStates.set(htmlPreview.project, data.windowName);
+}
 function clearHtmlPreview() {
   ++htmlPreview.version;
   htmlPreview.links = [];
+  htmlPreview.pending?.remove();
+  htmlPreview.pending = null;
   $('html-preview-frame').removeAttribute('srcdoc');
 }
 function previewResourcePath(reference, source, root) {
@@ -24,8 +32,46 @@ async function replacePreviewAsync(text, pattern, replace) {
   }
   return text;
 }
+function stageHtmlPreview(content, sandbox, version, links, ready) {
+  const current = $('html-preview-frame');
+  const next = current.cloneNode(false);
+  next.removeAttribute('id');
+  next.setAttribute('sandbox', sandbox);
+  next.setAttribute('aria-hidden', 'true');
+  next.tabIndex = -1;
+  // Keep the same viewport while the next document loads, without blanking the old one.
+  Object.assign(next.style, {
+    position: 'absolute', visibility: 'hidden', pointerEvents: 'none',
+    width: current.getBoundingClientRect().width + 'px',
+    height: current.getBoundingClientRect().height + 'px', border: '0'
+  });
+  next.onload = () => {
+    if (version !== htmlPreview.version || htmlPreview.pending !== next) {
+      next.remove();
+      return;
+    }
+    next.onload = null;
+    const focused = document.activeElement === current;
+    current.removeAttribute('id');
+    next.id = 'html-preview-frame';
+    next.removeAttribute('style');
+    next.removeAttribute('aria-hidden');
+    next.removeAttribute('tabindex');
+    // Do not move the loaded iframe: moving it would reload its document.
+    current.remove();
+    htmlPreview.pending = null;
+    htmlPreview.links = links;
+    if (focused) next.focus();
+    ready();
+  };
+  next.srcdoc = content;
+  htmlPreview.pending = next;
+  current.before(next);
+}
 async function refreshHtmlPreview() {
-  clearHtmlPreview();
+  ++htmlPreview.version;
+  htmlPreview.pending?.remove();
+  htmlPreview.pending = null;
   const version = htmlPreview.version, warnings = new Set();
   const file = htmlPreview.file, project = htmlPreview.project;
   const markdown = CoolderMarkdown.isMarkdownName(file.path);
@@ -143,8 +189,20 @@ async function refreshHtmlPreview() {
       } catch { el.removeAttribute('href'); }
     }
     if (!markdown) {
+      // Restore before theme boot scripts run, so the first paint uses the saved theme.
+      const restoreState = doc.createElement('script');
+      restoreState.textContent = 'window.name = ' +
+        JSON.stringify(htmlPreviewWindowStates.get(project) || '') + ';';
+      doc.head.prepend(restoreState);
       const bridge = doc.createElement('script');
       bridge.textContent = `
+        function publishPreviewWindowState() {
+          parent.postMessage({ type: 'coolder-preview-state', version: ${version}, windowName: window.name }, '*');
+        }
+        for (const eventName of ['click', 'input', 'change', 'keyup']) {
+          document.addEventListener(eventName, () => queueMicrotask(publishPreviewWindowState), true);
+        }
+        window.addEventListener('load', publishPreviewWindowState);
         document.addEventListener('click', function(event) {
           if (event.defaultPrevented || event.button !== 0) return;
           const link = event.target.closest('a, area');
@@ -152,7 +210,7 @@ async function refreshHtmlPreview() {
           const index = link.getAttribute('data-coolder-preview-link');
           if (index !== null) {
             event.preventDefault();
-            parent.postMessage({ type: 'coolder-preview-link', version: ${version}, index: Number(index) }, '*');
+            parent.postMessage({ type: 'coolder-preview-link', version: ${version}, index: Number(index), windowName: window.name }, '*');
           }
         });
         window.addEventListener('DOMContentLoaded', function() {
@@ -193,11 +251,11 @@ async function refreshHtmlPreview() {
     policy.content = "default-src 'none'; script-src 'nonce-" + nonce + "'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'";
     doc.head.prepend(policy);
     if (version !== htmlPreview.version) return;
-    htmlPreview.links = links;
-    $('html-preview-frame').setAttribute('sandbox', markdown ? '' : 'allow-scripts');
-    $('html-preview-frame').srcdoc = '<!doctype html>\n' + doc.documentElement.outerHTML;
-    uiText($('html-preview-status'), () => warnings.size
-      ? t('部分资源无法预览：') + [...warnings].join(', ') : file.path);
+    stageHtmlPreview('<!doctype html>\n' + doc.documentElement.outerHTML,
+      markdown ? '' : 'allow-scripts', version, links, () => {
+        uiText($('html-preview-status'), () => warnings.size
+          ? t('部分资源无法预览：') + [...warnings].join(', ') : file.path);
+      });
   } catch (error) {
     if (version === htmlPreview.version) plainText($('html-preview-status'), error.message);
   }
@@ -246,9 +304,15 @@ $('html-preview-dialog').querySelector('.dialog-title').addEventListener('dblcli
 window.addEventListener('message', event => {
   if (event.source !== $('html-preview-frame').contentWindow || !$('html-preview-dialog').open) return;
   const data = event.data;
-  if (!data || data.type !== 'coolder-preview-link' || data.version !== htmlPreview.version || !Number.isInteger(data.index)) return;
+  if (!data || data.version !== htmlPreview.version) return;
+  if (data.type === 'coolder-preview-state') {
+    rememberHtmlPreviewWindowState(data);
+    return;
+  }
+  if (data.type !== 'coolder-preview-link' || !Number.isInteger(data.index)) return;
   const target = htmlPreview.links[data.index];
   if (!target) return;
+  rememberHtmlPreviewWindowState(data);
   htmlPreview.file = target;
   refreshHtmlPreview();
 });

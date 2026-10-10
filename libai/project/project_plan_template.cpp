@@ -181,6 +181,9 @@ void build_project_plan_template(const std::string &project_path,
 		page.acceptance_criteria.push_back("index.html 正确引用 style.css 和 script.js");
 		page.acceptance_criteria.push_back("页面在桌面与窄屏下均可使用，交互支持键盘操作");
 		page.test_plan.push_back("直接用浏览器打开 index.html，验证样式、按钮交互和控制台错误");
+		page.acceptance_criteria.push_back("生成页面应在用户要求的访问方式下独立运行，不能以预览器注入或模拟 DOM 测试代替实际浏览器验收");
+		page.test_plan.push_back("若涉及多页面主题、语言或状态：逐页验证正反切换、刷新和返回；分别测试干净存储及不同页面残留冲突旧值，并记录访问协议、初始状态、动作与实际结果");
+		page.test_plan.push_back("浏览器或指定访问方式不可用时明确标记交互未验证，不得仅因构建或脚本检查通过就报告功能已修复");
 		tasks.push_back(page);
 		return;
 	}

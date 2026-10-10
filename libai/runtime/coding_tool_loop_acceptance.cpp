@@ -129,6 +129,7 @@ void coding_tool_loop_t::finish_task_acceptance(bool completed)
 	evidence.add_bool("evidence_current_at_run_end", current);
 	evidence.add_bool("all_user_requirements_verified", false);
 	evidence.add_text("evidence_source", "runtime_fixed_validator");
+	bool browser_interaction_required = webcool::ai::needs_browser_interaction(original_prompt);
 	auto &coverage = json.create_array();
 	evidence.add_child("requirement_coverage", coverage);
 	acl::json contract(task_contract.c_str());
@@ -139,6 +140,8 @@ void coding_tool_loop_t::finish_task_acceptance(bool completed)
 		auto *request = item->is_object() ? item : item->get_obj();
 		if (!request)
 			continue;
+		browser_interaction_required = browser_interaction_required ||
+		    webcool::ai::needs_browser_interaction(json_text((*request)["text"]));
 		auto &requirement = coverage.add_child(false, true);
 		requirement.add_text(
 		    "request_id", json_text((*request)["id"]).c_str());
@@ -181,6 +184,12 @@ void coding_tool_loop_t::finish_task_acceptance(bool completed)
 	    (chinese ?
 	            "待验收：缺少当前版本的有效验证证据。" :
 	            "Acceptance pending: no valid evidence for the current revision.");
+	if (browser_interaction_required) {
+		evidence.add_text("browser_interaction_status",
+		    current && !browser_status.empty() ? browser_status.c_str() : "unverified");
+		evidence.add_text("direct_site_acceptance", "coverage_not_established");
+		summary += " " + webcool::ai::browser_evidence_summary(current, browser_status, chinese);
+	}
 	if (browser_evidence.enabled) {
 		refresh_browser_evidence();
 		evidence.add_bool("reversible_live_style_observed",

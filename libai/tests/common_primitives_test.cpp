@@ -113,6 +113,14 @@ int main()
 	assert(large_delivery.size() <= 4096 &&
 	    large_delivery.find("验证结论") != std::string::npos);
 
+	assert(needs_browser_interaction("HTML theme navigation"));
+	assert(needs_browser_interaction("选择深色后其它页面恢复浅色"));
+	assert(!needs_browser_interaction("修复 C++ 链接错误"));
+	assert(browser_evidence_summary(true, "disabled", true).find("未执行") != std::string::npos);
+	assert(browser_evidence_summary(false, "passed", true).find("待验收") != std::string::npos);
+	assert(browser_evidence_summary(true, "passed", true).find("只覆盖") != std::string::npos);
+	assert(browser_evidence_summary(true, "not-run", false).find("unverified") != std::string::npos);
+	assert(browser_evidence_summary(true, "failed", true).find("失败") != std::string::npos);
 	assert(task_acceptance_status(false, true, true, false, false) ==
 	    "pending_verification");
 	assert(task_acceptance_status(true, false, true, false, false) ==
