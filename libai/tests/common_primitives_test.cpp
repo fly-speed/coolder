@@ -1,3 +1,4 @@
+#include "provider/ai_provider_client_internal.h"
 #include "validation/task_acceptance.h"
 #include "context/task_delivery_summary.h"
 #include "storage/task_contract_store.h"
@@ -14,6 +15,57 @@
 using namespace webcool::ai;
 int main()
 {
+	// Cache counts must normalize to an inclusive input total, and zero hits
+	// must remain distinguishable from providers with no cache breakdown.
+	{
+		using namespace provider_detail;
+		completion_result_t result;
+		result.input_tokens = 100;
+		acl::json chat(R"({"prompt_cache_hit_tokens":70,"prompt_cache_miss_tokens":30})");
+		assert(chat.finish());
+		parse_chat_cache_usage(&chat.get_root(), result);
+		assert(result.input_tokens == 100 && result.cached_input_tokens == 70 && result.cache_usage_available);
+		acl::json zero(R"({"prompt_tokens_details":{"cached_tokens":0}})");
+		assert(zero.finish());
+		parse_chat_cache_usage(&zero.get_root(), result);
+		assert(result.cached_input_tokens == 0 && result.cache_usage_available);
+		acl::json absent(R"({"prompt_tokens":100})");
+		assert(absent.finish());
+		completion_result_t unknown;
+		parse_chat_cache_usage(&absent.get_root(), unknown);
+		assert(!unknown.cache_usage_available);
+		acl::json anthropic(R"({"input_tokens":10,"cache_read_input_tokens":70,"cache_creation_input_tokens":20,"output_tokens":5})");
+		assert(anthropic.finish());
+		parse_anthropic_usage(&anthropic.get_root(), result);
+		assert(result.input_tokens == 100 && result.cached_input_tokens == 70 && result.output_tokens == 5);
+		acl::json delta(R"({"output_tokens":8})");
+		assert(delta.finish());
+		parse_anthropic_usage(&delta.get_root(), result);
+		assert(result.input_tokens == 100 && result.cached_input_tokens == 70 && result.output_tokens == 8);
+		completion_result_t copied;
+		copied.cached_input_tokens = 70;
+		result.cached_input_tokens = 0;
+		copy_usage(result, copied);
+		assert(copied.cache_usage_available && copied.cached_input_tokens == 0);
+		provider_config_t provider;
+		provider.protocol = "openai_chat";
+		std::vector<streamed_tool_call_t> calls;
+		stream_diagnostics_t diagnostics;
+		std::string text, reasoning, error;
+		completion_result_t streamed;
+		assert(parse_stream_line(provider, R"(data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5,"prompt_cache_hit_tokens":70,"prompt_cache_miss_tokens":30}})",
+		    streamed, calls, text, reasoning, diagnostics, error));
+		assert(streamed.input_tokens == 100 && streamed.cached_input_tokens == 70 && streamed.cache_usage_available);
+		provider.protocol = "anthropic_messages";
+		streamed = completion_result_t();
+		assert(parse_stream_line(provider, R"(data: {"type":"message_start","message":{"usage":{"input_tokens":10,"cache_read_input_tokens":70,"cache_creation_input_tokens":20}}})",
+		    streamed, calls, text, reasoning, diagnostics, error));
+		assert(parse_stream_line(provider, R"(data: {"type":"message_delta","usage":{"output_tokens":8}})",
+		    streamed, calls, text, reasoning, diagnostics, error));
+		assert(streamed.input_tokens == 100 && streamed.cached_input_tokens == 70 && streamed.output_tokens == 8);
+
+	}
+
 	acl::json progress_input(R"({"items":[
         {"requirement":"显示蛇","status":"implemented","evidence":"已连接玩家坐标到绘制函数","remaining":"浏览器确认"},
         {"requirement":"显示食物","status":"partial","evidence":"已接收食物数据","remaining":"绘制尚未接入"},

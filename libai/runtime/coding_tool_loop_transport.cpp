@@ -297,7 +297,7 @@ bool coding_tool_loop_t::retry_interrupted_stream(
 		err = "agent run cancelled";
 		return false;
 	}
-	begin_runtime_model_stream(runtime_task);
+	log_model_request(turn);
 	update_runtime_progress(
 	    runtime_task, "model_retry", "", executed_tool_calls);
 	webcool::ai::completion_result_t retry_output;
@@ -313,6 +313,13 @@ bool coding_tool_loop_t::retry_interrupted_stream(
 	// Both requests may be billable. Preserve all usage and latency returned
 	// by the provider while keeping failed-attempt reasoning only in the
 	// separately accumulated reasoning transcript.
+	turn.has_retry_usage = true;
+	turn.retry_usage.input_tokens = retry_output.input_tokens;
+	turn.retry_usage.cached_input_tokens = retry_output.cached_input_tokens;
+	turn.retry_usage.cache_usage_available = retry_output.cache_usage_available;
+	turn.retry_usage.output_tokens = retry_output.output_tokens;
+	turn.retry_usage.reasoning_tokens = retry_output.reasoning_tokens;
+	turn.retry_usage.latency_ms = retry_output.latency_ms;
 	retry_output.input_tokens += interrupted_output.input_tokens;
 	retry_output.cached_input_tokens +=
 	    interrupted_output.cached_input_tokens;
@@ -375,6 +382,7 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 			turn.input.system_prompt += prompt_text(
 			    prompt_id::tool_arguments_repair, chinese);
 		err.clear();
+		log_model_request(turn);
 		model_call_completed = webcool::ai::provider_client_t::complete(
 		    provider, api_key, turn.input, turn.output, err, &observer);
 	}
@@ -409,7 +417,8 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 		    err, turn.output.incomplete_reason, actual_output_limit);
 		append_model_operation_event(runtime_task,
 		    "model_request_failed", turn.output, err,
-		    actual_output_limit);
+		    actual_output_limit,
+		    turn.has_retry_usage ? &turn.retry_usage : NULL);
 		// Preserve whatever the provider emitted before the body read failed.
 		// Some adapters cannot return it in `output`, while the stream observer
 		// has already accumulated the same visible reasoning for the browser.

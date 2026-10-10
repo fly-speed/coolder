@@ -118,7 +118,8 @@ void coding_tool_loop_t::record_model_response(coding_turn_t &turn)
 	    turn.output, std::string(),
 	    turn.output.effective_max_output_tokens > 0 ?
 	        turn.output.effective_max_output_tokens :
-	        turn.input.max_output_tokens);
+	        turn.input.max_output_tokens,
+	    turn.has_retry_usage ? &turn.retry_usage : NULL);
 	if (!turn.output.reasoning.empty() &&
 	    accumulated_reasoning.size() < 1024 * 1024) {
 		if (!accumulated_reasoning.empty() &&

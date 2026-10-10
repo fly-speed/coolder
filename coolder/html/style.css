@@ -2150,7 +2150,8 @@ html[data-ui-theme='ocean'] {
 }
 .run-progress ol {
   margin: 10px 0 0;
-  padding-left: 18px;
+  /* Keep multi-digit markers inside the scroll area at every font size. */
+  padding-inline-start: 3em;
   max-height: 190px;
   overflow: auto;
 }
@@ -2598,3 +2599,71 @@ button:disabled:hover {
 .code-vim-status { flex: 0 0 auto; min-height: 28px; padding: 4px 12px; border-top: 1px solid var(--border); background: var(--surface); color: var(--text); font: 13px/1.5 ui-monospace, monospace; }
 .code-vim-status input { width: auto; min-width: 120px; padding: 0 4px; border: 0; background: transparent; color: inherit; font: inherit; }
 #code-vim[aria-pressed='true'] { color: var(--accent); border-color: var(--accent); }
+
+.model-interactions {
+  margin: 0 18px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.model-interactions > summary { cursor: pointer; font-weight: 600; }
+.model-interactions > div { max-height: 520px; overflow: auto; }
+.model-interaction { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.model-interaction:last-child { border-bottom: 0; }
+.model-interaction details { margin: 8px 0; }
+.model-interaction summary { cursor: pointer; }
+.model-interaction pre, .model-interaction p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  margin: 8px 0;
+}
+.model-interaction small, .model-interaction time {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.message-usage {
+  display: block;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8em;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keep conversation navigation in the gutter beside the input box. */
+#conversation-panel .composer {
+  position: relative;
+  padding-right: max(52px, clamp(16px, 4cqi, 64px));
+}
+.conversation-scroll-actions {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.conversation-scroll-actions .icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.conversation-scroll-actions .icon-button:hover {
+  background: var(--hover);
+  color: var(--accent);
+}
+#conversation-panel .composer.collapsed { padding-right: 90px; }
+.composer.collapsed .conversation-scroll-actions { flex-direction: row; }

@@ -175,6 +175,7 @@ bool completion_call_t::initialize_request()
 	result.reasoning.clear();
 	result.input_tokens = 0;
 	result.cached_input_tokens = 0;
+	result.cache_usage_available = false;
 	result.output_tokens = 0;
 	result.reasoning_tokens = 0;
 	result.effective_max_output_tokens = 0;
@@ -392,6 +393,7 @@ bool completion_call_t::recover_reasoning_budget()
 		// Both attempts are billable and therefore both belong in usage/audit data.
 		result.input_tokens += exhausted.input_tokens;
 		result.cached_input_tokens += exhausted.cached_input_tokens;
+		result.cache_usage_available = result.cache_usage_available || exhausted.cache_usage_available;
 		result.output_tokens += exhausted.output_tokens;
 		result.reasoning_tokens += exhausted.reasoning_tokens;
 		result.latency_ms += exhausted.latency_ms;
@@ -735,6 +737,7 @@ void completion_call_t::merge_recovered_usage()
 		result.input_tokens += malformed_stream_result.input_tokens;
 		result.cached_input_tokens +=
 		    malformed_stream_result.cached_input_tokens;
+		result.cache_usage_available = result.cache_usage_available || malformed_stream_result.cache_usage_available;
 		result.output_tokens += malformed_stream_result.output_tokens;
 		result.reasoning_tokens +=
 		    malformed_stream_result.reasoning_tokens;

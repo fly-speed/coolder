@@ -262,19 +262,7 @@ static bool parse_anthropic_stream_event(completion_result_t &result,
 	acl::json_node *usage = json["usage"];
 	if (usage == NULL)
 		usage = object_child(json["message"], "usage");
-	const long long input_tokens =
-	    node_number(object_child(usage, "input_tokens"));
-	const long long output_tokens =
-	    node_number(object_child(usage, "output_tokens"));
-	if (input_tokens > 0)
-		result.input_tokens = input_tokens;
-	if (output_tokens > 0)
-		result.output_tokens = output_tokens;
-	const long long cached =
-	    node_number(object_child(usage, "cache_read_input_tokens"));
-	if (!(cached > 0))
-		return true;
-	result.cached_input_tokens = cached;
+	parse_anthropic_usage(usage, result);
 	return true;
 }
 
@@ -297,6 +285,7 @@ static bool parse_gemini_stream_event(const provider_config_t &provider,
 		    node_number(object_child(usage, "promptTokenCount"));
 		chunk.cached_input_tokens =
 		    node_number(object_child(usage, "cachedContentTokenCount"));
+		chunk.cache_usage_available = object_child(usage, "cachedContentTokenCount") != NULL;
 		chunk.output_tokens =
 		    node_number(object_child(usage, "candidatesTokenCount"));
 	}
@@ -422,8 +411,7 @@ static bool parse_chat_stream_event(completion_result_t &result,
 	result.input_tokens = node_number(object_child(usage, "prompt_tokens"));
 	result.output_tokens =
 	    node_number(object_child(usage, "completion_tokens"));
-	result.cached_input_tokens = node_number(object_child(
-	    object_child(usage, "prompt_tokens_details"), "cached_tokens"));
+	parse_chat_cache_usage(usage, result);
 	result.reasoning_tokens = node_number(
 	    object_child(object_child(usage, "completion_tokens_details"),
 	        "reasoning_tokens"));

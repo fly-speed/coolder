@@ -20,6 +20,9 @@ struct coding_turn_t {
 	webcool::ai::completion_request_t input{};
 	// Normalized provider completion for the current model turn.
 	webcool::ai::completion_result_t output{};
+	// Per-attempt telemetry before retry usage is merged into billable totals.
+	webcool::ai::completion_result_t retry_usage{};
+	bool has_retry_usage = false;
 	// Whether investigation requires a summary before more reads.
 	bool investigation_checkpoint{};
 	// Parsed model protocol message selecting a tool or final answer.

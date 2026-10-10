@@ -249,6 +249,7 @@ static bool parse_responses_completion(
 	    node_number(object_child(usage, "output_tokens"));
 	result.cached_input_tokens = node_number(object_child(
 	    object_child(usage, "input_tokens_details"), "cached_tokens"));
+	result.cache_usage_available = object_child(object_child(usage, "input_tokens_details"), "cached_tokens") != NULL;
 	result.reasoning_tokens = node_number(object_child(
 	    object_child(usage, "output_tokens_details"), "reasoning_tokens"));
 	return true;
@@ -281,12 +282,7 @@ bool parse_completion_json(const provider_config_t &provider, acl::json &json,
 			}
 		}
 		acl::json_node *usage = json["usage"];
-		result.input_tokens =
-		    node_number(object_child(usage, "input_tokens"));
-		result.output_tokens =
-		    node_number(object_child(usage, "output_tokens"));
-		result.cached_input_tokens =
-		    node_number(object_child(usage, "cache_read_input_tokens"));
+		parse_anthropic_usage(usage, result);
 	} else if (provider.protocol == "gemini_native") {
 		acl::json_node *candidate =
 		    first_array_item(json["candidates"]);
@@ -318,6 +314,7 @@ bool parse_completion_json(const provider_config_t &provider, acl::json &json,
 		    node_number(object_child(usage, "candidatesTokenCount"));
 		result.cached_input_tokens =
 		    node_number(object_child(usage, "cachedContentTokenCount"));
+		result.cache_usage_available = object_child(usage, "cachedContentTokenCount") != NULL;
 	} else {
 		acl::json_node *choice = first_array_item(json["choices"]);
 		const std::string finish_reason =
@@ -367,9 +364,7 @@ bool parse_completion_json(const provider_config_t &provider, acl::json &json,
 			    node_number(object_child(usage, "prompt_tokens"));
 			result.output_tokens = node_number(
 			    object_child(usage, "completion_tokens"));
-			result.cached_input_tokens = node_number(object_child(
-			    object_child(usage, "prompt_tokens_details"),
-			    "cached_tokens"));
+			parse_chat_cache_usage(usage, result);
 			result.reasoning_tokens = node_number(object_child(
 			    object_child(usage, "completion_tokens_details"),
 			    "reasoning_tokens"));
@@ -418,11 +413,41 @@ bool parse_completion(const provider_config_t &provider,
 	return false;
 }
 
+// Normalize cache-aware input totals to include both hits and misses.
+void parse_chat_cache_usage(acl::json_node *usage, completion_result_t &result)
+{
+	auto *hit = object_child(usage, "prompt_cache_hit_tokens");
+	auto *miss = object_child(usage, "prompt_cache_miss_tokens");
+	auto *cached = object_child(object_child(usage, "prompt_tokens_details"), "cached_tokens");
+	if (hit || miss || cached) {
+		result.cache_usage_available = true;
+		result.cached_input_tokens = hit ? node_number(hit) : cached ? node_number(cached) :
+		    std::max(0LL, result.input_tokens - node_number(miss));
+		if (hit && miss)
+			result.input_tokens = node_number(hit) + node_number(miss);
+	}
+}
+void parse_anthropic_usage(acl::json_node *usage, completion_result_t &result)
+{
+	auto *input = object_child(usage, "input_tokens");
+	auto *read = object_child(usage, "cache_read_input_tokens");
+	auto *write = object_child(usage, "cache_creation_input_tokens");
+	// message_delta can carry output only. Preserve the input from message_start.
+	if (input) result.input_tokens = node_number(input) + node_number(read) + node_number(write);
+	if (read || write) {
+		result.cache_usage_available = true;
+		if (read) result.cached_input_tokens = node_number(read);
+	}
+	if (auto *output = object_child(usage, "output_tokens"))
+		result.output_tokens = node_number(output);
+}
+
 void copy_usage(const completion_result_t &source, completion_result_t &target)
 {
+	target.cache_usage_available = target.cache_usage_available || source.cache_usage_available;
 	if (source.input_tokens > 0)
 		target.input_tokens = source.input_tokens;
-	if (source.cached_input_tokens > 0) {
+	if (source.cache_usage_available || source.cached_input_tokens > 0) {
 		target.cached_input_tokens = source.cached_input_tokens;
 	}
 	if (source.output_tokens > 0)
@@ -484,6 +509,7 @@ bool provider_client_t::parse_completion_response(
 	result.reasoning.clear();
 	result.input_tokens = 0;
 	result.cached_input_tokens = 0;
+	result.cache_usage_available = false;
 	result.output_tokens = 0;
 	result.reasoning_tokens = 0;
 	result.latency_ms = 0;

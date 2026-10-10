@@ -11,6 +11,7 @@ const state = {
   run: '',
   snapshot: null,
   progressView: null,
+  interactionsView: null,
   closedDiffs: new Set(),
   reviewFile: null,
   file: null,
@@ -140,13 +141,20 @@ function assistantDisplayText(value, streaming = false, depth = 0) {
     if (fenced) text = fenced[1].trim();
     else if (/^```json\s*\n/i.test(text)) text = text.replace(/^```json\s*\n/i, '').trim();
     if (!text) return '';
-    if (text[0] !== '{' && text[0] !== '[' && text[0] !== '"') return original;
+    if (text[0] !== '{' && text[0] !== '[' && text[0] !== '"') {
+      const embedded = assistantEmbeddedText(text, streaming, read, join);
+      return embedded === null ? original : embedded || pending();
+    }
     try {
       const parsed = JSON.parse(text);
       if (typeof parsed === 'string') return read(parsed);
       const result = assistantEnvelopeText(parsed, read, join);
       return result === null ? original : result || pending();
     } catch {
+      if (/^\{\s*"(?:type|object)"\s*:\s*"(?:final|answer|response|message|chat\.completion)"/.test(text)) {
+        const embedded = assistantEmbeddedText(text, streaming, read, join);
+        if (embedded !== null) return embedded || pending();
+      }
       // Incomplete streaming envelopes are protocol fragments, not chat prose.
       if (
         /^\{\s*"(?:type|object|choices|output|completion_summary|text|content|error)"\s*:/.test(
@@ -156,7 +164,7 @@ function assistantDisplayText(value, streaming = false, depth = 0) {
         /"(?:choices|completion_summary)"\s*:/.test(text) ||
         (streaming && /^(?:\{|\[|\{\s*"[\w]*"?)\s*$/.test(text))
       )
-        return pending();
+        return assistantPartialText(text, join) || pending();
       return original;
     }
   }
@@ -204,12 +212,26 @@ function assistantEnvelopeText(value, read, join) {
   if (
     ['final', 'answer', 'response'].includes(value.type) ||
     'completion_summary' in value ||
-    ('text' in value && ('changes' in value || 'tool_calls' in value))
+    (!value.type && ['text', 'summary', 'message', 'content'].some(key => typeof value[key] === 'string'))
   ) {
     const parts = [
       read(value.completion_summary || ''),
-      read(value.text || value.summary || value.message || '')
+      read(value.text || value.summary || value.message || value.content || '')
     ];
+    if (Array.isArray(value.requirement_progress)) {
+      const labels = { implemented: '已实现，待验收', partial: '部分完成',
+        not_implemented: '未完成', unknown: '无法确认' };
+      for (const item of value.requirement_progress) {
+        if (!item || typeof item.requirement !== 'string') continue;
+        const status = ['implemented', 'partial'].includes(item.status) && !item.evidence
+          ? 'unknown' : item.status;
+        parts.push(join([
+          item.requirement + '：' + t(labels[status] || labels.unknown),
+          typeof item.evidence === 'string' ? item.evidence : '',
+          typeof item.remaining === 'string' && item.remaining ? t('待办') + '：' + item.remaining : ''
+        ]));
+      }
+    }
     for (const key of ['warnings', 'next_steps']) {
       const item = value[key];
       if (typeof item === 'string') parts.push(read(item));
@@ -236,6 +258,93 @@ function assistantEnvelopeText(value, read, join) {
   return null;
 }
 
+// Scan quoted tokens instead of matching fields inside file bodies or tool arguments.
+function assistantJsonString(text, start) {
+  let end = start + 1;
+  while (end < text.length) {
+    if (text[end] === '\\') { end += 2; continue; }
+    if (text[end] === '"') {
+      try { return { value: JSON.parse(text.slice(start, end + 1)), end: end + 1, complete: true }; }
+      catch { return { value: '', end: end + 1, complete: false }; }
+    }
+    end++;
+  }
+  // A delta can end in the middle of an escape or a Unicode sequence.
+  let raw = text.slice(start + 1);
+  for (let trim = 0; trim <= Math.min(6, raw.length); trim++) {
+    try { return { value: JSON.parse('"' + raw.slice(0, raw.length - trim) + '"'), end: text.length, complete: false }; }
+    catch { /* Wait for the remaining escape bytes. */ }
+  }
+  return { value: '', end: text.length, complete: false };
+}
+function assistantPartialText(text, join) {
+  let depth = 0;
+  const fields = {};
+  for (let i = 0; i < text.length;) {
+    const c = text[i];
+    if (c === '{' || c === '[') { depth++; i++; continue; }
+    if (c === '}' || c === ']') { depth--; i++; continue; }
+    if (c !== '"') { i++; continue; }
+    const token = assistantJsonString(text, i);
+    i = token.end;
+    if (!token.complete) break;
+    if (depth !== 1) continue;
+    while (/\s/.test(text[i] || '') && i < text.length) i++;
+    if (text[i] !== ':') continue;
+    i++;
+    while (/\s/.test(text[i] || '') && i < text.length) i++;
+    if (text[i] !== '"') continue;
+    const value = assistantJsonString(text, i);
+    i = value.end;
+    if (['type', 'completion_summary', 'text', 'summary', 'message'].includes(token.value))
+      fields[token.value] = value.value;
+    if (!value.complete) break;
+  }
+  if (fields.type && !['final', 'answer', 'response', 'message'].includes(fields.type)) return '';
+  return join([fields.completion_summary, fields.text || fields.summary || fields.message]);
+}
+function assistantEmbeddedText(text, streaming, read, join) {
+  // Restrict mixed prose detection to explicit response envelopes. Fenced code
+  // examples inside prose stay verbatim; a standalone fence is unwrapped above.
+  const candidates = /\{\s*"(?:type|object)"\s*:\s*"(?:final|answer|response|message|chat\.completion)"/g;
+  for (const match of text.matchAll(candidates)) {
+    const start = match.index;
+    if ((text.slice(0, start).match(/```/g) || []).length % 2) continue;
+    let depth = 0, end = start;
+    for (; end < text.length; end++) {
+      if (text[end] === '"') {
+        const token = assistantJsonString(text, end);
+        end = token.end - 1;
+        if (!token.complete) { end = text.length; break; }
+      } else if (text[end] === '{' || text[end] === '[') depth++;
+      else if (text[end] === '}' || text[end] === ']') {
+        if (--depth === 0) { end++; break; }
+      }
+    }
+    const prefix = text.slice(0, start).trim();
+    const payload = text.slice(start, end);
+    if (depth !== 0) {
+      const prose = assistantPartialText(payload, join);
+      return join([prefix, prose || t(streaming ? '正在整理模型回复…' : '模型回复中没有可显示的正文，请查看运行状态。')]);
+    }
+    try {
+      const parsed = JSON.parse(payload);
+      const prose = assistantEnvelopeText(parsed, read, join);
+      if (prose !== null) return join([prefix, prose, read(text.slice(end).trim())]);
+    } catch {
+      return join([prefix, assistantPartialText(payload, join)]);
+    }
+  }
+  if (streaming) {
+    const tail = text.match(/\{\s*(?:"([a-z]*)"?(?:\s*:\s*(?:"[^"]*)?)?)?$/);
+    if (tail && (!tail[1] || ['type', 'object'].some(key => key.startsWith(tail[1]))) &&
+        (text.slice(0, tail.index).match(/```/g) || []).length % 2 === 0) {
+      return join([text.slice(0, tail.index).trim(), t('正在整理模型回复…')]);
+    }
+  }
+  return null;
+}
+
 function messageTime(value) {
   if (value === undefined || value === null || value === '') return null;
   const numeric = Number(value);
@@ -255,7 +364,7 @@ function formatMessageTime(date) {
     hour12: false
   }).format(date);
 }
-function message(role, text, createdAt) {
+function message(role, text, createdAt, usage) {
   const e = node('div', undefined, 'message ' + role);
   const author = node('strong', () => (role === 'user' ? t('你') : 'COOLDER'));
   if (role === 'user') {
@@ -268,6 +377,7 @@ function message(role, text, createdAt) {
     e.dataset.requestText = text || '';
   } else e.append(author);
   e.append(document.createTextNode(role === 'assistant' ? assistantDisplayText(text) : text || ''));
+  if (role === 'assistant' && usage) e.append(usageFooter(usage));
   $('messages').append(e);
   return e;
 }
@@ -494,7 +604,8 @@ async function selectSession(s) {
   const item = (data.sessions || []).find(x => x.session_id === s.session_id);
   $('messages').replaceChildren();
   for (const m of item?.messages || [])
-    message(m.role, m.content || m.text || '', m.sent_at ?? m.created_at);
+    message(m.role, m.content || m.text || '', m.sent_at ?? m.created_at,
+      m.role === 'assistant' ? m : undefined);
   await sessions();
   if (item?.last_run_id) {
     state.run = item.last_run_id;
@@ -675,6 +786,30 @@ function focusTreeItem(item) {
   item.focus();
 }
 
+function usageText(usage, includeElapsed = false) {
+  const number = value => value === undefined || value === null ? t('未提供')
+    : Number(value).toLocaleString('en-US');
+  const duration = value => value === undefined || value === null ? t('未提供')
+    : (Math.max(0, Number(value)) / 1000).toFixed(2) + ' ' + t('秒');
+  const parts = [t('输入 tokens') + ': ' + number(usage.input_tokens),
+    t('输出 tokens') + ': ' + number(usage.output_tokens)];
+  if (usage.cache_usage_available || Number(usage.cached_input_tokens) > 0) {
+    parts.splice(1, 0, t('缓存命中输入 tokens') + ': ' + number(usage.cached_input_tokens),
+      t('缓存未命中输入 tokens') + ': ' + number(usage.input_tokens == null || usage.cached_input_tokens == null
+        ? undefined : Math.max(0, Number(usage.input_tokens) - Number(usage.cached_input_tokens))));
+  }
+  if (includeElapsed) {
+    const elapsed = usage.elapsed_ms ?? (usage.finished_at > 0 && usage.started_at > 0
+      ? Math.max(0, usage.finished_at - usage.started_at) * 1000 : undefined);
+    if (elapsed !== undefined) parts.push(t('总耗时') + ': ' + duration(elapsed));
+  }
+  parts.push(t('AI 请求耗时') + ': ' + duration(usage.latency_ms ?? usage.duration_ms));
+  return parts.join(' · ');
+}
+function usageFooter(usage) {
+  return node('small', () => t('本次会话消耗') + ' · ' + usageText(usage, true), 'message-usage');
+}
+
 function runProgressStage(s) {
   if (s.status === 'failed') return ['failed', '任务失败，请查看回复中的原因'];
   if (s.status === 'cancelled' || s.status === 'canceled') return ['cancelled', '任务已取消'];
@@ -719,7 +854,7 @@ function renderRunProgress(s) {
     list.setAttribute('aria-live', 'polite');
     root.append(summary, list);
     $('messages').append(root);
-    view = state.progressView = { run: state.run, root, list, stage: '', completed: 0, staged: 0 };
+    view = state.progressView = { run: state.run, root, list, stage: '', completed: 0, staged: 0, interactions: 0, requests: 0 };
   }
   const append = (label, detail = '') => {
     const follow = view.list.scrollHeight - view.list.scrollTop - view.list.clientHeight < 24;
@@ -731,6 +866,20 @@ function renderRunProgress(s) {
     while (view.list.children.length > 60) view.list.firstElementChild.remove();
     if (follow) view.list.scrollTop = view.list.scrollHeight;
   };
+  let events = [];
+  try { events = JSON.parse(s.model_interactions_json || '[]'); } catch { /* Keep phase updates available. */ }
+  if (Array.isArray(events)) {
+    for (let i = view.interactions; i < events.length; i++) {
+      const event = events[i];
+      if (event?.event === 'model_request_started') view.requests++;
+      if (['model_response_completed', 'model_request_failed', 'tool_arguments_recovery',
+        'model_stream_interrupted_before_retry'].includes(event?.event)) {
+        const number = view.requests;
+        append('AI 交互消耗', () => t('第') + ' ' + number + ' ' + t('次交互') + ' · ' + usageText(event));
+      }
+    }
+    view.interactions = events.length;
+  }
   const count = Number(s.completed_tool_calls) || 0;
   if (count > view.completed) {
     append('工具执行进度', String(count));
@@ -749,6 +898,66 @@ function renderRunProgress(s) {
   view.root.classList.toggle('finished', s.status !== 'running');
 }
 
+function renderModelInteractions(s) {
+  if (!state.run || typeof s.model_interactions_json !== 'string') return;
+  let events;
+  try { events = JSON.parse(s.model_interactions_json); } catch { return; }
+  if (!Array.isArray(events)) return;
+  let view = state.interactionsView;
+  if (!view || view.run !== state.run || !view.root.isConnected) {
+    const root = node('details', undefined, 'model-interactions');
+    root.open = true;
+    const list = node('div');
+    root.append(node('summary', () => t('AI 交互记录')), list);
+    $('messages').append(root);
+    view = state.interactionsView = { run: state.run, root, list, entries: [] };
+  }
+  // Append only new entries so polling preserves expansion and text selection.
+  const field = (row, label, text, truncated = false) => {
+    if (!text) return;
+    const section = node('details');
+    section.append(node('summary', () => t(label)), node('pre', text));
+    if (truncated) section.append(node('small', () => t('内容较长，仅显示概览')));
+    row.append(section);
+  };
+  for (let i = view.entries.length; i < events.length; i++) {
+    const event = events[i];
+    if (!event || typeof event !== 'object') { view.entries.push(null); continue; }
+    const row = node('article', undefined, 'model-interaction');
+    if (event.event === 'model_request_started') {
+      const number = view.entries.filter(item => item?.event === 'model_request_started').length + 1;
+      row.append(node('strong', () => t('发送给 AI') + ' · ' + number));
+      field(row, '任务概览', event.task_overview, event.task_overview_truncated);
+      field(row, '上下文概览', event.context_overview, event.context_overview_truncated);
+      field(row, '系统指令概览', event.instructions_overview, event.instructions_overview_truncated);
+      row.append(node('small', () => [
+        t('上下文字节') + ': ' + (event.transcript_bytes ?? 0),
+        t('历史交互') + ': ' + (event.history_exchange_count ?? 0),
+        t('工具结果') + ': ' + (event.tool_result_count ?? 0),
+        t('图片') + ': ' + (event.image_count ?? 0)
+      ].join(' · ')));
+    } else {
+      row.append(node('strong', () => t(event.event === 'model_request_failed' ? 'AI 请求失败' : 'AI 返回')));
+      const text = [event.completion_summary, event.reply_overview, event.requirement_overview]
+        .filter(value => typeof value === 'string' && value.trim());
+      for (const part of [...new Set(text)]) row.append(node('p', assistantDisplayText(part)));
+      if (event.reply_overview_truncated) row.append(node('small', () => t('内容较长，仅显示概览')));
+      if (event.requested_tools) row.append(node('p', () => t('请求工具') + ': ' + event.requested_tools));
+      if (event.error) row.append(node('p', event.error, 'error'));
+      row.append(node('small', () => usageText(event)));
+    }
+    const date = messageTime(event.timestamp_ms);
+    if (date) row.append(node('time', () => formatMessageTime(date)));
+    view.list.append(row);
+    view.entries.push(event);
+  }
+  if (s.model_interactions_truncated && !view.truncated) {
+    view.list.append(node('p', () => t('交互记录已达到保存上限，后续信息请查看最终回复。')));
+    view.truncated = true;
+  }
+  view.root.hidden = !events.length;
+}
+
 function renderRun(s) {
   const messages = $('messages');
   const follow = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 64;
@@ -762,6 +971,7 @@ function renderRun(s) {
   $('recover').hidden = active || !s.recovery_available;
   if (s.session_id) state.session = s.session_id;
   renderRunProgress(s);
+  renderModelInteractions(s);
   let live = $('live-reply');
   if (!live) {
     live = message('assistant', '');
@@ -770,12 +980,12 @@ function renderRun(s) {
   live.replaceChildren(
     node('strong', 'COOLDER'),
     document.createTextNode(
-      assistantDisplayText(
-        s.completion_summary || s.text || s.streamed_text || s.error,
-        s.status === 'running'
-      ) || t('正在处理任务…')
+      [s.completion_summary, s.text || s.streamed_text || s.error]
+        .filter(Boolean).map(text => assistantDisplayText(text, s.status === 'running'))
+        .filter((text, i, all) => text && all.indexOf(text) === i).join('\n\n') || t('正在处理任务…')
     )
   );
+  if (!active) live.append(usageFooter(s));
   $('tools').replaceChildren();
   for (const t of Array.isArray(s.tool_calls) ? s.tool_calls : [])
     $('tools').append(
@@ -1003,6 +1213,16 @@ async function start(resume = false) {
     if (epoch === state.epoch) $('send').disabled = state.snapshot?.status === 'running';
   }
 }
+
+function scrollConversation(edge) {
+  const messages = $('messages');
+  messages.scrollTo({
+    top: edge === 'top' ? 0 : messages.scrollHeight,
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+  });
+}
+$('conversation-scroll-top').onclick = () => scrollConversation('top');
+$('conversation-scroll-bottom').onclick = () => scrollConversation('bottom');
 
 $('toggle-composer').onclick = () => {
   const collapsed = !$('composer-content').hidden;

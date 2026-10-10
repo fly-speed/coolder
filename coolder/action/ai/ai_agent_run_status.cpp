@@ -3,6 +3,46 @@
 namespace action
 {
 using namespace agent_detail;
+
+// Read the authenticated run's bounded journal after releasing runtime locks.
+// The same durable source supports live snapshots and expired runtime entries.
+static void add_model_interactions_json(acl::json_node &root,
+    const std::string &user_root, const webcool::ai::agent_run_record_t &record,
+    const std::shared_ptr<agent_runtime_task_t> &task)
+{
+	std::string log, err;
+	if (task) {
+		std::lock_guard<webcool::mutex> guard(task->operation_log_mutex);
+		log = task->operation_log;
+	} else {
+		webcool::ai::agent_request_store_t store(
+		    user_root, record.project_path, record.id);
+		store.operation_log(log, false, err);
+	}
+	std::istringstream lines(log);
+	std::string line, entries = "[";
+	bool truncated = false, cache_available = record.cached_input_tokens > 0;
+	while (std::getline(lines, line)) {
+		acl::json event(line.c_str());
+		if (!event.finish()) continue;
+		const std::string name = json_text(event["event"]);
+		const auto *cache = event["cache_usage_available"];
+		if (cache && cache->get_bool() && *cache->get_bool()) cache_available = true;
+		if (name == "operation_log_truncated") truncated = true;
+		if (name != "model_request_started" &&
+		    name != "model_response_completed" &&
+		    name != "model_request_failed" &&
+		    name != "tool_arguments_recovery" &&
+		    name != "model_stream_interrupted_before_retry") continue;
+		if (entries.size() > 1) entries += ",";
+		entries += line;
+	}
+	entries += "]";
+	root.add_text("model_interactions_json", entries.c_str());
+	root.add_bool("model_interactions_truncated", truncated);
+	root.add_bool("cache_usage_available", cache_available);
+}
+
 class runtime_subscription_guard_t {
 public:
 	explicit runtime_subscription_guard_t(
@@ -221,6 +261,7 @@ bool AiAgentRunStatusAction::run(request_t &req, response_t &res)
 		add_durable_recovery_json(
 		    root, user_root, record, session_hint);
 	}
+	add_model_interactions_json(root, user_root, record, runtime_task);
 	return sendJson(res, 200, root, req.isKeepAlive());
 }
 
@@ -425,6 +466,7 @@ bool AiAgentRunEventsAction::run(request_t &req, response_t &res)
 				add_durable_recovery_json(
 				    root, user_root, record, session_hint);
 			}
+			add_model_interactions_json(root, user_root, record, runtime_task);
 			const std::string data = serialize_json(root);
 			std::ostringstream frame;
 			frame << "id: " << version << "\n"

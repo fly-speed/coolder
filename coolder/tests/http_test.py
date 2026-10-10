@@ -103,7 +103,8 @@ class Provider(http.server.BaseHTTPRequestHandler):
             'id': 'fixture',
             'object': 'chat.completion',
             'choices': [{'index': 0, 'message': message, 'finish_reason': finish}],
-            'usage': {'prompt_tokens': 20, 'completion_tokens': 10, 'total_tokens': 30},
+            'usage': {'prompt_tokens': 20, 'completion_tokens': 10, 'total_tokens': 30,
+                'prompt_cache_hit_tokens': 8, 'prompt_cache_miss_tokens': 12},
         }
         data = json.dumps(result).encode()
         try:
@@ -376,10 +377,36 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
             m.get('role') == 'tool' for p in requests for m in p.get('messages', [])
         ), requests
         assert result['tool_calls'] and result['tool_calls'][0]['ok'], result
+        interaction_run_id = started['run_id']
+        interactions = json.loads(result['model_interactions_json'])
+        sent = [e for e in interactions if e['event'] == 'model_request_started']
+        replies = [e for e in interactions if e['event'] == 'model_response_completed']
+        assert sent and replies, interactions
+        assert all('task_overview' in e and 'context_overview' in e for e in sent)
+        assert any(e.get('requested_tools') for e in replies), replies
+        assert any(e.get('completion_summary') == 'coolder fixture complete' for e in replies)
+        assert result['input_tokens'] == sum(e['input_tokens'] for e in replies) > 0
+        assert result['output_tokens'] == sum(e['output_tokens'] for e in replies) > 0
+        assert result['latency_ms'] == sum(e['latency_ms'] for e in replies)
+        assert result['cached_input_tokens'] == sum(e['cached_input_tokens'] for e in replies) > 0
+        assert result['cache_usage_available']
+        assert all(e['cached_input_tokens'] == 8 and e['cache_usage_available'] for e in replies)
+        saved_usage = {key: result[key] for key in ('input_tokens', 'cached_input_tokens', 'output_tokens', 'latency_ms')}
+
+
         session_list, _ = call(
             '/api/v1/ai/sessions?project_id=' + project['project_id']
         )
         assert session_list['sessions'], session_list
+        assistant_turn = next(m for session in session_list['sessions']
+            for m in session.get('messages', []) if m['role'] == 'assistant' and m['run_id'] == interaction_run_id)
+        assert assistant_turn['input_tokens'] == saved_usage['input_tokens']
+        assert assistant_turn['cached_input_tokens'] == saved_usage['cached_input_tokens']
+        assert assistant_turn['cache_usage_available']
+        assert assistant_turn['output_tokens'] == saved_usage['output_tokens']
+        assert assistant_turn['duration_ms'] == saved_usage['latency_ms']
+        assert assistant_turn['elapsed_ms'] >= 0
+
         user_times = [
             m['sent_at']
             for session in session_list['sessions']
@@ -854,6 +881,19 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
             '/api/v1/ai/sessions?project_id=' + project['project_id']
         )
         assert saved_sessions['sessions']
+        restored_run, _ = call('/api/v1/ai/runs/status?id=' + interaction_run_id)
+        restored_interactions = json.loads(restored_run['model_interactions_json'])
+        assert restored_interactions == interactions, restored_interactions
+        assert all(restored_run[key] == value for key, value in saved_usage.items()), restored_run
+        restored_turn = next(m for session in saved_sessions['sessions'] for m in session.get('messages', [])
+            if m['role'] == 'assistant' and m['run_id'] == interaction_run_id)
+        assert restored_turn['input_tokens'] == saved_usage['input_tokens']
+        assert restored_turn['cached_input_tokens'] == saved_usage['cached_input_tokens']
+        assert restored_turn['cache_usage_available']
+        assert restored_turn['output_tokens'] == saved_usage['output_tokens']
+        assert restored_turn['duration_ms'] == saved_usage['latency_ms']
+        assert restored_turn['elapsed_ms'] == assistant_turn['elapsed_ms']
+
         saved_providers, _ = call('/api/v1/ai/providers')
         assert saved_providers['providers'][0]['id'] == provider_id
         policy, _ = call('/api/v1/admin/ai-policy')

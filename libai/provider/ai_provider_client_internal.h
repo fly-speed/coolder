@@ -193,6 +193,8 @@ bool parse_completion(const provider_config_t &provider,
 
 // Copy provider token-accounting fields into the normalized result.
 void copy_usage(const completion_result_t &source, completion_result_t &target);
+void parse_chat_cache_usage(acl::json_node *usage, completion_result_t &result);
+void parse_anthropic_usage(acl::json_node *usage, completion_result_t &result);
 
 // Replace partial stream state with a complete result and remaining deltas.
 void adopt_completed_stream_result(const completion_result_t &completed,

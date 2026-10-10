@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "coding_runtime.h"
+#include "../context/requirement_progress.h"
 namespace action
 {
 namespace agent_detail
@@ -56,7 +57,7 @@ std::string sanitize_operation_detail(const std::string &input)
 		output += "[redacted]";
 		i = token_end;
 	}
-	return output;
+	return webcool::ai::utf8_prefix(output, 2048);
 }
 
 void append_runtime_operation_events(
@@ -172,16 +173,44 @@ void append_simple_operation_event(
 void append_model_operation_event(
     const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
     const webcool::ai::completion_result_t &output, const std::string &error,
-    long long effective_max_output_tokens)
+    long long effective_max_output_tokens,
+    const webcool::ai::completion_result_t *attempt_usage)
 {
 	acl::json json;
 	acl::json_node &event = json.create_node();
 	event.add_text("event", name);
-	event.add_number("latency_ms", output.latency_ms);
-	event.add_number("input_tokens", output.input_tokens);
-	event.add_number("cached_input_tokens", output.cached_input_tokens);
-	event.add_number("output_tokens", output.output_tokens);
-	event.add_number("reasoning_tokens", output.reasoning_tokens);
+	webcool::ai::agent_protocol_message_t message;
+	const bool parsed = webcool::ai::parse_agent_protocol_message(
+	    output.text, message);
+	const bool protocol = parsed || message.final_message;
+	const std::string reply = protocol ? message.final_text : output.text;
+	event.add_text("reply_overview",
+	    sanitize_operation_detail(reply).c_str());
+	event.add_bool("reply_overview_truncated", reply.size() > 2048);
+	if (protocol) {
+		event.add_text("completion_summary",
+		    sanitize_operation_detail(message.completion_summary).c_str());
+		if (!message.requirement_progress_json.empty())
+			event.add_text("requirement_overview",
+			    sanitize_operation_detail(
+			        webcool::ai::requirement_progress_summary(
+			            message.requirement_progress_json,
+			            task->ui_language != "en")).c_str());
+	}
+	std::string tools;
+	for (const auto &call : output.tool_calls) {
+		if (!tools.empty()) tools += ", ";
+		tools += call.name;
+	}
+	if (tools.empty()) tools = protocol ? message.tool.name : output.tool_name;
+	event.add_text("requested_tools", sanitize_operation_detail(tools).c_str());
+	const auto &usage = attempt_usage ? *attempt_usage : output;
+	event.add_number("latency_ms", usage.latency_ms);
+	event.add_number("input_tokens", usage.input_tokens);
+	event.add_number("cached_input_tokens", usage.cached_input_tokens);
+	event.add_bool("cache_usage_available", usage.cache_usage_available);
+	event.add_number("output_tokens", usage.output_tokens);
+	event.add_number("reasoning_tokens", usage.reasoning_tokens);
 	if (effective_max_output_tokens > 0)
 		event.add_number(
 		    "effective_max_output_tokens", effective_max_output_tokens);

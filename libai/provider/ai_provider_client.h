@@ -247,6 +247,8 @@ struct completion_result_t {
 	long long input_tokens = 0;
 	// Input tokens served from the provider's prompt cache.
 	long long cached_input_tokens = 0;
+	// Distinguish an explicit zero cache hit count from absent usage details.
+	bool cache_usage_available = false;
 	// Provider-reported generated token count.
 	long long output_tokens = 0;
 	// Generated tokens attributed to provider reasoning.

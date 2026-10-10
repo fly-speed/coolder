@@ -64,7 +64,7 @@ for (const partial of [
   '{"type":"final","text":"生成中',
   '{"choices":[{"delta":{"content":"hello'
 ]) {
-  assert.equal(show(partial, true), '正在整理模型回复…');
+  assert.equal(show(partial, true), partial.includes('生成中') ? '生成中' : '正在整理模型回复…');
   assert.ok(!show(partial).includes('{'));
 }
 assert.ok(!show({ type: 'tool_call', arguments: { secret: 'hidden' } }).includes('secret'));
@@ -74,6 +74,30 @@ assert.equal(
 );
 console.log('chat display: all regression cases passed');
 
-assert.equal(show('```json\n{"type":"final","text":"partial', true), '正在整理模型回复…');
+assert.equal(show('```json\n{"type":"final","text":"partial', true), 'partial');
 assert.equal(show('{"id":"abc","object":"chat.completion","choices":[', true), '正在整理模型回复…');
 assert.equal(show('{"', true), '正在整理模型回复…');
+
+// Runtime validation messages can precede the model's JSON, including mid-stream.
+const prefix = '构建失败已确认为环境依赖问题，与站点改动无关。';
+const wrapped = prefix + '\n\n' + JSON.stringify(final) + '\n验证尚未执行。';
+assert.equal(show(wrapped), prefix + '\n\n任务完成\n\n已新增登录页面。\n\n验证尚未执行。');
+assert.equal(show(prefix + '\n{"type":"final","text":"第一行\\n第二行', true), prefix + '\n\n第一行\n第二行');
+assert.equal(show('{"type":"final","text":"已完成","changes":[{"content":"hidden', true), '已完成');
+assert.equal(show('{"type":"final","text":"文本\\u4e', true), '文本');
+assert.equal(show('{"type":"final","text":"文本\\', true), '文本');
+assert.equal(show({text:'可读正文',usage:{tokens:20}}), '可读正文');
+assert.equal(show({summary:'概要',metadata:{id:20}}), '概要');
+const tool = {type:'tool_call',arguments:{content:JSON.stringify(final)}};
+assert.ok(!show(JSON.stringify(tool)).includes('已新增登录页面'));
+assert.ok(!show('{"type":"tool_call","arguments":{"text":"secret',true).includes('secret'));
+assert.equal(show(JSON.stringify({type:'final',text:'大括号 } 和引号 \" 保留'})), '大括号 } 和引号 \" 保留');
+console.log('Mixed prose and partial JSON display cases passed.');
+
+// Every streaming boundary of a mixed response must avoid raw protocol bytes.
+const wire = JSON.stringify(final);
+for (let length = 1; length <= wire.length; length++) {
+  const displayed = show(prefix + '\n' + wire.slice(0, length), true);
+  assert.ok(!displayed.includes('{"type"'), displayed);
+  assert.ok(!displayed.includes('hidden source'), displayed);
+}

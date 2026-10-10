@@ -37,9 +37,34 @@ static bool append_session_message(
 		message.add_text(
 		    "completion_summary", saved.completion_summary.c_str());
 	}
+	if (saved.role == "assistant") {
+		for (const auto &run : runs) {
+			if (run.id == saved.run_id && run.project_path == session.project_path &&
+			    run.finished_at >= run.started_at && run.started_at > 0)
+				message.add_number("elapsed_ms", (run.finished_at - run.started_at) * 1000);
+		}
+	}
 	message.add_number("duration_ms", saved.duration_ms);
 	message.add_number("input_tokens", saved.input_tokens);
 	message.add_number("cached_input_tokens", saved.cached_input_tokens);
+	if (saved.role == "assistant") {
+		bool cache_available = saved.cached_input_tokens > 0;
+		if (!cache_available) {
+			webcool::ai::agent_request_store_t store(user_root, session.project_path, saved.run_id);
+			std::string log, err, line;
+			if (store.operation_log(log, false, err)) {
+				std::istringstream lines(log);
+				while (std::getline(lines, line)) {
+					acl::json event(line.c_str());
+					if (!event.finish()) continue;
+					const auto *cache = event["cache_usage_available"];
+					if (cache && cache->get_bool() && *cache->get_bool()) { cache_available = true; break; }
+				}
+			}
+		}
+		message.add_bool("cache_usage_available", cache_available);
+	}
+
 	message.add_number("output_tokens", saved.output_tokens);
 	message.add_number("reasoning_tokens", saved.reasoning_tokens);
 	// The per-run artifact is the durable source of file history, including

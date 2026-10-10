@@ -386,7 +386,8 @@ void append_model_operation_event(
     const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
     const webcool::ai::completion_result_t &output,
     const std::string &error = std::string(),
-    long long effective_max_output_tokens = 0);
+    long long effective_max_output_tokens = 0,
+    const webcool::ai::completion_result_t *attempt_usage = NULL);
 
 // Update the live phase and progress counters visible to subscribers.
 void update_runtime_progress(const std::shared_ptr<agent_runtime_task_t> &task,

@@ -473,6 +473,25 @@ void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
 	acl::json request_json;
 	acl::json_node &request_event = request_json.create_node();
 	request_event.add_text("event", "model_request_started");
+	// Persist a bounded overview of the actual request, including native replay.
+	request_event.add_text("task_overview",
+	    sanitize_operation_detail(original_prompt).c_str());
+	request_event.add_bool("task_overview_truncated", original_prompt.size() > 2048);
+	request_event.add_text("context_overview",
+	    sanitize_operation_detail(turn.input.user_prompt).c_str());
+	request_event.add_bool("context_overview_truncated",
+	    turn.input.user_prompt.size() > 2048);
+	request_event.add_text("instructions_overview",
+	    sanitize_operation_detail(turn.input.system_prompt).c_str());
+	request_event.add_bool("instructions_overview_truncated",
+	    turn.input.system_prompt.size() > 2048);
+	request_event.add_number("history_exchange_count",
+	    static_cast<long long>(turn.input.tool_history.size()));
+	request_event.add_number("tool_result_count",
+	    static_cast<long long>(turn.input.tool_outputs.size()));
+	request_event.add_number("image_count",
+	    static_cast<long long>(turn.input.images.size()));
+
 	request_event.add_number(
 	    "loop_iteration", static_cast<long long>(turn.call));
 	request_event.add_number("completed_tool_calls",
