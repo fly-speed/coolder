@@ -26,18 +26,26 @@ static libai_options options(JNIEnv *env, jlongArray values)
 }
 
 extern "C" {
-JNIEXPORT jlong JNICALL Java_io_coolder_libai_Agent_nativeCreate(
-    JNIEnv *env, jobject owner, jstring instructions)
+JNIEXPORT jlong JNICALL Java_io_coolder_libai_Agent_nativeCreate(JNIEnv *env,
+    jobject owner, jstring instructions, jstring config, jstring key)
 {
 	try {
 		const auto text = jni_utf8(env, instructions);
+		const auto json =
+		    config ? jni_utf8(env, config) : std::string();
+		const auto secret = config ? jni_utf8(env, key) : std::string();
 		std::unique_ptr<jni_agent_t> context(new jni_agent_t);
 		env->GetJavaVM(&context->vm);
 		context->owner = env->NewGlobalRef(owner);
 		if (!context->owner)
 			return 0;
-		context->agent =
-		    libai_agent_create(jni_model, context.get(), text.c_str());
+		if (config) {
+			context->agent = libai_agent_create_provider(
+			    json.c_str(), secret.c_str(), text.c_str());
+		} else {
+			context->agent = libai_agent_create(
+			    jni_model, context.get(), text.c_str());
+		}
 		if (!context->agent) {
 			env->DeleteGlobalRef(context->owner);
 			jni_throw(env, libai_last_error());
@@ -85,7 +93,7 @@ JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeAddTool(JNIEnv *env,
 }
 JNIEXPORT jstring JNICALL Java_io_coolder_libai_Agent_nativeRun(JNIEnv *env,
     jobject, jlong pointer, jstring input, jlongArray limits, jboolean stream,
-    jboolean authorize, jboolean events)
+    jboolean authorize, jboolean events, jlong cancellation)
 {
 	try {
 		auto *context = reinterpret_cast<jni_agent_t *>(pointer);
@@ -94,8 +102,9 @@ JNIEXPORT jstring JNICALL Java_io_coolder_libai_Agent_nativeRun(JNIEnv *env,
 			authorize ? jni_authorize : NULL,
 			events ? jni_event : NULL };
 		const auto text = jni_utf8(env, input);
-		char *raw = libai_agent_run(
-		    context->agent, text.c_str(), &config, &hooks);
+		char *raw = libai_agent_run_with_cancellation(context->agent,
+		    text.c_str(), &config, &hooks,
+		    reinterpret_cast<libai_cancellation *>(cancellation));
 		if (!raw) {
 			jni_throw(env, libai_last_error());
 			return NULL;
@@ -142,5 +151,52 @@ JNIEXPORT jboolean JNICALL Java_io_coolder_libai_Agent_nativeEmit(
 		jni_throw(env, "JNI stream failed");
 		return JNI_FALSE;
 	}
+}
+JNIEXPORT jstring JNICALL Java_io_coolder_libai_Agent_nativeMessages(
+    JNIEnv *env, jobject, jlong pointer)
+{
+	auto *context = reinterpret_cast<jni_agent_t *>(pointer);
+	std::unique_ptr<char, void (*)(char *)> result(
+	    libai_agent_messages(context->agent), libai_string_free);
+	if (!result) {
+		jni_throw(env, libai_last_error());
+		return nullptr;
+	}
+	return jni_string(env, result.get());
+}
+JNIEXPORT jlong JNICALL Java_io_coolder_libai_Agent_nativeTokenCreate(
+    JNIEnv *env, jclass)
+{
+	auto *token = libai_cancellation_create();
+	if (!token)
+		jni_throw(env, libai_last_error());
+	return reinterpret_cast<jlong>(token);
+}
+JNIEXPORT jlong JNICALL Java_io_coolder_libai_Agent_nativeTokenRetain(
+    JNIEnv *env, jclass, jlong pointer)
+{
+	auto *token = libai_cancellation_retain(
+	    reinterpret_cast<libai_cancellation *>(pointer));
+	if (!token)
+		jni_throw(env, libai_last_error());
+	return reinterpret_cast<jlong>(token);
+}
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeTokenDestroy(
+    JNIEnv *, jclass, jlong pointer)
+{
+	libai_cancellation_destroy(
+	    reinterpret_cast<libai_cancellation *>(pointer));
+}
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeTokenCancel(
+    JNIEnv *, jclass, jlong pointer)
+{
+	libai_cancellation_cancel(
+	    reinterpret_cast<libai_cancellation *>(pointer));
+}
+JNIEXPORT jboolean JNICALL Java_io_coolder_libai_Agent_nativeTokenCancelled(
+    JNIEnv *, jclass, jlong pointer)
+{
+	return libai_cancellation_cancelled(
+	    reinterpret_cast<libai_cancellation *>(pointer));
 }
 }

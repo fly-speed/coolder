@@ -9,6 +9,18 @@ import java.util.Map;
 public final class Agent implements AutoCloseable {
     static { System.loadLibrary("ai_jni"); }
 
+    /** Independently owned thread-safe stop token. Retained runs survive close(). */
+    public static final class Cancellation implements AutoCloseable {
+        private long handle = nativeTokenCreate();
+        public synchronized void cancel() { check(); nativeTokenCancel(handle); }
+        public synchronized boolean cancelled() { check(); return nativeTokenCancelled(handle); }
+        private void check() { if (handle == 0) throw new IllegalStateException("cancellation closed"); }
+        private synchronized long retain() { check(); return nativeTokenRetain(handle); }
+        @Override public synchronized void close() {
+            if (handle != 0) { nativeTokenDestroy(handle); handle = 0; }
+        }
+    }
+
     /** Model implementations receive a typed-transcript JSON request. */
     public interface Model { Response complete(String requestJson, Invocation invocation); }
     /** Tools validate their own JSON arguments and return text or an error. */
@@ -76,8 +88,18 @@ public final class Agent implements AutoCloseable {
     public Agent(Model model, String instructions) {
         if (model == null) throw new IllegalArgumentException("model is null");
         this.model = model;
-        handle = nativeCreate(checked(instructions));
+        handle = nativeCreate(checked(instructions), null, null);
     }
+    private Agent(String config, String apiKey, String instructions) {
+        this.model = null;
+        handle = nativeCreate(checked(instructions), checked(config), checked(apiKey));
+    }
+    /** Built-in desktop transport; normal tool and streaming hooks apply. */
+    public static Agent fromProvider(String configJson, String apiKey, String instructions) {
+        return new Agent(configJson, apiKey, instructions);
+    }
+    /** Copy the idle transcript as a JSON array. */
+    public synchronized String messages() { idle(); return nativeMessages(handle); }
     private void idle() {
         if (handle == 0) throw new IllegalStateException("agent is closed");
         if (busy) throw new IllegalStateException("agent is running");
@@ -97,6 +119,9 @@ public final class Agent implements AutoCloseable {
     public String run(String text) { return run(text, new Options(), new Hooks()); }
     /** Returns status/text/error and usage as JSON; sessions persist between calls. */
     public String run(String text, Options options, Hooks hooks) {
+        return run(text, options, hooks, null);
+    }
+    public String run(String text, Options options, Hooks hooks, Cancellation cancellation) {
         checked(text);
         if (hooks == null || options == null) throw new IllegalArgumentException("options/hooks are null");
         Hooks snapshot = new Hooks();
@@ -106,10 +131,13 @@ public final class Agent implements AutoCloseable {
         synchronized (this) {
             idle(); busy = true; this.hooks = snapshot; pointer = handle;
         }
+        long lease = 0;
         try {
+            if (cancellation != null) lease = cancellation.retain();
             return nativeRun(pointer, text, limits, snapshot.onText != null,
-                             snapshot.authorize != null, snapshot.onEvent != null);
+                             snapshot.authorize != null, snapshot.onEvent != null, lease);
         } finally {
+            if (lease != 0) nativeTokenDestroy(lease);
             synchronized (this) { busy = false; this.hooks = null; }
         }
     }
@@ -147,10 +175,16 @@ public final class Agent implements AutoCloseable {
     }
     private void event(String event) { hooks.onEvent.onEvent(event); }
 
-    private native long nativeCreate(String instructions);
+    private native long nativeCreate(String instructions, String config, String apiKey);
+    private native String nativeMessages(long pointer);
+    private static native long nativeTokenCreate();
+    private static native long nativeTokenRetain(long pointer);
+    private static native void nativeTokenDestroy(long pointer);
+    private static native void nativeTokenCancel(long pointer);
+    private static native boolean nativeTokenCancelled(long pointer);
     private native void nativeDestroy(long pointer);
     private native void nativeAddTool(long pointer, String name, String description, String schema, boolean approval);
-    private native String nativeRun(long pointer, String text, long[] options, boolean stream, boolean authorize, boolean events);
+    private native String nativeRun(long pointer, String text, long[] options, boolean stream, boolean authorize, boolean events, long cancellation);
     private native void nativeCancel(long pointer);
     private native void nativeReset(long pointer);
     private static native boolean nativeStopped(long invocation);

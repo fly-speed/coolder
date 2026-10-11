@@ -22,7 +22,15 @@ public final class AgentTest {
             String result = agent.run("开始", new Agent.Options(), hooks);
             check(result.contains("completed") && result.contains("你好🌏") && tools[0] == 1);
             try { saved[0].stopped(); throw new AssertionError(); } catch (IllegalStateException expected) { }
+            check(agent.messages().contains("编号") && agent.messages().contains("\"role\":\"tool\""));
+            try (Agent.Cancellation token = new Agent.Cancellation()) {
+                token.cancel(); check(token.cancelled());
+                int before = turns[0];
+                check(agent.run("skip", new Agent.Options(), new Agent.Hooks(), token).contains("cancelled"));
+                check(turns[0] == before);
+            }
             agent.reset();
+            check(agent.messages().equals("[]"));
             Agent.Options options = new Agent.Options(); options.maxModelCalls = 0;
             check(agent.run("budget", options, new Agent.Hooks()).contains("budget_exceeded"));
         }
@@ -41,6 +49,13 @@ public final class AgentTest {
             try { agent.close(); throw new AssertionError(); } catch (IllegalStateException expected) { }
             agent.cancel(); thread.join(5000);
             check(!thread.isAlive() && result[0].contains("cancelled"));
+        }
+        String url = System.getenv("LIBAI_TEST_PROVIDER_URL");
+        if (url != null) {
+            try (Agent agent = Agent.fromProvider("{\"protocol\":\"openai_chat\",\"base_url\":\"" + url + "\",\"model\":\"fixture\"}", "temporary", "")) {
+                check(agent.run("你好😀").contains("native😀"));
+                check(agent.messages().contains("native😀"));
+            }
         }
         System.out.println("Java JNI tests passed");
     }

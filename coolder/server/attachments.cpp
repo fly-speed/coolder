@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "attachments.h"
 #include "action/action_util.h"
-#include <libai_cpp/coding.h>
+#include <coding_host.h>
 #include <openssl/evp.h>
 #include <filesystem>
 #include <fstream>
@@ -94,7 +94,7 @@ struct draft_guard {
 bool attachment_route(
     request_t &req, response_t &res, const account_t &account, bool discard)
 {
-	using namespace action::agent_detail;
+	using namespace libai::cpp::runtime;
 	auto *body = req.getJson(discard ? 4096 : 24 * 1024 * 1024);
 	if (!body) {
 		return fail(res, 400, "invalid attachment request");

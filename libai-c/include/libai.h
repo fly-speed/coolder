@@ -20,6 +20,8 @@ extern "C" {
 
 /* Opaque owner of a C++ agent, persistent session and registered callbacks. */
 typedef struct libai_agent libai_agent;
+/* Owning handle to a shareable cooperative stop token. */
+typedef struct libai_cancellation libai_cancellation;
 /* Borrowed model-output builder, valid only during a model callback. */
 typedef struct libai_response libai_response;
 /* Borrowed tool-output builder, valid only during a tool callback. */
@@ -75,6 +77,30 @@ LIBAI_API void libai_options_default(libai_options *options);
 /* Create an agent; instructions and callback outputs are copied by the bridge. */
 LIBAI_API libai_agent *libai_agent_create(
     libai_model_fn model, void *user, const char *instructions);
+/* Create an agent backed by the built-in desktop Provider transport.
+ * config is a JSON object matching the C++ ProviderConfig fields; key is not stored.
+ * Supports tool callbacks, streaming and shared cancellation through normal run APIs.
+ * Portable builds return NULL and an availability diagnostic. */
+LIBAI_API libai_agent *libai_agent_create_provider(
+    const char *config, const char *api_key, const char *instructions);
+/* Allocate an independent stop token, including before a run starts. */
+LIBAI_API libai_cancellation *libai_cancellation_create(void);
+/* Retain the same stop state in another independently owned handle. */
+LIBAI_API libai_cancellation *libai_cancellation_retain(
+    const libai_cancellation *);
+/* Destroy one handle; retained handles and an active run keep the state alive.
+ * Do not destroy a handle concurrently with an API call using that same handle. */
+LIBAI_API void libai_cancellation_destroy(libai_cancellation *);
+/* Request or inspect stop state; safe concurrently with runs using retained handles. */
+LIBAI_API void libai_cancellation_cancel(libai_cancellation *);
+/* Inspect the shared atomic stop state without modifying it. */
+LIBAI_API int libai_cancellation_cancelled(const libai_cancellation *);
+/* Copy an idle agent's full conversation into an owned UTF-8 JSON array. */
+LIBAI_API char *libai_agent_messages(libai_agent *);
+/* Run using a caller-owned token; NULL allocates a fresh per-run token.
+ * The token must remain valid until this call returns; state is never reset. */
+LIBAI_API char *libai_agent_run_with_cancellation(libai_agent *, const char *,
+    const libai_options *, const libai_hooks *, const libai_cancellation *);
 /* Destroy an idle agent; return -1 rather than freeing an active agent. */
 LIBAI_API int libai_agent_destroy(libai_agent *agent);
 /* Register a tool while idle; contexts must outlive the agent. */

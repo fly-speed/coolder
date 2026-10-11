@@ -46,6 +46,14 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)emit:(NSString *)text;
 @end
 
+/** Independent atomic stop state; usable before a run or from another thread. */
+@interface LAICancellation : NSObject
+/** Request cooperative cancellation without resetting the token. */
+- (void)cancel;
+/** Inspect whether cancellation was requested. */
+@property(nonatomic, readonly) BOOL cancelled;
+@end
+
 /** Stable run limits initialized to the C++ SDK defaults. */
 @interface LAIRunOptions : NSObject
 /** Logical model-attempt ceiling. */
@@ -64,6 +72,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic) NSUInteger maxModelRetries;
 /** Cooperative deadline duration in milliseconds. */
 @property(nonatomic) int64_t timeoutMs;
+/** Optional shared stop token; nil allocates a per-run token. */
+@property(nonatomic, strong, nullable) LAICancellation *cancellation;
 @end
 
 /** Application model block; no native provider SDK is required on iOS. */
@@ -95,6 +105,14 @@ typedef void (^LAIEventSink)(NSString *);
 - (nullable instancetype)initWithModel:(LAIModel)model
                           instructions:(NSString *)instructions
                                  error:(NSError *_Nullable *_Nullable)error;
+/** Construct the built-in desktop Provider using endpoint options and an in-memory key. */
+- (nullable instancetype)initWithProvider:(NSDictionary<NSString *, id> *)config
+                                   apiKey:(NSString *)apiKey
+                             instructions:(NSString *)instructions
+                                    error:(NSError *_Nullable *_Nullable)error;
+/** Copy the idle transcript with complete tool calls and reasoning. */
+- (nullable NSArray<NSDictionary<NSString *, id> *> *)messages:
+    (NSError *_Nullable *_Nullable)error;
 /** Register an idle agent's application capability and handler. */
 - (BOOL)addTool:(NSString *)name
          description:(NSString *)description

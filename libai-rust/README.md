@@ -77,3 +77,6 @@ LIBAI_CODING_FULL=ON ACL_PATH=/absolute/acl OPENSSL_ROOT_DIR=/absolute/openssl .
 完整模式生成并链接 `libai_c` 动态库，开发构建写入其 rpath；发布 APP 时将 native build 的
 install/lib 内动态库一并部署，并配置系统动态库搜索路径。默认模式仍链接 portable 静态桥接库。
 `available` 在轻量和移动端构建返回 false。详见 [统一操作协议](../libai/docs/CODING_SERVICE.md)。
+
+新增会话快照、独立取消令牌及内置 Provider Agent。接口对应关系和生命周期见
+[Agent 接口能力补齐](../libai/docs/CODING_SERVICE.md#agent-接口能力补齐)。

@@ -92,3 +92,37 @@ BOOL lai_error(NSError **error, NSString *message)
 		           }];
 	return NO;
 }
+
+@implementation LAICancellation
+- (instancetype)init
+{
+	if ((self = [super init])) {
+		_native = libai_cancellation_create();
+		if (!_native)
+			return nil;
+	}
+	return self;
+}
+- (void)cancel
+{
+	@synchronized(self) {
+		libai_cancellation_cancel(_native);
+	}
+}
+- (BOOL)cancelled
+{
+	@synchronized(self) {
+		return libai_cancellation_cancelled(_native);
+	}
+}
+- (libai_cancellation *)retainNative
+{
+	@synchronized(self) {
+		return libai_cancellation_retain(_native);
+	}
+}
+- (void)dealloc
+{
+	libai_cancellation_destroy(_native);
+}
+@end

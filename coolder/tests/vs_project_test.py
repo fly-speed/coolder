@@ -105,6 +105,20 @@ class VisualStudioProjectTests(unittest.TestCase):
             for relative in items(project, tag):
                 self.assertTrue((directory / relative.replace("\\", "/")).is_file())
 
+    def test_cpp_binding_uses_original_backend(self):
+        directory = ROOT.parent / "libai-c++"
+        project = read_project(directory / "libai-cpp.vcxproj")
+        filters = read_project(directory / "libai-cpp.vcxproj.filters")
+        for tag in ("ClCompile", "ClInclude"):
+            self.assertEqual(items(project, tag), items(filters, tag))
+            for relative in items(project, tag):
+                self.assertTrue((directory / relative.replace("\\", "/")).is_file(), relative)
+        self.assertNotIn("coding-implementation", (directory / "libai-cpp.vcxproj").read_text())
+        native = ROOT.parent / "libai"
+        expected = {str(path.resolve()) for path in native.glob("*/*.cpp") if path.parent.name not in {"tests", "examples"}}
+        actual = {str((directory / relative.replace("\\", "/")).resolve()) for relative in items(project, "ClCompile") if relative.startswith("..\\libai\\") and not relative.endswith("stdafx.cpp")}
+        self.assertEqual(actual, expected)
+
     def test_resource_packaging(self):
         project = read_project(ROOT / "coolder.vcxproj")
         bundle = project.find("./m:Target[@Name='BundleCoolderFrontend']", NS)

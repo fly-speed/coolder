@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "server/host.h"
 #include "server/auth.h"
-#include <libai_cpp/coding.h>
+#include <coding_host.h>
 #include <filesystem>
 #include <iostream>
 #include <csignal>
@@ -89,8 +89,8 @@ static void serve_connection(acl::socket_stream *conn)
 static void cancel_active_runs()
 {
 	std::lock_guard<libai::cpp::Mutex> guard(
-	    action::agent_detail::g_agent_runtime_mutex);
-	for (auto &item : action::agent_detail::g_agent_runtime_tasks) {
+	    libai::cpp::runtime::g_agent_runtime_mutex);
+	for (auto &item : libai::cpp::runtime::g_agent_runtime_tasks) {
 		item.second->cancel_requested = true;
 		if (!item.second->worker)
 			continue;

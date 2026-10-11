@@ -216,9 +216,13 @@ Monaco 的运行时、语言模块和 Worker 保留原有按需加载：Worker �
 
 ## AI 库依赖边界
 
-APP 仅包含 `libai_cpp/coding.h` 和 `libai_cpp/platform.h`，CMake 链接 `libai::cpp`，
-VS 解决方案引用 `libai-c++/libai-cpp.vcxproj`。C++ 封装内部复用 libai，并为 APP
-公开类型化的 provider、工作区、项目计划、会话、运行记录、沙箱与编码运行时接口。
+APP 使用 `coding_host.h` 和 `platform.h`，
+CMake 显式链接 `libai::cpp` 与内部宿主目标 `libai::cpp_host`。
+VS 解决方案引用 `libai-c++/libai-cpp.vcxproj`。封装内部复用 libai，为同仓库宿主
+提供 provider、工作区、项目计划、会话、运行记录、沙箱与编码运行时接入。
+宿主适配头文件位于 `libai-c++/src`，通过 `libai::cpp_host` 私有转发 libai 接口，
+不再复制 libai 的模块声明或实现；同级绑定共用原始后端。它们
+不进入第三方 SDK；第三方使用轻量的 Agent、NativeProviderModel 和 CodingService 接口。
 账号认证、HTTP 路由、网页展示和用户权限决定仍属于 APP。
 
 新应用可选择轻量 `Agent` 或共享 `CodingService`；Java/Python/Rust/Objective-C

@@ -38,6 +38,23 @@ extern "C" {
         user: *mut c_void,
         instructions: *const c_char,
     ) -> *mut c_void;
+    pub fn libai_agent_create_provider(
+        config: *const c_char,
+        key: *const c_char,
+        instructions: *const c_char,
+    ) -> *mut c_void;
+    pub fn libai_agent_messages(agent: *mut c_void) -> *mut c_char;
+    pub fn libai_cancellation_create() -> *mut c_void;
+    pub fn libai_cancellation_destroy(token: *mut c_void);
+    pub fn libai_cancellation_cancel(token: *mut c_void);
+    pub fn libai_cancellation_cancelled(token: *mut c_void) -> c_int;
+    pub fn libai_agent_run_with_cancellation(
+        agent: *mut c_void,
+        input: *const c_char,
+        options: *const crate::Options,
+        hooks: *const Hooks,
+        token: *mut c_void,
+    ) -> *mut c_char;
     pub fn libai_agent_destroy(agent: *mut c_void) -> c_int;
     pub fn libai_agent_add_tool(
         agent: *mut c_void,

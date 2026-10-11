@@ -24,6 +24,8 @@ file(GLOB COOLDER_ACTIONS CONFIGURE_DEPENDS action/ai/*.cpp)
 add_executable(coolder main.cpp server/host.cpp server/attachments.cpp server/auth.cpp server/project_sharing.cpp server/ai_policy.cpp ${COOLDER_ACTIONS})
 target_include_directories(coolder PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(coolder PRIVATE libai::cpp)
+# Coolder is an in-repository host; private integration is not part of third-party SDK.
+target_link_libraries(coolder PRIVATE libai::cpp_host)
 target_precompile_headers(coolder PRIVATE stdafx.h)
 target_compile_definitions(coolder PRIVATE
 	COOLDER_HTML_DIR="${CMAKE_CURRENT_SOURCE_DIR}/html")

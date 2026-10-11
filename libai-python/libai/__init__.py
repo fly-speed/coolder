@@ -53,6 +53,50 @@ def _json(value):
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
 
+class Cancellation:
+    """Independent stop state, shareable across runs and threads; close when done."""
+    def __init__(self, library=None):
+        self._lib = n.load(library)
+        self._lock = threading.Lock()
+        self._handle = self._lib.libai_cancellation_create()
+        if not self._handle:
+            raise RuntimeError(self._lib.libai_last_error().decode())
+
+    def _retain(self):
+        with self._lock:
+            if not self._handle:
+                raise RuntimeError("cancellation is closed")
+            lease = self._lib.libai_cancellation_retain(self._handle)
+            if not lease:
+                raise RuntimeError(self._lib.libai_last_error().decode())
+            return lease
+
+    def cancel(self):
+        with self._lock:
+            if not self._handle:
+                raise RuntimeError("cancellation is closed")
+            self._lib.libai_cancellation_cancel(self._handle)
+
+    @property
+    def cancelled(self):
+        with self._lock:
+            if not self._handle:
+                raise RuntimeError("cancellation is closed")
+            return bool(self._lib.libai_cancellation_cancelled(self._handle))
+
+    def close(self):
+        with self._lock:
+            if self._handle:
+                self._lib.libai_cancellation_destroy(self._handle)
+                self._handle = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
 class Agent:
     """Own one native agent/session; use as a context manager or call close()."""
     def __init__(self, model, instructions="", library=None):
@@ -66,6 +110,31 @@ class Agent:
         self._handle = self._lib.libai_agent_create(self._model, None, n.utf8(instructions))
         if not self._handle:
             self._raise_native()
+
+    @classmethod
+    def from_provider(cls, config, api_key, instructions="", library=None):
+        """Use built-in desktop transport with normal streaming/tool hooks."""
+        agent = cls.__new__(cls)
+        agent._lib = n.load(library)
+        agent._lock, agent._busy = threading.Lock(), False
+        agent._tools, agent._model = [], None
+        agent._handle = agent._lib.libai_agent_create_provider(
+            n.utf8(_json(config)), n.utf8(api_key), n.utf8(instructions))
+        if not agent._handle:
+            agent._raise_native()
+        return agent
+
+    def messages(self):
+        """Copy the idle transcript as dictionaries, including calls/reasoning."""
+        with self._lock:
+            self._idle()
+            pointer = self._lib.libai_agent_messages(self._handle)
+            if not pointer:
+                self._raise_native()
+            try:
+                return json.loads(c.string_at(pointer).decode("utf-8"))
+            finally:
+                self._lib.libai_string_free(pointer)
 
     def _raise_native(self):
         raise RuntimeError(self._lib.libai_last_error().decode("utf-8"))
@@ -120,7 +189,7 @@ class Agent:
             self._tools.append(callback)
         return self
 
-    def run(self, text, on_text=None, authorize=None, on_event=None, **limits):
+    def run(self, text, on_text=None, authorize=None, on_event=None, cancellation=None, **limits):
         """Return a result dictionary; failures have an explicit status/error."""
         options = n.Options()
         self._lib.libai_options_default(c.byref(options))
@@ -148,8 +217,16 @@ class Agent:
         with self._lock:
             self._idle()
             self._busy = True
+        lease = None
         try:
-            pointer = self._lib.libai_agent_run(self._handle, n.utf8(text), c.byref(options), c.byref(hooks))
+            if cancellation is not None:
+                if not isinstance(cancellation, Cancellation):
+                    raise TypeError("cancellation must be Cancellation")
+                if self._lib._name != cancellation._lib._name:
+                    raise ValueError("agent and cancellation must use the same native library")
+                lease = cancellation._retain()
+            pointer = self._lib.libai_agent_run_with_cancellation(
+                self._handle, n.utf8(text), c.byref(options), c.byref(hooks), lease)
             if not pointer:
                 self._raise_native()
             try:
@@ -160,6 +237,8 @@ class Agent:
                 raise RuntimeError("observer callback failed") from errors[0]
             return result
         finally:
+            if lease:
+                cancellation._lib.libai_cancellation_destroy(lease)
             with self._lock:
                 self._busy = False
 

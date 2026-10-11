@@ -27,6 +27,54 @@
 	}
 	return self;
 }
+- (instancetype)initWithProvider:(NSDictionary<NSString *, id> *)config
+                          apiKey:(NSString *)apiKey
+                    instructions:(NSString *)instructions
+                           error:(NSError **)error
+{
+	if (!(self = [super init]))
+		return nil;
+	_tools = [NSMutableDictionary new];
+	NSData *data = [NSJSONSerialization dataWithJSONObject:config
+	                                               options:0
+	                                                 error:error];
+	if (!data)
+		return nil;
+	NSString *json = [[NSString alloc] initWithData:data
+	                                       encoding:NSUTF8StringEncoding];
+	@try {
+		_native = libai_agent_create_provider(
+		    lai_utf8(json), lai_utf8(apiKey), lai_utf8(instructions));
+	} @catch (NSException *exception) {
+		lai_error(error, exception.description);
+		return nil;
+	}
+	if (!_native) {
+		lai_error(
+		    error, [NSString stringWithUTF8String:libai_last_error()]);
+		return nil;
+	}
+	return self;
+}
+- (NSArray<NSDictionary<NSString *, id> *> *)messages:(NSError **)error
+{
+	@synchronized(self) {
+		if (![self idle:error])
+			return nil;
+		char *raw = libai_agent_messages(_native);
+		if (!raw) {
+			lai_error(error,
+			    [NSString stringWithUTF8String:libai_last_error()]);
+			return nil;
+		}
+		NSData *data = [[NSString stringWithUTF8String:raw]
+		    dataUsingEncoding:NSUTF8StringEncoding];
+		libai_string_free(raw);
+		return [NSJSONSerialization JSONObjectWithData:data
+		                                       options:0
+		                                         error:error];
+	}
+}
 - (BOOL)idle:(NSError **)error
 {
 	if (!_native)
@@ -77,6 +125,7 @@
 		_hooks.onEvent = hooks.onEvent;
 		_busy = YES;
 	}
+	libai_cancellation *lease = NULL;
 	@try {
 		options = options ?: [LAIRunOptions new];
 		libai_options limits = { options.maxModelCalls,
@@ -88,8 +137,17 @@
 			_hooks.onText ? lai_text : NULL,
 			_hooks.authorize ? lai_authorize : NULL,
 			_hooks.onEvent ? lai_event : NULL };
-		char *raw = libai_agent_run(
-		    _native, lai_utf8(input), &limits, &observers);
+		if (options.cancellation) {
+			lease = [options.cancellation retainNative];
+			if (!lease) {
+				lai_error(error,
+				    [NSString stringWithUTF8String:
+				                  libai_last_error()]);
+				return nil;
+			}
+		}
+		char *raw = libai_agent_run_with_cancellation(
+		    _native, lai_utf8(input), &limits, &observers, lease);
 		if (!raw) {
 			lai_error(error,
 			    [NSString stringWithUTF8String:libai_last_error()]);
@@ -105,6 +163,7 @@
 		lai_error(error, exception.description);
 		return nil;
 	} @finally {
+		libai_cancellation_destroy(lease);
 		@synchronized(self) {
 			_busy = NO;
 			_hooks = nil;

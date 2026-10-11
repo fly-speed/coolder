@@ -62,7 +62,21 @@ int main(void)
 		} @catch (NSException *exception) {
 			(void)exception;
 		}
+		NSArray *messages = [agent messages:&error];
+		assert(messages.count == 4);
+		assert([messages[2][@"role"] isEqualToString:@"tool"]);
+		LAICancellation *token = [LAICancellation new];
+		[token cancel];
+		assert(token.cancelled);
+		LAIRunOptions *cancelled = [LAIRunOptions new];
+		cancelled.cancellation = token;
+		result = [agent run:@"skip"
+		            options:cancelled
+		              hooks:nil
+		              error:&error];
+		assert([result[@"status"] isEqualToString:@"cancelled"]);
 		assert([agent reset:&error]);
+		assert([agent messages:&error].count == 0);
 		LAIRunOptions *options = [LAIRunOptions new];
 		options.maxModelCalls = 0;
 		result = [agent run:@"budget"
@@ -82,6 +96,25 @@ int main(void)
 		result = [agent run:@"fail" options:nil hooks:nil error:&error];
 		assert([result[@"status"] isEqualToString:@"model_error"]);
 		assert([agent close:&error]);
+		NSString *url = NSProcessInfo.processInfo
+		                    .environment[@"LIBAI_TEST_PROVIDER_URL"];
+		if (url) {
+			agent = [[LAIAgent alloc] initWithProvider:@{
+				@"protocol" : @"openai_chat",
+				@"base_url" : url,
+				@"model" : @"fixture"
+			}
+			                                    apiKey:@"temporary"
+			                              instructions:@""
+			                                     error:&error];
+			assert(agent);
+			result = [agent run:@"你好😀"
+			            options:nil
+			              hooks:nil
+			              error:&error];
+			assert([result[@"text"] isEqualToString:@"native😀"]);
+			assert([agent close:&error]);
+		}
 		puts("Objective-C bridge tests passed");
 	}
 }

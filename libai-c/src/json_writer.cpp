@@ -47,15 +47,12 @@ static void calls(
 	out << ']';
 }
 
-std::string bridge_request_json(const libai::model_request_t &request)
+std::string bridge_messages_json(const std::vector<libai::message_t> &messages)
 {
 	std::ostringstream out;
-	out << '{';
-	field(out, "instructions", request.instructions);
-	out << ",\"max_output_tokens\":" << request.max_output_tokens
-	    << ",\"messages\":[";
+	out << '[';
 	bool first = true;
-	for (const auto &message : request.messages) {
+	for (const auto &message : messages) {
 		if (!first)
 			out << ',';
 		first = false;
@@ -78,8 +75,19 @@ std::string bridge_request_json(const libai::model_request_t &request)
 		calls(out, message.calls);
 		out << '}';
 	}
-	out << "],\"tools\":[";
-	first = true;
+	out << ']';
+	return out.str();
+}
+
+std::string bridge_request_json(const libai::model_request_t &request)
+{
+	std::ostringstream out;
+	out << '{';
+	field(out, "instructions", request.instructions);
+	out << ",\"max_output_tokens\":" << request.max_output_tokens
+	    << ",\"messages\":" << bridge_messages_json(request.messages);
+	out << ",\"tools\":[";
+	bool first = true;
 	for (const auto &tool : request.tools) {
 		if (!first)
 			out << ',';

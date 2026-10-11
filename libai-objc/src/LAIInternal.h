@@ -12,12 +12,20 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) NSThread *thread;
 @end
 
+/** Stop-state handle kept private to the Foundation wrapper. */
+@interface LAICancellation ()
+/** Owning handle; native runs retain an independent lease. */
+@property(nonatomic, assign) libai_cancellation *native;
+/** Retain the same stop state while protecting the handle from disposal. */
+- (libai_cancellation *)retainNative;
+@end
+
 /** Agent state accessed only while its facade remains alive. */
 @interface LAIAgent ()
 /** Native owner of the C++ agent/session. */
 @property(nonatomic, assign) libai_agent *_Nullable native;
 /** Copied application model block. */
-@property(nonatomic, copy) LAIModel model;
+@property(nonatomic, copy, nullable) LAIModel model;
 /** Named tool blocks retained until close. */
 @property(nonatomic, strong) NSMutableDictionary<NSString *, LAITool> *tools;
 /** Observer snapshot retained for the active run. */

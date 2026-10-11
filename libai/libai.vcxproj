@@ -311,6 +311,7 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemGroup>
+    <ClCompile Include="common\native_runtime.cpp" />
     <ClCompile Include="agent\agent_execution_mode.cpp" />
     <ClInclude Include="agent\agent_execution_mode.h" />
     <ClCompile Include="agent\agent_progress_supervisor.cpp" />

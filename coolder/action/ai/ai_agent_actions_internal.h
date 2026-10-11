@@ -1,5 +1,5 @@
 #pragma once
-#include <libai_cpp/coding.h>
+#include <coding_host.h>
 #include "ai_agent_actions.h"
 #include "action/actions.h"
 #include "action/action_util.h"
@@ -7,6 +7,8 @@ namespace action
 {
 namespace agent_detail
 {
+// Import the independently declared coding runtime for HTTP host adapters.
+using namespace ::libai::cpp::runtime;
 // Return the storage path used for absolute project.
 bool absolute_project_path(const std::string &path);
 // Authorize the requested project location scope for this HTTP request.

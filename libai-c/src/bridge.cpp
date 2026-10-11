@@ -147,13 +147,15 @@ int libai_agent_add_tool(libai_agent *agent, const char *name,
 	}
 	return -1;
 }
-char *libai_agent_run(libai_agent *agent, const char *input,
-    const libai_options *limits, const libai_hooks *hooks)
+char *libai_agent_run_with_cancellation(libai_agent *agent, const char *input,
+    const libai_options *limits, const libai_hooks *hooks,
+    const libai_cancellation *cancellation)
 {
 	try {
 		auto lock = idle_lock(agent);
 		auto options = run_options(limits, hooks);
-		options.cancellation =
+		options.cancellation = cancellation ?
+		    cancellation->value :
 		    std::make_shared<libai::cancellation_t>();
 		std::atomic_store(&agent->cancellation, options.cancellation);
 		const auto result = agent->runtime->run(
@@ -170,6 +172,26 @@ char *libai_agent_run(libai_agent *agent, const char *input,
 		bridge_error("native run failed");
 	}
 	return NULL;
+}
+char *libai_agent_run(libai_agent *agent, const char *input,
+    const libai_options *limits, const libai_hooks *hooks)
+{
+	return libai_agent_run_with_cancellation(
+	    agent, input, limits, hooks, nullptr);
+}
+char *libai_agent_messages(libai_agent *agent)
+{
+	try {
+		bridge_error("");
+		auto lock = idle_lock(agent);
+		return bridge_owned(
+		    bridge_messages_json(agent->session.messages));
+	} catch (const std::exception &error) {
+		bridge_error(error.what());
+	} catch (...) {
+		bridge_error("session snapshot failed");
+	}
+	return nullptr;
 }
 void libai_agent_cancel(libai_agent *agent)
 {

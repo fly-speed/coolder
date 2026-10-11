@@ -4,7 +4,7 @@ find_package(Threads REQUIRED)
 # Compile the bridge directly into JNI so deployment needs one native library.
 add_library(libai_jni SHARED
  src/main/cpp/jni_strings.cpp src/main/cpp/jni_callbacks.cpp src/main/cpp/jni_bridge.cpp src/main/cpp/jni_coding.cpp
- ../libai-c/src/bridge.cpp ../libai-c/src/builders.cpp ../libai-c/src/json_writer.cpp ../libai-c/src/coding.cpp)
+ ../libai-c/src/bridge.cpp ../libai-c/src/builders.cpp ../libai-c/src/json_writer.cpp ../libai-c/src/coding.cpp ../libai-c/src/cancellation.cpp ../libai-c/src/provider.cpp)
 set_target_properties(libai_jni PROPERTIES POSITION_INDEPENDENT_CODE ON OUTPUT_NAME ai_jni)
 target_compile_features(libai_jni PRIVATE cxx_std_11)
 target_include_directories(libai_jni PRIVATE ../libai-c/include ..)
@@ -21,6 +21,6 @@ install(TARGETS libai_jni LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
 
 option(LIBAI_CODING_FULL "Enable desktop coding service (ACL/OpenSSL required)" OFF)
 if(LIBAI_CODING_FULL)
- include("${CMAKE_CURRENT_SOURCE_DIR}/../libai-c++/cmake/CodingBackend.cmake")
+ include("${CMAKE_CURRENT_SOURCE_DIR}/../libai/cmake/CodingBackend.cmake")
  libai_enable_coding(libai_jni)
 endif()

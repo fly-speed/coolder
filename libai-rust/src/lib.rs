@@ -11,7 +11,7 @@ pub use types::*;
 /// The facade is intentionally neither Send nor Sync: callback state may be local.
 pub struct Agent {
     pointer: *mut c_void,
-    _model: Box<ModelHolder>,
+    _model: Option<Box<ModelHolder>>,
     // C stores each holder address, so vector growth must not move the holders.
     #[allow(clippy::vec_box)]
     tools: Vec<Box<ToolHolder>>,
@@ -39,10 +39,35 @@ impl Agent {
             }
             Ok(Self {
                 pointer,
-                _model: holder,
+                _model: Some(holder),
                 tools: Vec::new(),
             })
         }
+    }
+    /// Built-in desktop Provider with JSON endpoint options and an in-memory credential.
+    pub fn from_provider(
+        config_json: &str,
+        api_key: &str,
+        instructions: &str,
+    ) -> Result<Self, Error> {
+        let config = cstring(config_json)?;
+        let key = cstring(api_key)?;
+        let instructions = cstring(instructions)?;
+        let pointer = unsafe {
+            ffi::libai_agent_create_provider(config.as_ptr(), key.as_ptr(), instructions.as_ptr())
+        };
+        if pointer.is_null() {
+            return Err(native_error());
+        }
+        Ok(Self {
+            pointer,
+            _model: None,
+            tools: Vec::new(),
+        })
+    }
+    /// Copy the full idle transcript as a JSON array.
+    pub fn messages(&self) -> Result<String, Error> {
+        owned_result(unsafe { ffi::libai_agent_messages(self.pointer) })
     }
     pub fn add_tool(
         &mut self,
@@ -85,6 +110,16 @@ impl Agent {
         options: &Options,
         hooks: Hooks<'_>,
     ) -> Result<String, Error> {
+        self.run_with_cancellation(input, options, hooks, None)
+    }
+    /// Reuse an independent stop token, including a token cancelled before this run.
+    pub fn run_with_cancellation(
+        &mut self,
+        input: &str,
+        options: &Options,
+        hooks: Hooks<'_>,
+        cancellation: Option<&Cancellation>,
+    ) -> Result<String, Error> {
         let input = cstring(input)?;
         let mut holder = callbacks::HookHolder {
             hooks,
@@ -109,7 +144,13 @@ impl Agent {
                 .map(|_| callbacks::event as ffi::EventFn),
         };
         unsafe {
-            let result = ffi::libai_agent_run(self.pointer, input.as_ptr(), options, &native_hooks);
+            let result = ffi::libai_agent_run_with_cancellation(
+                self.pointer,
+                input.as_ptr(),
+                options,
+                &native_hooks,
+                cancellation.map_or(std::ptr::null_mut(), |token| token.pointer),
+            );
             if result.is_null() {
                 return Err(native_error());
             }
@@ -140,6 +181,43 @@ impl Drop for Agent {
 }
 fn native_error() -> Error {
     Error(unsafe { callbacks::text(ffi::libai_last_error()) })
+}
+
+fn owned_result(pointer: *mut std::ffi::c_char) -> Result<String, Error> {
+    if pointer.is_null() {
+        return Err(native_error());
+    }
+    let text = unsafe { callbacks::text(pointer) };
+    unsafe { ffi::libai_string_free(pointer) };
+    Ok(text)
+}
+
+/// Cooperative stop state. Share with Arc for cancellation from another thread.
+pub struct Cancellation {
+    pointer: *mut c_void,
+}
+// Native token contains only shared ownership and atomic stop state.
+unsafe impl Send for Cancellation {}
+unsafe impl Sync for Cancellation {}
+impl Cancellation {
+    pub fn new() -> Result<Self, Error> {
+        let pointer = unsafe { ffi::libai_cancellation_create() };
+        if pointer.is_null() {
+            return Err(native_error());
+        }
+        Ok(Self { pointer })
+    }
+    pub fn cancel(&self) {
+        unsafe { ffi::libai_cancellation_cancel(self.pointer) }
+    }
+    pub fn cancelled(&self) -> bool {
+        unsafe { ffi::libai_cancellation_cancelled(self.pointer) != 0 }
+    }
+}
+impl Drop for Cancellation {
+    fn drop(&mut self) {
+        unsafe { ffi::libai_cancellation_destroy(self.pointer) }
+    }
 }
 
 /// Root-confined coding facilities; the host owns authorization and JSON decoding.

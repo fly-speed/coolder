@@ -9,11 +9,19 @@
 namespace webcool
 {
 
+// Initialize ACL thread state without starting a scheduler or changing its hooks.
+void initialize_native_runtime();
+
 // Mutex adapter shared by native threads and the ACL-based runtime.
 class mutex {
 public:
 	// Initialize the underlying mutex used by this adapter.
-	mutex() = default;
+	mutex()
+	{
+#if !defined(WEBCOOL_USE_STD_MUTEX)
+		initialize_native_runtime();
+#endif
+	}
 	// Destroy the mutex after all users have released it.
 	~mutex() = default;
 

@@ -2,7 +2,7 @@
 #include "project_sharing.h"
 #include "host.h"
 #include "action/action_util.h"
-#include <libai_cpp/coding.h>
+#include <coding_host.h>
 #include <algorithm>
 #include <fstream>
 #include <iomanip>

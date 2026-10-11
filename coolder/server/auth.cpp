@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "auth.h"
-#include <libai_cpp/coding.h>
+#include <coding_host.h>
 #include "host.h"
 #include "action/action_util.h"
 #include <openssl/crypto.h>

@@ -65,3 +65,6 @@ with Agent(complete, instructions="你是编程助手") as agent:
 默认轻量及移动端构建的 available 返回 false，调用会报告未启用完整组件。
 
 详见 [统一操作协议和调用示例](../libai/docs/CODING_SERVICE.md)。
+
+新增会话快照、独立取消令牌及内置 Provider Agent。接口对应关系和生命周期见
+[Agent 接口能力补齐](../libai/docs/CODING_SERVICE.md#agent-接口能力补齐)。

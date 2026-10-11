@@ -50,3 +50,13 @@ std::string bridge_request_json(const libai::model_request_t &request);
 std::string bridge_result_json(const libai::run_result_t &result);
 /* Serialize a lifecycle event without exposing request bodies or credentials. */
 std::string bridge_event_json(const libai::agent_event_t &event);
+
+/* Shared native cancellation state behind one owning C handle. */
+struct libai_cancellation {
+	/* Retained SDK token; independently owned handles may share this state. */
+	std::shared_ptr<libai::cancellation_t> value;
+};
+/* Copy a string into C-owned memory, throwing on allocation failure. */
+char *bridge_owned(const std::string &text);
+/* Serialize an ordered transcript independently of model request metadata. */
+std::string bridge_messages_json(const std::vector<libai::message_t> &messages);

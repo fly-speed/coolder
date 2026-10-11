@@ -3,7 +3,7 @@
 #include "auth.h"
 #include "project_sharing.h"
 #include "attachments.h"
-#include <libai_cpp/coding.h>
+#include <coding_host.h>
 #include "action/action_util.h"
 #include "action/ai/ai_agent_actions.h"
 #include "action/ai/ai_provider_actions.h"
