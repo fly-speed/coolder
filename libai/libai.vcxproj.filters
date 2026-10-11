@@ -238,4 +238,9 @@
     <ClCompile Include="workspace\workspace_patch.cpp" />
     <ClInclude Include="workspace\workspace_patch.h" />
   </ItemGroup>
+  <ItemGroup><ClCompile Include="common\record_json.cpp"><Filter>common</Filter></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="coding\coding_migration.cpp"><Filter>common</Filter></ClCompile></ItemGroup>
+  <ItemGroup><ClInclude Include="common\record_json.h"><Filter>common</Filter></ClInclude></ItemGroup>
+  <ItemGroup><ClCompile Include="coding\coding_runtime.cpp"></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="coding\coding_sandbox.cpp"></ClCompile></ItemGroup>
 </Project>

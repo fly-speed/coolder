@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include "server/host.h"
 #include "server/auth.h"
+#include "server/project_sharing.h"
 #include <coding_host.h>
+#include <libai_cpp/coding_service.h>
 #include <filesystem>
 #include <iostream>
 #include <csignal>
@@ -259,6 +261,10 @@ int main(int argc, char **argv)
 			       "COOLDER_LIBSSL for HTTPS providers.\n";
 		}
 
+		const auto migration = libai::cpp::CodingService(coolder::data_dir).call("storage.migrate");
+		acl::json migrated(migration.c_str());
+		if (!migrated.finish() || !migrated["ok"] || !migrated["ok"]->get_bool() || !*migrated["ok"]->get_bool())
+			throw std::runtime_error("JSON storage migration failed: " + migration);
 		libai::cpp::coding::ai_admin_policy_t policy;
 		policy.language_tools = "python,javascript,go,java,rust,swift";
 		policy.allow_browser_debug = false;
@@ -278,6 +284,7 @@ int main(int argc, char **argv)
 		policy.allow_users_local_projects = false;
 		libai::cpp::coding::ai_runtime_policy_set(policy);
 		coolder::accounts_init();
+		coolder::project_sharing_init();
 
 		coolder::authority = "127.0.0.1:" + std::to_string(port);
 		acl::server_socket server;

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "ai_admin_policy.h"
 #include "../common/ai_error_log.h"
 #include "../project/supported_languages.h"
@@ -241,7 +242,7 @@ bool ai_admin_policy_store_t::load(
 {
 	std::lock_guard<std::mutex> guard(g_policy_store_mutex);
 	policy = ai_admin_policy_t();
-	std::ifstream in(policy_path(upload_root_).c_str(), std::ios::in);
+	record_json::input in(policy_path(upload_root_).c_str(), std::ios::in);
 	if (!in.good())
 		return true;
 	bool has_mode_tool_calls = false;
@@ -421,7 +422,7 @@ bool ai_admin_policy_store_t::save(
 	}
 	const std::string path = policy_path(upload_root_);
 	const std::string temporary = path + ".tmp";
-	std::ofstream out(temporary.c_str(), std::ios::out | std::ios::trunc);
+	record_json::output out(temporary.c_str(), std::ios::out | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write AI policy database";
 		return ai_error("ai.admin-policy", "open-temporary", err);

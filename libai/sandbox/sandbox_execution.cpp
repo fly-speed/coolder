@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "../common/file_ops.h"
 #include "../common/identifiers.h"
 #include "../common/record_codec.h"
@@ -143,7 +144,7 @@ bool save_plan(const std::string &directory,
 {
 	const std::string path = pending_path(directory);
 	const std::string temporary = path + ".tmp";
-	std::ofstream out(temporary.c_str(),
+	record_json::output out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write sandbox execution plan";
@@ -187,7 +188,7 @@ bool load_plan_file(const std::string &path, const std::string &requested_id,
 		err = "invalid sandbox execution plan id";
 		return false;
 	}
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good()) {
 		err = "sandbox execution plan not found";
 		return false;
@@ -251,9 +252,13 @@ bool append_audit(const std::string &user_root,
 	const std::string path = join_path(
 	    join_path(user_root, ".webcool_agent"), "sandbox_runs.v1");
 	std::vector<std::string> records;
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	std::string line;
-	if (in.good() && std::getline(in, line) && line == kAuditHeader) {
+	if (in.good() && (!std::getline(in, line) || line != kAuditHeader)) {
+        err = "invalid sandbox audit store";
+        return false;
+    }
+    if (in.good()) {
 		while (records.size() < kMaxAuditRecords &&
 		    std::getline(in, line)) {
 			if (line.empty())
@@ -279,7 +284,7 @@ bool append_audit(const std::string &user_root,
 	       << (result && result->cancelled ? 1 : 0);
 	records.push_back(record.str());
 	const std::string temporary = path + ".tmp";
-	std::ofstream out(temporary.c_str(),
+	record_json::output out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write sandbox execution audit";
@@ -512,7 +517,7 @@ bool sandbox_execution_store_t::list_history(size_t limit,
 	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
 	const std::string path = join_path(
 	    join_path(user_root_, ".webcool_agent"), "sandbox_runs.v1");
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true; // A user who has never run a command has no history.
 	std::string line;

@@ -52,7 +52,8 @@ std::string coding_service_call(const std::string &root,
 		if (stat(registry.c_str(), &info) == 0)
 			throw std::invalid_argument(
 			    "CodingService requires a scope without external project mounts");
-		if (arguments.size() > 8 * 1024 * 1024 ||
+		if (arguments.size() > (operation == "providers.complete" ?
+		        32 * 1024 * 1024 : 8 * 1024 * 1024) ||
 		    arguments.find('\0') != std::string::npos ||
 		    arguments.find("\\u0000") != std::string::npos)
 			throw std::invalid_argument(
@@ -64,7 +65,7 @@ std::string coding_service_call(const std::string &root,
 		auto &a = input.get_root();
 		if (operation == "capabilities") {
 			coding_detail::strings(out, "operations",
-			    { "capabilities", "agents.list", "workspace.list",
+			    { "capabilities", "storage.migrate", "agents.list", "workspace.list",
 			        "workspace.read", "workspace.search",
 			        "workspace.outline", "workspace.sha256",
 			        "workspace.create", "workspace.replace",
@@ -82,10 +83,17 @@ std::string coding_service_call(const std::string &root,
 			        "runs.list", "runs.get", "runs.create",
 			        "runs.complete", "runs.fail",
 			        "runs.audit_cancel", "sandbox.history",
-			        "sandbox.preview", "providers.list",
-			        "providers.save", "providers.remove",
+			        "sandbox.preview", "sandbox.capabilities",
+			        "sandbox.execute", "sandbox.cancel",
+			        "runtime.policy.get", "runtime.policy.validate",
+			        "runtime.policy.configure", "providers.list",
+			        "providers.save", "providers.remove", "providers.test",
 			        "providers.complete" });
 			ok = true;
+		} else if (operation == "storage.migrate") {
+			ok = coding_detail::migrate(root, a, out, error);
+		} else if (operation.compare(0, 15, "runtime.policy.") == 0) {
+			ok = coding_detail::runtime(operation, a, out, error);
 		} else if (operation == "agents.list") {
 			agents(out);
 			ok = true;

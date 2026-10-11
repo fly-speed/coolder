@@ -124,10 +124,12 @@ bool storage(const std::string &root, const std::string &op, acl::json_node &a,
 		out.add_text("id", p.id.c_str())
 		    .add_text("project_path", p.project_path.c_str())
 		    .add_text("command_id", p.command.id.c_str())
-		    .add_number("timeout_ms", p.limits.timeout_ms);
+		    .add_number("timeout_ms", p.limits.timeout_ms)
+		    .add_text("executable", p.command.executable.c_str());
+		strings(out, "fixed_arguments", p.command.fixed_arguments);
 		return true;
 	}
-	return false;
+	return sandbox(root, op, a, out, error);
 }
 }
 }

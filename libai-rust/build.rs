@@ -41,7 +41,11 @@ fn main() {
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .arg("-DCMAKE_INSTALL_LIBDIR=lib")
         .arg(format!("-DCMAKE_INSTALL_PREFIX={}", install.display()));
-    for name in ["ACL_PATH", "OPENSSL_ROOT_DIR"] {
+    for name in [
+        "ACL_PATH",
+        "OPENSSL_ROOT_DIR",
+        "OPENSSL_PATH",
+    ] {
         if let Ok(value) = env::var(name) {
             configure.arg(format!("-D{name}={value}"));
         }
@@ -73,6 +77,7 @@ fn main() {
         "cargo:rustc-link-search=native={}",
         install.join("lib").display()
     );
+    println!("cargo:libdir={}", install.join("lib").display());
     if full {
         println!("cargo:rustc-link-lib=dylib=ai_c");
         if !target.contains("msvc") {
@@ -91,7 +96,7 @@ fn main() {
         println!("cargo:rustc-link-lib=pthread");
     }
     println!("cargo:rerun-if-changed=../libai-c");
-    println!("cargo:rerun-if-changed=../libai/sdk");
+
     println!("cargo:rerun-if-env-changed=LIBAI_CMAKE_TOOLCHAIN_FILE");
     println!("cargo:rerun-if-env-changed=CMAKE");
     println!("cargo:rerun-if-env-changed=LIBAI_CODING_FULL");

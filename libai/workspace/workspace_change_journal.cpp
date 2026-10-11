@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "workspace_change_set_internal.h"
 namespace webcool
 {
@@ -26,7 +27,7 @@ bool save_journal(const std::string &directory, const stored_set_t &set,
 		           << set.changes[i].proposed_sha256 << '\n'
 		           << hex_encode(originals[i]) << '\n';
 	}
-	const std::string data = serialized.str();
+	const std::string data = record_json::encode(serialized.str(), journal_path(directory));
 	const std::string path = journal_path(directory);
 	const std::string temporary = path + ".tmp";
 	FILE *out = fopen(temporary.c_str(), "wb");
@@ -74,7 +75,7 @@ bool load_journal(const std::string &path, stored_set_t &set,
     std::vector<std::string> &originals, bool &found, std::string &err)
 {
 	found = false;
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true;
 	found = true;

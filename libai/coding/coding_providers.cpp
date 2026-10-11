@@ -1,6 +1,8 @@
 #include "coding_internal.h"
 #include "../provider/ai_provider_store.h"
 #include "../sdk/provider_model.h"
+#include "../provider/output_token_limit.h"
+#include <algorithm>
 namespace webcool
 {
 namespace ai
@@ -19,7 +21,12 @@ void record(acl::json_node &out, const provider_config_t &p)
 	    .add_text("api_key_hint", p.api_key_hint.c_str())
 	    .add_bool("enabled", p.enabled)
 	    .add_bool("allow_file_content", p.allow_file_content)
-	    .add_bool("is_default", p.is_default);
+	    .add_bool("is_default", p.is_default)
+	    .add_text("last_test_status", p.last_test_status.c_str())
+	    .add_number("last_test_at", p.last_test_at)
+	    .add_number("last_test_http_status", p.last_test_http_status)
+	    .add_number("last_test_latency_ms", p.last_test_latency_ms)
+	    .add_text("last_test_error", p.last_test_error.c_str());
 }
 libai::message_t message(acl::json_node &n)
 {
@@ -54,6 +61,46 @@ libai::message_t message(acl::json_node &n)
 		}
 	}
 	return m;
+}
+bool test_connection(provider_store_t &store, acl::json_node &a,
+    acl::json_node &out, std::string &error)
+{
+	std::vector<provider_config_t> providers;
+	if (!store.list(providers, error))
+		return false;
+	const auto id = text(a, "id");
+	const provider_config_t *selected = nullptr;
+	for (const auto &p : providers)
+		if (p.id == id)
+			selected = &p;
+	if (!selected) {
+		error = "provider is absent";
+		return false;
+	}
+	std::string key;
+	if (!store.reveal_api_key(*selected, key, error))
+		return false;
+	provider_test_result_t result;
+	const bool ok =
+	    provider_client_t::test_connection(*selected, key, result, error);
+	std::fill(key.begin(), key.end(), '\0');
+	std::string health_error;
+	const bool saved =
+	    store.record_test_result(selected->id, ok, result.http_status,
+	        result.latency_ms, ok ? "" : error, health_error);
+	if (!ok)
+		return false;
+	if (!saved) {
+		error = health_error;
+		return false;
+	}
+	out.add_number("http_status", result.http_status)
+	    .add_number("latency_ms", result.latency_ms)
+	    .add_text("endpoint", result.endpoint.c_str())
+	    .add_bool("model_verified", result.model_verified)
+	    .add_bool("responses_verified", result.responses_verified)
+	    .add_bool("tools_verified", result.tools_verified);
+	return true;
 }
 bool complete(provider_store_t &store, acl::json_node &a, acl::json_node &out,
     std::string &error)
@@ -111,12 +158,47 @@ bool complete(provider_store_t &store, acl::json_node &a, acl::json_node &out,
 		}
 	}
 	libai::provider_model_t model(*selected, key);
+	std::vector<completion_image_t> images;
+	auto *input_images = array_value(a["images"]);
+	if (input_images) {
+		if (!input_images->is_array())
+			throw std::invalid_argument("images must be an array");
+		for (auto *n = input_images->first_child(); n;
+		     n = input_images->next_child()) {
+			if (images.size() >= 8)
+				throw std::invalid_argument("too many images");
+			completion_image_t image;
+			image.name = text(*n, "name");
+			image.mime_type = text(*n, "mime_type");
+			const auto encoded = text(*n, "base64");
+			if (encoded.size() > 12 * 1024 * 1024 ||
+			    encoded.find_first_not_of(
+			        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=") !=
+			        std::string::npos)
+				throw std::invalid_argument(
+				    "invalid image base64");
+			acl::string bytes;
+			bytes.base64_decode(encoded.c_str());
+			image.data.assign(bytes.c_str(), bytes.size());
+			if (image.data.empty() ||
+			    image.data.size() > 8 * 1024 * 1024)
+				throw std::invalid_argument(
+				    "invalid image size");
+			images.push_back(image);
+		}
+	}
+	model.set_images(images);
 	const auto result = model.complete(request, libai::stream_sink_t());
 	out.add_text("text", result.text.c_str())
 	    .add_text("reasoning", result.reasoning.c_str())
 	    .add_number("input_tokens", result.input_tokens)
 	    .add_number("output_tokens", result.output_tokens)
-	    .add_bool("retryable", result.retryable);
+	    .add_bool("retryable", result.retryable)
+	    .add_number("cached_input_tokens",
+	        model.last_completion().cached_input_tokens)
+	    .add_bool("cache_usage_available",
+	        model.last_completion().cache_usage_available)
+	    .add_number("latency_ms", model.last_completion().latency_ms);
 	auto &array = coding_detail::array(out, "calls");
 	for (const auto &c : result.calls)
 		array.add_child(false, true)
@@ -124,6 +206,13 @@ bool complete(provider_store_t &store, acl::json_node &a, acl::json_node &out,
 		    .add_text("name", c.name.c_str())
 		    .add_text("arguments", c.arguments.c_str());
 	error = result.error;
+	const auto &native = model.last_completion();
+	const auto effective = native.effective_max_output_tokens > 0 ?
+	    native.effective_max_output_tokens :
+	    tokens;
+	out.add_number("effective_max_output_tokens", effective)
+	    .add_number("reasoning_tokens", native.reasoning_tokens);
+	annotate_output_token_limit(error, native.incomplete_reason, effective);
 	return error.empty();
 }
 }
@@ -142,6 +231,8 @@ bool providers(const std::string &root, const std::string &op,
 	}
 	if (op == "providers.remove")
 		return store.remove(text(a, "id"), error);
+	if (op == "providers.test")
+		return test_connection(store, a, out, error);
 	if (op == "providers.complete")
 		return complete(store, a, out, error);
 	if (op == "providers.save") {

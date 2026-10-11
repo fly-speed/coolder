@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "agent_workspace_internal.h"
 
 namespace webcool
@@ -70,7 +71,7 @@ bool read_project_roots(const std::string &user_root,
 	}
 	cache.erase(user_root);
 #endif
-	std::ifstream in(registry_path(user_root).c_str(), std::ios::in);
+	record_json::input in(registry_path(user_root).c_str(), std::ios::in);
 	if (!in.good())
 		return true;
 	std::string line;
@@ -160,7 +161,7 @@ bool agent_workspace_t::register_project_root(const std::string &user_root,
 	}
 	const std::string target = registry_path(user_root);
 	const std::string temporary = target + ".tmp";
-	std::ofstream out(temporary.c_str(), std::ios::out | std::ios::trunc);
+	record_json::output out(temporary.c_str(), std::ios::out | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write external project root registry";
 		return false;
@@ -263,7 +264,7 @@ bool agent_workspace_t::unregister_project_root(const std::string &user_root,
 		return true;
 	const std::string target = registry_path(user_root);
 	const std::string temporary = target + ".tmp";
-	std::ofstream out(temporary.c_str(), std::ios::out | std::ios::trunc);
+	record_json::output out(temporary.c_str(), std::ios::out | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write external project root registry";
 		return false;

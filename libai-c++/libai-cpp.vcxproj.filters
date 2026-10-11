@@ -108,4 +108,9 @@
     <ClInclude Include="src\platform.h" />
     <ClInclude Include="include\libai_cpp\types.h" />
   </ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\coding\coding_runtime.cpp"></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\coding\coding_sandbox.cpp"></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\coding\coding_migration.cpp"></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\common\record_json.cpp"></ClCompile></ItemGroup>
+  <ItemGroup><ClInclude Include="..\libai\common\record_json.h" /></ItemGroup>
 </Project>

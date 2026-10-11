@@ -4,18 +4,13 @@ find_package(Threads REQUIRED)
 # Compile the bridge directly into JNI so deployment needs one native library.
 add_library(libai_jni SHARED
  src/main/cpp/jni_strings.cpp src/main/cpp/jni_callbacks.cpp src/main/cpp/jni_bridge.cpp src/main/cpp/jni_coding.cpp
- ../libai-c/src/bridge.cpp ../libai-c/src/builders.cpp ../libai-c/src/json_writer.cpp ../libai-c/src/coding.cpp ../libai-c/src/cancellation.cpp ../libai-c/src/provider.cpp)
+ ../libai-c/src/bridge.cpp ../libai-c/src/builders.cpp ../libai-c/src/json_writer.cpp ../libai-c/src/coding.cpp ../libai-c/src/cancellation.cpp ../libai-c/src/provider.cpp )
 set_target_properties(libai_jni PROPERTIES POSITION_INDEPENDENT_CODE ON OUTPUT_NAME ai_jni)
 target_compile_features(libai_jni PRIVATE cxx_std_11)
 target_include_directories(libai_jni PRIVATE ../libai-c/include ..)
 target_link_libraries(libai_jni PRIVATE Threads::Threads)
 if(NOT ANDROID)
- if(LIBAI_JNI_INCLUDE_DIR)
-  target_include_directories(libai_jni PRIVATE "${LIBAI_JNI_INCLUDE_DIR}" "${LIBAI_JNI_INCLUDE_DIR}/darwin" "${LIBAI_JNI_INCLUDE_DIR}/linux" "${LIBAI_JNI_INCLUDE_DIR}/win32")
- else()
-  find_package(JNI REQUIRED)
-  target_include_directories(libai_jni PRIVATE ${JNI_INCLUDE_DIRS})
- endif()
+ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/JNIHeaders.cmake")
 endif()
 install(TARGETS libai_jni LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
 

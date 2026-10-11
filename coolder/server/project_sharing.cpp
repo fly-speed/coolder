@@ -5,6 +5,7 @@
 #include <coding_host.h>
 #include <algorithm>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <map>
 #include <sstream>
@@ -47,6 +48,42 @@ grants_t load_grants()
 			throw std::runtime_error("cannot read memberships");
 		return grants;
 	}
+	in >> std::ws;
+	if (in.peek() == '{') {
+		std::string source((std::istreambuf_iterator<char>(in)), {});
+		acl::json json(source.c_str());
+		if (!json.finish() || !json["version"] ||
+		    !json["version"]->get_int64() ||
+		    *json["version"]->get_int64() != 1)
+			throw std::runtime_error("invalid membership JSON");
+		auto *rows =
+		    json["grants"] ? json["grants"]->get_obj() : nullptr;
+		if (!rows || !rows->is_array())
+			throw std::runtime_error(
+			    "invalid membership JSON records");
+		for (auto *row = rows->first_child(); row;
+		     row = rows->next_child()) {
+			const auto owner =
+			    libai::cpp::coding::json_values::text(
+			        (*row)["owner"]);
+			const auto project =
+			    libai::cpp::coding::json_values::text(
+			        (*row)["project"]);
+			const auto member =
+			    libai::cpp::coding::json_values::text(
+			        (*row)["member"]);
+			const auto permission =
+			    libai::cpp::coding::json_values::text(
+			        (*row)["permission"]);
+			if (owner.empty() || project.empty() ||
+			    member.empty() ||
+			    (permission != "read" && permission != "write"))
+				throw std::runtime_error(
+				    "invalid membership JSON record");
+			grants[{ owner, project, member }] = permission;
+		}
+		return grants;
+	}
 	std::string line;
 	while (std::getline(in, line)) {
 		std::istringstream row(line);
@@ -67,13 +104,24 @@ void save_grants(const grants_t &grants)
 {
 	const auto path = data_dir + "/auth/project-members.v1";
 	std::ofstream out(path + ".tmp", std::ios::trunc);
+	acl::json json;
+	auto &root = json.create_node();
+	root.add_number("version", 1);
+	auto &rows = json.create_array();
+	root.add_child("grants", rows);
 	for (const auto &grant : grants) {
-		out << std::quoted(std::get<0>(grant.first)) << ' '
-		    << std::quoted(std::get<1>(grant.first)) << ' '
-		    << std::quoted(std::get<2>(grant.first)) << ' '
-		    << std::quoted(grant.second) << '\n';
+		auto &row = rows.add_child(false, true);
+		row.add_text("owner", std::get<0>(grant.first).c_str())
+		    .add_text("project", std::get<1>(grant.first).c_str())
+		    .add_text("member", std::get<2>(grant.first).c_str())
+		    .add_text("permission", grant.second.c_str());
 	}
+	out << root.to_string().c_str() << '\n';
 	out.close();
+	std::filesystem::permissions(path + ".tmp",
+	    std::filesystem::perms::owner_read |
+	        std::filesystem::perms::owner_write,
+	    std::filesystem::perm_options::replace);
 	if (!out ||
 	    !libai::cpp::coding::file_ops::replace_file(path + ".tmp", path))
 		throw std::runtime_error("cannot save memberships");
@@ -325,4 +373,28 @@ bool project_sharing_route(request_t &req, response_t &res,
 	return files(
 	    req, res, body, operation, method, *owner, project, permission);
 }
+void project_sharing_init()
+{
+	const auto path = data_dir + "/auth/project-members.v1";
+	if (!libai::cpp::coding::file_ops::path_entry_exists(path))
+		return;
+	std::ifstream in(path);
+	in >> std::ws;
+	if (in.peek() == '{') {
+		load_grants();
+		return;
+	}
+	const auto grants = load_grants();
+	if (std::filesystem::is_symlink(
+	        std::filesystem::symlink_status(path + ".legacy")))
+		throw std::runtime_error("membership backup is a symlink");
+	if (!std::filesystem::exists(path + ".legacy"))
+		std::filesystem::copy_file(path, path + ".legacy");
+	std::filesystem::permissions(path + ".legacy",
+	    std::filesystem::perms::owner_read |
+	        std::filesystem::perms::owner_write,
+	    std::filesystem::perm_options::replace);
+	save_grants(grants);
+}
+
 } // namespace coolder

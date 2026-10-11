@@ -227,3 +227,5 @@ VS 解决方案引用 `libai-c++/libai-cpp.vcxproj`。封装内部复用 libai�
 
 新应用可选择轻量 `Agent` 或共享 `CodingService`；Java/Python/Rust/Objective-C
 均提供后者。详见 [跨语言编码 API](../libai/docs/CODING_SERVICE.md)。
+
+持久化数据使用 JSON，旧格式启动时迁移并保留 `.legacy` 备份。存储结构、迁移规则与跨 APP 使用范围见 [JSON_STORAGE.md](docs/JSON_STORAGE.md)。

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "ai_provider_store_internal.h"
 namespace webcool
 {
@@ -206,7 +207,7 @@ bool load_unlocked(const std::string &user_root,
     std::vector<provider_config_t> &providers, std::string &err)
 {
 	providers.clear();
-	std::ifstream in(
+	record_json::input in(
 	    provider_file(user_root).c_str(), std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true;
@@ -277,7 +278,7 @@ bool load_unlocked(const std::string &user_root,
 bool load_health_unlocked(const std::string &user_root,
     std::vector<provider_config_t> &providers, std::string &err)
 {
-	std::ifstream in(provider_health_file(user_root).c_str(),
+	record_json::input in(provider_health_file(user_root).c_str(),
 	    std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true;
@@ -335,7 +336,7 @@ bool save_health_unlocked(const std::string &user_root,
 		return false;
 	const std::string path = provider_health_file(user_root);
 	const std::string tmp = path + ".tmp";
-	std::ofstream out(
+	record_json::output out(
 	    tmp.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 	if (!out.good()) {
 		err = "cannot write AI provider health database";
@@ -379,7 +380,7 @@ bool save_unlocked(const std::string &user_root,
 		return false;
 	const std::string path = provider_file(user_root);
 	const std::string tmp = path + ".tmp";
-	std::ofstream out(
+	record_json::output out(
 	    tmp.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 	if (!out.good()) {
 		err = "cannot write AI provider database";

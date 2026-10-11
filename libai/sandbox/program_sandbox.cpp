@@ -11,6 +11,7 @@
 #include <cstring>
 #include <limits.h>
 #include <sstream>
+#include <mutex>
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -42,6 +43,16 @@ namespace sandbox_detail
 // These are broker protocol limits, separate from kernel resource limits.
 // Arguments remain distinct argv elements and are never concatenated into a
 // command string or interpreted by a shell.
+namespace
+{
+std::mutex helper_mutex;
+std::string default_helper;
+}
+std::string configured_helper_path()
+{
+	std::lock_guard<std::mutex> lock(helper_mutex);
+	return default_helper;
+}
 const size_t kMaxArguments = 64;
 const size_t kMaxArgumentBytes = 32 * 1024;
 
@@ -196,6 +207,9 @@ void append_pipe(int fd, std::string &output, size_t &total, size_t limit,
 #ifdef __APPLE__
 std::string adjacent_helper_path()
 {
+	const auto configured = configured_helper_path();
+	if (!configured.empty())
+		return configured;
 	uint32_t size = 0;
 	(void)_NSGetExecutablePath(NULL, &size);
 	if (size == 0 || size > 64 * 1024)
@@ -238,6 +252,9 @@ bool mac_process_tree_exceeds(pid_t root, unsigned long limit)
 #elif defined(__linux__)
 std::string adjacent_helper_path()
 {
+	const auto configured = configured_helper_path();
+	if (!configured.empty())
+		return configured;
 	char path[PATH_MAX + 1];
 	const ssize_t length = readlink("/proc/self/exe", path, PATH_MAX);
 	if (length <= 0 || length > PATH_MAX)
@@ -269,6 +286,9 @@ void cleanup_linux_cgroup(pid_t helper_pid)
 #ifdef _WIN32
 std::string adjacent_helper_path()
 {
+	const auto configured = configured_helper_path();
+	if (!configured.empty())
+		return configured;
 	std::vector<wchar_t> path(32768, L'\0');
 	const DWORD length =
 	    GetModuleFileNameW(NULL, &path[0], static_cast<DWORD>(path.size()));
@@ -449,6 +469,12 @@ bool program_sandbox_t::browser_runtime_available(
 	reason = "browser validation is unsupported on this platform";
 	return false;
 #endif
+}
+
+void program_sandbox_t::set_default_helper(const std::string &path)
+{
+	std::lock_guard<std::mutex> lock(sandbox_detail::helper_mutex);
+	sandbox_detail::default_helper = path;
 }
 
 program_sandbox_t::program_sandbox_t(const std::string &user_root,

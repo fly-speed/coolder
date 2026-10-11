@@ -95,6 +95,7 @@ public:
 			const stream_sink_t &sink_;
 		} observer(source, sink);
 		auto input = request(source);
+		input.images = images_;
 		input.transport_session =
 		    webcool::ai::provider_client_t::create_transport_session();
 		webcool::ai::completion_result_t output;
@@ -106,6 +107,7 @@ public:
 			    error.empty() ? "provider request failed" : error;
 			result.retryable = output.retryable_error;
 		}
+		last_completion_ = output;
 		result.text = output.text;
 		result.reasoning = output.reasoning;
 		result.input_tokens = static_cast<std::size_t>(
@@ -127,6 +129,18 @@ public:
 		return result;
 	}
 
+	// Supply bounded in-memory images for provider-native vision requests.
+	void set_images(const std::vector<webcool::ai::completion_image_t> &images)
+	{
+		images_ = images;
+	}
+
+	// Last native completion metadata for generic service usage accounting.
+	const webcool::ai::completion_result_t &last_completion() const
+	{
+		return last_completion_;
+	}
+
 private:
 	// Reverse wire-name normalization using this request's advertised tools.
 	static std::string restored_name(
@@ -141,6 +155,10 @@ private:
 		}
 		return name;
 	}
+	// Optional provider-native image attachments.
+	std::vector<webcool::ai::completion_image_t> images_;
+	// Last response usage and timing; no credential is included.
+	webcool::ai::completion_result_t last_completion_;
 	// Provider endpoint, protocol and model configuration.
 	webcool::ai::provider_config_t config_;
 	// Application credential kept in memory; never log or serialize it.

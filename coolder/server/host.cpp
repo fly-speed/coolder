@@ -176,7 +176,8 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 	}
 	if (path == "/api/health" && method == "GET") {
 		return reply(res, 200,
-		    "{\"ok\":true,\"app\":\"coolder\",\"version\":\"1.0.0\"}");
+		    "{\"ok\":true,\"app\":\"" + std::string("coolder") +
+		        "\",\"version\":\"1.0.0\"}");
 	}
 	if (path == "/api/v1/admin/ai-policy" &&
 	    (method == "GET" || method == "POST")) {
@@ -313,8 +314,19 @@ bool load_user_prefs(const std::string &, const std::string &username,
 	std::ifstream f(coolder::account_preferences(username));
 	if (!f)
 		return true;
-	std::getline(f, prefs.ai_coding_provider_id);
-
+	std::string source((std::istreambuf_iterator<char>(f)), {});
+	if (source.find_first_not_of(" \t\r\n") != std::string::npos &&
+	    source[source.find_first_not_of(" \t\r\n")] == '{') {
+		acl::json json(source.c_str());
+		if (!json.finish() || !json["ai_coding_provider_id"] ||
+		    !json["ai_coding_provider_id"]->is_string())
+			return false;
+		prefs.ai_coding_provider_id =
+		    json["ai_coding_provider_id"]->get_string();
+	} else {
+		std::istringstream legacy(source);
+		std::getline(legacy, prefs.ai_coding_provider_id);
+	}
 	return true;
 }
 
@@ -323,7 +335,11 @@ bool save_user_prefs(const std::string &, const std::string &username,
 {
 	const std::string path = coolder::account_preferences(username);
 	std::ofstream f(path + ".tmp");
-	f << prefs.ai_coding_provider_id;
+	acl::json json;
+	auto &row = json.create_node();
+	row.add_text(
+	    "ai_coding_provider_id", prefs.ai_coding_provider_id.c_str());
+	f << row.to_string().c_str();
 	f.close();
 	if (!(!f || std::rename((path + ".tmp").c_str(), path.c_str()) != 0))
 		return true;

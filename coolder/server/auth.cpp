@@ -100,17 +100,110 @@ void private_directory(const std::string &path)
 	fs::permissions(path, fs::perms::owner_all, fs::perm_options::replace);
 }
 
+void migrate_preferences(const std::string &path)
+{
+	if (!std::filesystem::exists(path))
+		return;
+	if (std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+		throw std::runtime_error("preference file is a symlink");
+	std::ifstream in(path);
+	in >> std::ws;
+	if (in.peek() == '{')
+		return;
+	std::string language, theme, size, extra;
+	if (!(in >> language >> theme >> size) || in >> extra ||
+	    language.empty() || (size != "sm" && size != "md" && size != "lg"))
+		throw std::runtime_error("invalid legacy preferences");
+	const auto backup = path + ".legacy";
+	if (std::filesystem::is_symlink(
+	        std::filesystem::symlink_status(backup)))
+		throw std::runtime_error("preference backup is a symlink");
+	if (!std::filesystem::exists(backup))
+		std::filesystem::copy_file(path, backup);
+	std::filesystem::permissions(backup,
+	    std::filesystem::perms::owner_read |
+	        std::filesystem::perms::owner_write,
+	    std::filesystem::perm_options::replace);
+	acl::json json;
+	auto &row = json.create_node();
+	row.add_text("language", language.c_str())
+	    .add_text("theme", theme.c_str())
+	    .add_text("font_size", size.c_str());
+	const auto temp = path + "." + random_hex();
+	std::ofstream out(temp);
+	out << row.to_string().c_str();
+	out.close();
+	if (!out)
+		throw std::runtime_error(
+		    "cannot migrate interface preferences");
+	std::filesystem::permissions(temp,
+	    std::filesystem::perms::owner_read |
+	        std::filesystem::perms::owner_write,
+	    std::filesystem::perm_options::replace);
+	if (!libai::cpp::coding::file_ops::replace_file(temp, path))
+		throw std::runtime_error("cannot install preference JSON");
+}
+
+void migrate_provider_preferences(const std::string &path)
+{
+	if (!std::filesystem::exists(path))
+		return;
+	if (std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+		throw std::runtime_error("provider preferences is a symlink");
+	std::ifstream in(path);
+	in >> std::ws;
+	if (in.peek() == '{')
+		return;
+	std::string provider, extra;
+	std::getline(in, provider);
+	if (std::getline(in, extra) && !extra.empty())
+		throw std::runtime_error("invalid provider preferences");
+	const auto backup = path + ".legacy";
+	if (std::filesystem::is_symlink(
+	        std::filesystem::symlink_status(backup)))
+		throw std::runtime_error(
+		    "provider preference backup is a symlink");
+	if (!std::filesystem::exists(backup))
+		std::filesystem::copy_file(path, backup);
+	std::filesystem::permissions(backup,
+	    std::filesystem::perms::owner_read |
+	        std::filesystem::perms::owner_write,
+	    std::filesystem::perm_options::replace);
+	acl::json json;
+	auto &row = json.create_node();
+	row.add_text("ai_coding_provider_id", provider.c_str());
+	const auto temp = path + "." + random_hex();
+	std::ofstream out(temp);
+	out << row.to_string().c_str();
+	out.close();
+	if (!out)
+		throw std::runtime_error("cannot migrate provider preferences");
+	std::filesystem::permissions(temp,
+	    std::filesystem::perms::owner_read |
+	        std::filesystem::perms::owner_write,
+	    std::filesystem::perm_options::replace);
+	if (!libai::cpp::coding::file_ops::replace_file(temp, path))
+		throw std::runtime_error("cannot install provider preferences");
+}
+
 void persist(const std::map<std::string, account_t> &updated)
 {
 	const auto path = data_dir + "/auth/accounts.v1";
 	const auto temporary = path + "." + random_hex();
 	std::ofstream out(temporary);
-	out << "coolder-accounts-v1 " << iterations << '\n';
+	acl::json json;
+	auto &root = json.create_node();
 	for (const auto &item : updated) {
 		const auto &a = item.second;
-		out << a.username << ' ' << a.id << ' ' << a.admin << ' '
-		    << a.enabled << ' ' << a.salt << ' ' << a.digest << '\n';
+		auto &row = root.add_child(a.username.c_str(), true);
+		row.add_text("username", a.username.c_str())
+		    .add_text("id", a.id.c_str())
+		    .add_bool("admin", a.admin)
+		    .add_bool("enabled", a.enabled)
+		    .add_text("salt", a.salt.c_str())
+		    .add_text("digest", a.digest.c_str());
 	}
+	out << root.to_string().c_str() << '\n';
 	out.close();
 	if (!out) {
 		throw std::runtime_error("cannot save accounts");
@@ -131,9 +224,10 @@ std::string session_key(const request_t &req)
 	std::string part;
 	while (std::getline(stream, part, ';')) {
 		part.erase(0, part.find_first_not_of(' '));
-		if (!(part.compare(0, 16, "coolder_session=") == 0))
+		if (!(part.compare(0, std::string("coolder_session").size() + 1,
+		          std::string("coolder_session") + "=") == 0))
 			continue;
-		return part.substr(16);
+		return part.substr(std::string("coolder_session").size() + 1);
 	}
 	return "";
 }
@@ -183,7 +277,7 @@ void login(response_t &res, const account_t &a)
 	const auto key = random_hex();
 	sessions[key] = { a.username, now + std::chrono::hours(8) };
 	res.setHeader("Set-Cookie",
-	    ("coolder_session=" + key +
+	    (std::string("coolder_session") + "=" + key +
 	        "; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800")
 	        .c_str());
 }
@@ -225,12 +319,59 @@ void accounts_init()
 	if (!std::filesystem::exists(path)) {
 		return;
 	}
-	std::ifstream in(path);
-	std::string version;
-	int rounds = 0;
-	if (!(in >> version >> rounds) || version != "coolder-accounts-v1" ||
-	    rounds != iterations) {
-		throw std::runtime_error("invalid account store");
+	if (std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+		throw std::runtime_error("account file is a symlink");
+	std::ifstream file(path);
+	std::string content((std::istreambuf_iterator<char>(file)), {});
+	const bool legacy =
+	    content.find_first_not_of(" \t\r\n") != std::string::npos &&
+	    content[content.find_first_not_of(" \t\r\n")] != '{';
+	std::stringstream in;
+	if (legacy) {
+		in.str(content);
+		std::string version;
+		int rounds = 0;
+		if (!(in >> version >> rounds) ||
+		    version != "coolder-accounts-v1" || rounds != iterations)
+			throw std::runtime_error("invalid account store");
+	} else {
+		acl::json json(content.c_str());
+		if (!json.finish() || !json.get_root().is_object())
+			throw std::runtime_error("invalid account JSON");
+		auto &root = json.get_root();
+		for (auto *entry = root.first_child(); entry;
+		     entry = root.next_child()) {
+			const std::string name =
+			    entry->tag_name() ? entry->tag_name() : "";
+			auto *row =
+			    entry->is_object() ? entry : entry->get_obj();
+			if (!row)
+				throw std::runtime_error(
+				    "invalid account JSON record");
+			if (!row->is_object() || !(*row)["admin"] ||
+			    !(*row)["admin"]->is_bool() || !(*row)["enabled"] ||
+			    !(*row)["enabled"]->is_bool() ||
+			    name !=
+			        libai::cpp::coding::json_values::text(
+			            (*row)["username"]) ||
+			    !(*row)["username"]->is_string() || !(*row)["id"] ||
+			    !(*row)["id"]->is_string() || !(*row)["salt"] ||
+			    !(*row)["salt"]->is_string() || !(*row)["digest"] ||
+			    !(*row)["digest"]->is_string())
+				throw std::runtime_error(
+				    "invalid account JSON record");
+			in << name << ' '
+			   << libai::cpp::coding::json_values::text(
+			          (*row)["id"])
+			   << ' ' << *(*row)["admin"]->get_bool() << ' '
+			   << *(*row)["enabled"]->get_bool() << ' '
+			   << libai::cpp::coding::json_values::text(
+			          (*row)["salt"])
+			   << ' '
+			   << libai::cpp::coding::json_values::text(
+			          (*row)["digest"])
+			   << '\n';
+		}
 	}
 	std::set<std::string> ids;
 	unsigned admins = 0;
@@ -256,9 +397,30 @@ void accounts_init()
 		}
 		accounts[a.username] = a;
 	}
-	if (admins != 1) {
+	if (admins != 1 && (legacy || !accounts.empty())) {
 		throw std::runtime_error(
 		    "account store must contain one administrator");
+	}
+	if (legacy) {
+		const auto backup = path + ".legacy";
+		if (std::filesystem::is_symlink(
+		        std::filesystem::symlink_status(backup)))
+			throw std::runtime_error("account backup is a symlink");
+		if (!std::filesystem::exists(backup)) {
+			std::filesystem::copy_file(path, backup);
+			std::filesystem::permissions(backup,
+			    std::filesystem::perms::owner_read |
+			        std::filesystem::perms::owner_write,
+			    std::filesystem::perm_options::replace);
+		}
+		persist(accounts);
+	}
+	for (const auto &a : accounts) {
+		migrate_preferences(
+		    data_dir + "/auth/ui-" + a.second.id + ".v1");
+		migrate_provider_preferences(a.second.admin ?
+		        data_dir + "/preferences" :
+		        data_dir + "/users/" + a.second.id + "/preferences");
 	}
 }
 
@@ -307,26 +469,46 @@ static bool handle_interface_preferences(response_t &res,
 	// Account identity comes exclusively from the authenticated session.
 	const auto filename = data_dir + "/auth/ui-" + actor.id + ".v1";
 	std::string language = "zh", theme = "default", font_size = "md";
+	bool legacy = false;
 	std::ifstream in(filename);
-	if (in && !(in >> language >> theme >> font_size)) {
-		throw std::runtime_error("invalid interface preferences");
+	if (in) {
+		std::string content((std::istreambuf_iterator<char>(in)), {});
+		std::stringstream values(content);
+		values >> std::ws;
+		legacy = values.peek() != '{';
+		if (legacy) {
+			std::string extra;
+			if (!(values >> language >> theme >> font_size) ||
+			    values >> extra)
+				throw std::runtime_error(
+				    "invalid interface preferences");
+		} else {
+			acl::json prefs(content.c_str());
+			if (!prefs.finish() || !prefs.get_root().is_object())
+				throw std::runtime_error(
+				    "invalid interface preferences JSON");
+			language = text(&prefs, "language");
+			theme = text(&prefs, "theme");
+			font_size = text(&prefs, "font_size");
+		}
 	}
-	if (method == "POST") {
-		if (!body) {
+	if (method == "POST" || legacy) {
+		if (method == "POST" && !body) {
 			return error(res, 400, "invalid JSON body");
 		}
 		for (const auto *key : { "language", "theme", "font_size" }) {
-			if (!((*body)[key] && !(*body)[key]->get_string()))
+			if (!(body && (*body)[key] &&
+			        !(*body)[key]->get_string()))
 				continue;
 			return error(res, 400, "preferences must be strings");
 		}
-		if ((*body)["language"]) {
+		if (body && (*body)["language"]) {
 			language = text(body, "language");
 		}
-		if ((*body)["theme"]) {
+		if (body && (*body)["theme"]) {
 			theme = text(body, "theme");
 		}
-		if ((*body)["font_size"]) {
+		if (body && (*body)["font_size"]) {
 			font_size = text(body, "font_size");
 		}
 		const std::set<std::string> themes = { "default", "blue",
@@ -345,9 +527,28 @@ static bool handle_interface_preferences(response_t &res,
 		        font_size != "lg")) {
 			return error(res, 400, "invalid interface preferences");
 		}
+		if (legacy) {
+			if (std::filesystem::is_symlink(
+			        std::filesystem::symlink_status(
+			            filename + ".legacy")))
+				throw std::runtime_error(
+				    "preference backup is a symlink");
+			if (!std::filesystem::exists(filename + ".legacy"))
+				std::filesystem::copy_file(
+				    filename, filename + ".legacy");
+			std::filesystem::permissions(filename + ".legacy",
+			    std::filesystem::perms::owner_read |
+			        std::filesystem::perms::owner_write,
+			    std::filesystem::perm_options::replace);
+		}
 		const auto temporary = filename + "." + random_hex();
 		std::ofstream out(temporary);
-		out << language << ' ' << theme << ' ' << font_size << '\n';
+		acl::json prefs;
+		auto &node = prefs.create_node();
+		node.add_text("language", language.c_str())
+		    .add_text("theme", theme.c_str())
+		    .add_text("font_size", font_size.c_str());
+		out << node.to_string().c_str() << '\n';
 		out.close();
 		if (!out) {
 			throw std::runtime_error(
@@ -409,7 +610,9 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 	    method == "POST") {
 		sessions.erase(session_key(req));
 		res.setHeader("Set-Cookie",
-		    "coolder_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+		    (std::string("coolder_session") +
+		        "=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")
+		        .c_str());
 		return reply(res, 200, "{\"ok\":true}");
 	}
 	if (path == "/api/v1/auth/preferences" &&

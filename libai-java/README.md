@@ -72,3 +72,5 @@ try (Agent agent = new Agent((requestJson, invocation) -> {
 
 新增会话快照、独立取消令牌及内置 Provider Agent。接口对应关系和生命周期见
 [Agent 接口能力补齐](../libai/docs/CODING_SERVICE.md#agent-接口能力补齐)。
+
+JNI 构建只需要头文件，不依赖 AWT 或链接 JVM。脚本按选定 Java 的 `java.home` / `JAVA_HOME` 探测完整 JDK；macOS/Linux 上也可自动使用已安装 Android NDK 的 VM 通用 JNI 头文件，支持 Android Studio 内置 JDK 缺少 `include/` 的情况。NDK 默认位置为 macOS 的 `~/Library/Android/sdk` 或 Linux 的 `~/Android/Sdk`，也可设置 `ANDROID_SDK_ROOT` / `ANDROID_NDK_HOME`。没有可用头文件时，配置阶段给出完整 JDK 或显式头文件路径的修复提示。无需额外指定临时目录中的 JNI 头文件。

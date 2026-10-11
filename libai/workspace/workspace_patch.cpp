@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "../common/file_ops.h"
 #include "../common/identifiers.h"
 #include "../common/record_codec.h"
@@ -162,7 +163,7 @@ bool save_patch(
 {
 	const std::string path = plan_path(directory);
 	const std::string temporary = path + ".tmp";
-	std::ofstream out(temporary.c_str(),
+	record_json::output out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write workspace patch plan";
@@ -204,7 +205,7 @@ bool load_patch(const std::string &directory, const std::string &id,
 		return false;
 	}
 	const std::string path = plan_path(directory);
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good()) {
 		err = "workspace patch plan not found";
 		return false;

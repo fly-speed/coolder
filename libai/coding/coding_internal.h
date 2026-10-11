@@ -96,6 +96,13 @@ bool projects(const std::string &root, const std::string &op, acl::json_node &a,
 // Execute persistent session and metadata history operations.
 bool storage(const std::string &root, const std::string &op, acl::json_node &a,
     acl::json_node &out, std::string &error);
+// Execute fixed-command sandbox capabilities, execution and cancellation.
+bool sandbox(const std::string &root, const std::string &op,
+    acl::json_node &a, acl::json_node &out, std::string &error);
+// Upgrade versioned private metadata to JSON, keeping protected legacy backups.
+bool migrate(const std::string &root, acl::json_node &a, acl::json_node &out, std::string &error);
+// Validate or configure trusted host runtime budgets and toolchain allowlists.
+bool runtime(const std::string &op, acl::json_node &a, acl::json_node &out, std::string &error);
 // Execute provider settings and native model operations.
 bool providers(const std::string &root, const std::string &op,
     acl::json_node &a, acl::json_node &out, std::string &error);

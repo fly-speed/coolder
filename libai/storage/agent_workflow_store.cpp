@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "../common/file_ops.h"
 #include "../common/record_codec.h"
 #include "agent_workflow_store.h"
@@ -276,7 +277,7 @@ bool agent_workflow_store_t::save(
 	const std::string target = checkpoint_path(
 	    user_root_, value.project_id, value.session_id, value.task_id);
 	const std::string temporary = target + ".tmp";
-	std::ofstream out(temporary.c_str(),
+	record_json::output out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write agent workflow checkpoint";
@@ -329,7 +330,7 @@ bool agent_workflow_store_t::load(const std::string &project,
 		return ai_error("agent.workflow", "validate-load", err);
 	}
 	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
-	std::ifstream in(
+	record_json::input in(
 	    checkpoint_path(user_root_, project, session, task).c_str(),
 	    std::ios::in | std::ios::binary);
 	if (!in.good())

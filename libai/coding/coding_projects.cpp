@@ -130,10 +130,14 @@ bool inspection(const std::string &root, const std::string &op,
 		strings(out, "detected_languages", p.detected_languages);
 		strings(out, "unavailable_tools", p.unavailable_tools);
 		auto &array = coding_detail::array(out, "commands");
-		for (const auto &c : p.commands)
-			array.add_child(false, true)
-			    .add_text("id", c.id.c_str())
-			    .add_text("executable", c.executable.c_str());
+		for (const auto &c : p.commands) {
+			auto &command = array.add_child(false, true);
+			command.add_text("id", c.id.c_str())
+			    .add_text("executable", c.executable.c_str())
+			    .add_bool("dynamic_arguments", c.allow_dynamic_arguments)
+			    .add_bool("requires_confirmation", true);
+			strings(command, "fixed_arguments", c.fixed_arguments);
+		}
 		return true;
 	}
 	return false;

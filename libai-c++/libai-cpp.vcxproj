@@ -436,4 +436,9 @@
     <ClInclude Include="src\platform.h" />
     <ClInclude Include="include\libai_cpp\types.h" />
   </ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\coding\coding_runtime.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\coding\coding_sandbox.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\coding\coding_migration.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\libai\common\record_json.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
+  <ItemGroup><ClInclude Include="..\libai\common\record_json.h" /></ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "ai_provider_store_internal.h"
 namespace webcool
 {
@@ -60,7 +61,7 @@ bool write_master_key_file(const std::string &upload_root,
 	const std::string path =
 	    storage_detail::join_path(upload_root, kMasterKeyFile);
 	const std::string tmp = path + ".tmp";
-	std::ofstream out(
+	record_json::output out(
 	    tmp.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 	if (!out.good()) {
 		err = "cannot write AI master key";
@@ -118,7 +119,7 @@ bool read_master_keyring(
 		return false;
 	const std::string path =
 	    storage_detail::join_path(upload_root, kMasterKeyFile);
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good()) {
 		keyring.active.assign(32, 0);
 		if (!(RAND_bytes(&keyring.active[0],

@@ -226,6 +226,16 @@ std::string trim_slashes(std::string value)
 	return value;
 }
 
+// A configured API path is already a complete prefix (e.g. GLM /api/paas/v4).
+// Retain the historical /v1 default only for an origin without a path.
+static std::string compatible_api_base(const provider_config_t &provider)
+{
+	const std::string base = trim_slashes(provider.base_url);
+	const size_t scheme = base.find("://");
+	const size_t path = base.find('/', scheme == std::string::npos ? 0 : scheme + 3);
+	return path == std::string::npos ? base + "/v1" : base;
+}
+
 std::string test_url(const provider_config_t &provider)
 {
 	const std::string base = trim_slashes(provider.base_url);
@@ -233,9 +243,12 @@ std::string test_url(const provider_config_t &provider)
 		return ends_with(base, "/api") ? base + "/tags" :
 		                                 base + "/api/tags";
 	}
-	if (!(provider.protocol == "gemini_native"))
-		return ends_with(base, "/v1") ? base + "/models" :
-		                                base + "/v1/models";
+	if (!(provider.protocol == "gemini_native")) {
+		const std::string prefix = provider.protocol == "anthropic_messages" ?
+		    (ends_with(base, "/v1") ? base : base + "/v1") :
+		    compatible_api_base(provider);
+		return prefix + "/models";
+	}
 	return (ends_with(base, "/v1beta") || ends_with(base, "/v1")) ?
 	    base + "/models?pageSize=1" :
 	    base + "/v1beta/models?pageSize=1";
@@ -295,27 +308,20 @@ std::string completion_url(const provider_config_t &provider, bool stream)
 		return ends_with(base, "/v1") ? base + "/messages" :
 		                                base + "/v1/messages";
 	}
-	if (!(provider.protocol == "openai_responses"))
-		return ends_with(base, "/v1") ? base + "/chat/completions" :
-		                                base + "/v1/chat/completions";
-	return ends_with(base, "/v1") ? base + "/responses" :
-	                                base + "/v1/responses";
+	return compatible_api_base(provider) +
+	    (provider.protocol == "openai_responses" ? "/responses" : "/chat/completions");
 }
 
 std::string responses_item_url(const provider_config_t &provider,
     const std::string &response_id, bool cancel)
 {
-	const std::string base = trim_slashes(provider.base_url);
-	const std::string prefix = ends_with(base, "/v1") ? base : base + "/v1";
-	return prefix + "/responses/" + percent_encode_path(response_id) +
+	return compatible_api_base(provider) + "/responses/" + percent_encode_path(response_id) +
 	    (cancel ? "/cancel" : "");
 }
 
 std::string responses_compact_url(const provider_config_t &provider)
 {
-	const std::string base = trim_slashes(provider.base_url);
-	return (ends_with(base, "/v1") ? base : base + "/v1") +
-	    "/responses/compact";
+	return compatible_api_base(provider) + "/responses/compact";
 }
 
 std::string node_text(acl::json_node *node)

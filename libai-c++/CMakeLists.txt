@@ -7,7 +7,7 @@ option(BUILD_SHARED_LIBS "Build a shared C++ application library (default: stati
 option(LIBAI_CPP_BUILD_TESTS "Build C++ facade integration tests" OFF)
 option(LIBAI_CPP_BUILD_EXAMPLES "Build a standalone application example" ON)
 option(LIBAI_CPP_FULL "Include desktop coding facilities (ACL/OpenSSL required)" OFF)
-add_library(libai_cpp src/agent.cpp src/coding_service.cpp)
+add_library(libai_cpp src/agent.cpp src/coding_service.cpp )
 add_library(libai::cpp ALIAS libai_cpp)
 set_target_properties(libai_cpp PROPERTIES EXPORT_NAME cpp OUTPUT_NAME ai_cpp
  VERSION ${PROJECT_VERSION} SOVERSION 1 POSITION_INDEPENDENT_CODE ON)

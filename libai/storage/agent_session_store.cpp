@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "../common/file_ops.h"
 #include "../common/identifiers.h"
 #include "../common/record_codec.h"
@@ -324,7 +325,7 @@ bool load_records(const std::string &user_root,
     std::vector<agent_session_record_t> &records, std::string &err)
 {
 	records.clear();
-	std::ifstream in(join_path(user_root, kFile).c_str(),
+	record_json::input in(join_path(user_root, kFile).c_str(),
 	    std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true;
@@ -406,7 +407,7 @@ bool save_records(const std::string &user_root,
 		return false;
 	const std::string path = join_path(user_root, kFile);
 	const std::string temporary = path + ".tmp";
-	std::ofstream out(temporary.c_str(),
+	record_json::output out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write agent session database";

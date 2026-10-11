@@ -46,6 +46,9 @@ extern const size_t kMaxArguments;
 // Upper bound for argument bytes.
 extern const size_t kMaxArgumentBytes;
 
+// Return the trusted host-configured helper path, if any.
+std::string configured_helper_path();
+
 // Check whether a path lies inside the specified filesystem root.
 bool path_is_within(const std::string &root, const std::string &candidate);
 

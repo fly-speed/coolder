@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "ai_provider_client_internal.h"
 #include <map>
+#include "../common/json_value.h"
 
 namespace webcool
 {
@@ -118,6 +119,50 @@ static bool sdk_chat_content(acl::json &json, acl::json_node &messages,
 	return true;
 }
 
+// Attach native images to the current user turn for every supported protocol.
+static void sdk_images(acl::json &json, acl::json_node &item,
+    const libai::message_t &message, const completion_request_t &input,
+    bool responses, bool anthropic, bool gemini)
+{
+	const char *field = gemini ? "parts" : "content";
+	acl::json_node *parts = NULL;
+	if (anthropic || gemini)
+		parts = json_value::array_value(item[field]);
+	else {
+		json.remove(item[field]);
+		parts = &json.create_array();
+		item.add_child(field, *parts);
+		parts->add_child(false, true)
+		    .add_text("type", responses ? "input_text" : "text")
+		    .add_text("text", message.text.c_str());
+	}
+	for (const auto &image : input.images) {
+		acl::string encoded;
+		encoded.base64_encode(image.data.data(), image.data.size());
+		auto &part = parts->add_child(false, true);
+		if (gemini || anthropic) {
+			if (anthropic)
+				part.add_text("type", "image");
+			auto &source = json.create_node();
+			part.add_child(gemini ? "inlineData" : "source", source);
+			if (anthropic)
+				source.add_text("type", "base64");
+			source.add_text(gemini ? "mimeType" : "media_type", image.mime_type.c_str())
+			    .add_text("data", encoded.c_str());
+		} else {
+			const auto uri = "data:" + image.mime_type + ";base64," + encoded.c_str();
+			part.add_text("type", responses ? "input_image" : "image_url");
+			if (responses)
+				part.add_text("image_url", uri.c_str());
+			else {
+				auto &url = json.create_node();
+				part.add_child("image_url", url);
+				url.add_text("url", uri.c_str());
+			}
+		}
+	}
+}
+
 // SDK transcripts retain user/assistant/tool roles across independent runs.
 // Legacy coding requests continue using their specialized serializers.
 bool add_sdk_messages(const provider_config_t &provider,
@@ -140,6 +185,10 @@ bool add_sdk_messages(const provider_config_t &provider,
 		system.add_text("role", "system");
 		system.add_text("content", input.system_prompt.c_str());
 	}
+	const libai::message_t *last_user = NULL;
+	for (const auto &message : input.messages)
+		if (message.role == libai::message_t::role_t::user)
+			last_user = &message;
 	std::map<std::string, std::string> names;
 	acl::json_node *grouped_tool = NULL, *grouped_parts = NULL;
 	for (const auto &message : input.messages) {
@@ -173,6 +222,8 @@ bool add_sdk_messages(const provider_config_t &provider,
 			if (!sdk_chat_content(json, messages, item, message,
 			        responses, names))
 				return false;
+			if (&message == last_user && !input.images.empty())
+				sdk_images(json, item, message, input, responses, false, false);
 			continue;
 		}
 		auto &parts = grouped ? *grouped_parts : json.create_array();
@@ -187,6 +238,8 @@ bool add_sdk_messages(const provider_config_t &provider,
 		               json, parts, message, gemini, names)) {
 			return false;
 		}
+		if (&message == last_user && !input.images.empty())
+			sdk_images(json, item, message, input, responses, anthropic, gemini);
 	}
 	return true;
 }

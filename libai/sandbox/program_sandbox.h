@@ -104,6 +104,8 @@ struct sandbox_result_t {
 // server never performs complex sandbox setup between fork and exec.
 class program_sandbox_t {
 public:
+	// Configure a trusted helper for hosts whose executable is a language runtime.
+	static void set_default_helper(const std::string &path);
 	// Initialize program sandbox state from the supplied arguments.
 	program_sandbox_t(const std::string &user_root,
 	    const std::string &project_path,

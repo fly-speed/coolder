@@ -1,5 +1,6 @@
 #include <libai/sdk/provider_model.h>
 #include <libai/common/json_value.h>
+#include <libai/provider/ai_provider_client_internal.h>
 #include <cassert>
 #include <iostream>
 
@@ -17,6 +18,25 @@ static std::size_t count(acl::json_node *array)
 
 int main()
 {
+	// Explicit compatible API prefixes must not receive an extra /v1.
+	for (const std::string path : { "", "/", "/v1", "/v1/", "/api/paas/v4/",
+	         "/api/coding/paas/v4", "/gateway/custom/", "/compatible-mode/v1" }) {
+		provider_config_t provider;
+		provider.base_url = "https://example.invalid" + path;
+		const std::string prefix = "https://example.invalid" +
+		    (path.empty() || path == "/" ? "/v1" : (path.back() == '/' ? path.substr(0, path.size() - 1) : path));
+		for (const std::string protocol : { "openai_chat", "openai_compatible", "openai_responses" }) {
+			provider.protocol = protocol;
+			const std::string route = protocol == "openai_responses" ? "/responses" : "/chat/completions";
+			assert(provider_detail::test_url(provider) == prefix + "/models");
+			assert(provider_detail::completion_url(provider, false) == prefix + route);
+			assert(provider_detail::completion_url(provider, true) == prefix + route);
+		}
+		assert(provider_detail::responses_item_url(provider, "id/a", false) == prefix + "/responses/id%2Fa");
+		assert(provider_detail::responses_item_url(provider, "id/a", true) == prefix + "/responses/id%2Fa/cancel");
+		assert(provider_detail::responses_compact_url(provider) == prefix + "/responses/compact");
+	}
+
 	libai::model_request_t source;
 	source.instructions = "application instructions";
 	libai::tool_spec_t spec;
@@ -149,5 +169,27 @@ int main()
 		collision = true;
 	}
 	assert(collision);
+	libai::model_request_t vision_source;
+	libai::message_t user_image;
+	user_image.role = libai::message_t::role_t::user;
+	user_image.text = "Describe this image";
+	vision_source.messages.push_back(user_image);
+	vision_source.max_output_tokens = 64;
+	auto vision = libai::provider_model_t::request(vision_source);
+	completion_image_t image;
+	image.name = "fixture.png";
+	image.mime_type = "image/png";
+	image.data = "PNG fixture";
+	vision.images.push_back(image);
+	for (const auto &protocol : { "openai_chat", "openai_responses",
+	         "anthropic_messages", "gemini_native" }) {
+		provider.protocol = protocol;
+		std::string serialized;
+		assert(provider_client_t::serialize_completion_request(
+		    provider, vision, false, serialized));
+		assert(serialized.find("UE5HIGZpeHR1cmU=") != std::string::npos);
+		assert(serialized.find("Describe this image") != std::string::npos);
+		assert(serialized.find("image/png") != std::string::npos);
+	}
 	std::cout << "SDK provider transcript tests passed\n";
 }

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../common/record_json.h"
 #include "workspace_change_set_internal.h"
 namespace webcool
 {
@@ -11,7 +12,7 @@ bool save_set(
 {
 	const std::string path = pending_path(directory, set.id);
 	const std::string temporary = path + ".tmp";
-	std::ofstream out(temporary.c_str(),
+	record_json::output out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
 		err = "cannot write workspace change set";
@@ -58,7 +59,7 @@ bool load_set(const std::string &path, const std::string &id, stored_set_t &set,
 		err = "invalid workspace change-set id";
 		return false;
 	}
-	std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
+	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good()) {
 		err = "workspace change set not found";
 		return false;

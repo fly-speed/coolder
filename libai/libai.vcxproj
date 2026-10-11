@@ -312,6 +312,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemGroup>
     <ClCompile Include="common\native_runtime.cpp" />
+    <ClCompile Include="coding\coding_migration.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="common\record_json.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="agent\agent_execution_mode.cpp" />
     <ClInclude Include="agent\agent_execution_mode.h" />
     <ClCompile Include="agent\agent_progress_supervisor.cpp" />
@@ -349,6 +351,7 @@
     <ClInclude Include="common\identifiers.h" />
     <ClInclude Include="common\json_value.h" />
     <ClInclude Include="common\json_values.h" />
+    <ClInclude Include="common\record_json.h" />
     <ClInclude Include="common\platform_compat.h" />
     <ClInclude Include="common\record_codec.h" />
     <ClInclude Include="common\utf8_text.h" />
@@ -513,4 +516,6 @@
     <ClCompile Include="workspace\workspace_patch.cpp" />
     <ClInclude Include="workspace\workspace_patch.h" />
   </ItemGroup>
+  <ItemGroup><ClCompile Include="coding\coding_runtime.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="coding\coding_sandbox.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
 </Project>
