@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(libai_agent_example LANGUAGES CXX)
+find_package(libai CONFIG REQUIRED)
+add_executable(libai_agent_example main.cpp)
+target_link_libraries(libai_agent_example PRIVATE libai::agent)

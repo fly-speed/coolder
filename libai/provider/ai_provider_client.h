@@ -3,6 +3,7 @@
 
 #include "../agent/agent_registry.h"
 #include "ai_provider_store.h"
+#include "../agent.h"
 
 #include <memory>
 #include <string>
@@ -128,6 +129,8 @@ struct completion_tool_call_t {
 	// Whether the request explicitly supplied a content string.
 	bool content_present =
 	    false; // Explicit JSON string, including an intentional empty deletion.
+	// Full JSON object, preserving custom/nested/typed arguments for SDK tools.
+	std::string arguments_json;
 };
 
 // A completed native assistant/tool exchange. Chat-style providers require
@@ -186,7 +189,7 @@ struct completion_request_t {
 	std::string prompt_cache_ttl;
 	// Run identifier attached to provider request metadata.
 	std::string metadata_run_id;
-	// Session identifier attached to provider request metadata.
+	// agent_session_t identifier attached to provider request metadata.
 	std::string metadata_session_id;
 	// Whether the Responses provider may retain the response.
 	bool store = true;
@@ -213,6 +216,8 @@ struct completion_request_t {
 	std::vector<completion_tool_output_t> tool_outputs;
 	// Prior native assistant/tool exchanges retained for replay.
 	std::vector<completion_tool_exchange_t> tool_history;
+	// Optional typed SDK transcript. Empty preserves the coding runtime payload.
+	std::vector<libai::message_t> messages;
 };
 
 // Transient completion result. Text and tool arguments are kept in memory only
@@ -271,7 +276,7 @@ struct completion_result_t {
 	bool reasoning_budget_recovered = false;
 	// Whether the result contains provider-native function calls.
 	bool native_tool_call = false;
-	// Tool calls reported or retained for this operation.
+	// tool_t calls reported or retained for this operation.
 	std::vector<completion_tool_call_t> tool_calls;
 	// Compatibility mirror of tool_calls.front(). New agent code consumes the
 	// vector; these fields keep older callers and stored test fixtures readable.
@@ -298,7 +303,7 @@ public:
 	{
 	}
 	// Called immediately before each HTTP request, including transport fallbacks
-	// and automatic reasoning retries. Agent runtimes use this hook to archive
+	// and automatic reasoning retries. agent_t runtimes use this hook to archive
 	// the exact JSON body in the selected project. API keys are HTTP headers and
 	// are therefore never present in payload.
 	virtual bool on_request_payload(

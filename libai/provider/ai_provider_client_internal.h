@@ -26,6 +26,9 @@ namespace ai
 // Private implementation details shared by the provider client translation units.
 namespace provider_detail
 {
+// Serialize a typed SDK transcript into the selected native protocol.
+bool add_sdk_messages(const provider_config_t &provider,
+    const completion_request_t &input, acl::json &json, acl::json_node &root);
 
 // Reasoning streams have substantial SSE framing overhead. Transport bytes,
 // final visible output and individual events therefore need separate limits.
@@ -154,6 +157,8 @@ acl::json_node *first_array_item(acl::json_node *node);
 acl::json_node *array_value(acl::json_node *node);
 
 // Request helpers.
+// Convert a canonical application tool name to its native wire name.
+std::string wire_tool_name(const std::string &canonical);
 // Map a provider wire name back to the runtime's canonical tool name.
 std::string canonical_tool_name(const std::string &wire);
 
@@ -193,7 +198,9 @@ bool parse_completion(const provider_config_t &provider,
 
 // Copy provider token-accounting fields into the normalized result.
 void copy_usage(const completion_result_t &source, completion_result_t &target);
+// Decode cached-token accounting from a chat provider usage object.
 void parse_chat_cache_usage(acl::json_node *usage, completion_result_t &result);
+// Decode Anthropic input/output and prompt-cache token accounting.
 void parse_anthropic_usage(acl::json_node *usage, completion_result_t &result);
 
 // Replace partial stream state with a complete result and remaining deltas.

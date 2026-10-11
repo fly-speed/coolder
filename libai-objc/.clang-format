@@ -1,0 +1,67 @@
+# Linux kernel layout, adapted for this project's C++ sources.
+# Use the shared tab/indentation policy for Objective-C. Use clang-format 18.
+# Reference: https://www.kernel.org/doc/html/latest/process/coding-style.html
+BasedOnStyle: LLVM
+Language: ObjC
+IndentWidth: 8
+TabWidth: 8
+UseTab: ForIndentation
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 8
+AccessModifierOffset: -8
+ColumnLimit: 80
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+NamespaceIndentation: None
+CompactNamespaces: false
+IndentCaseLabels: false
+IndentGotoLabels: false
+IndentPPDirectives: None
+PointerAlignment: Right
+ReferenceAlignment: Right
+DerivePointerAlignment: false
+AlignAfterOpenBracket: DontAlign
+AlignOperands: DontAlign
+AlignEscapedNewlines: Left
+AlignTrailingComments: Never
+BinPackArguments: true
+BinPackParameters: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializers: BeforeComma
+Cpp11BracedListStyle: false
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+# Preserve include order, comments, literals and the existing control flow.
+SortIncludes: Never
+IncludeBlocks: Preserve
+SortUsingDeclarations: Never
+FixNamespaceComments: false
+ReflowComments: false
+BreakStringLiterals: false
+InsertBraces: false
+RemoveBracesLLVM: false
+QualifierAlignment: Leave
+
+BracedInitializerIndentWidth: 4
+LambdaBodyIndentation: OuterScope

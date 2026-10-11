@@ -91,6 +91,9 @@
     <ClCompile Include="provider\ai_provider_response.cpp">
       <Filter>provider</Filter>
     </ClCompile>
+    <ClCompile Include="provider\ai_provider_sdk_messages.cpp">
+      <Filter>provider</Filter>
+    </ClCompile>
     <ClCompile Include="provider\ai_provider_store.cpp">
       <Filter>provider</Filter>
     </ClCompile>
@@ -270,6 +273,12 @@
       <Filter>agent</Filter>
     </ClInclude>
     <ClInclude Include="coding.h" />
+    <ClInclude Include="agent.h" />
+    <ClInclude Include="sdk\agent.h"><Filter>agent</Filter></ClInclude>
+    <ClInclude Include="sdk\agent_types.h"><Filter>agent</Filter></ClInclude>
+    <ClInclude Include="sdk\run_engine.h"><Filter>agent</Filter></ClInclude>
+    <ClInclude Include="sdk\provider_model.h"><Filter>provider</Filter></ClInclude>
+    <ClInclude Include="sdk\workspace_tools.h"><Filter>workspace</Filter></ClInclude>
     <ClInclude Include="common\ai_error_log.h">
       <Filter>common</Filter>
     </ClInclude>

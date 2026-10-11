@@ -338,6 +338,7 @@
     <ClCompile Include="provider\ai_provider_common.cpp" />
     <ClCompile Include="provider\ai_provider_diagnostics.cpp" />
     <ClCompile Include="provider\ai_provider_request.cpp" />
+    <ClCompile Include="provider\ai_provider_sdk_messages.cpp" />
     <ClCompile Include="provider\ai_provider_response.cpp" />
     <ClCompile Include="provider\ai_provider_store.cpp" />
     <ClCompile Include="provider\ai_provider_stream.cpp" />
@@ -406,6 +407,12 @@
     <ClInclude Include="agent\agent_run_scheduler.h" />
     <ClInclude Include="agent\ai_admin_policy.h" />
     <ClInclude Include="coding.h" />
+    <ClInclude Include="agent.h" />
+    <ClInclude Include="sdk\agent.h" />
+    <ClInclude Include="sdk\agent_types.h" />
+    <ClInclude Include="sdk\run_engine.h" />
+    <ClInclude Include="sdk\provider_model.h" />
+    <ClInclude Include="sdk\workspace_tools.h" />
     <ClInclude Include="common\ai_error_log.h" />
     <ClInclude Include="common\platform_compat.h" />
     <ClInclude Include="common\windows_browser_runtime.h" />

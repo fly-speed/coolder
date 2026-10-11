@@ -1,0 +1,13 @@
+[package]
+name = "coolder-libai"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.77"
+links = "ai_c"
+build = "build.rs"
+description = "Rust bindings to the portable libai C++ agent SDK"
+license = "MIT"
+
+[lib]
+name = "libai"
+path = "src/lib.rs"

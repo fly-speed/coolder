@@ -1,0 +1,42 @@
+cmake_minimum_required(VERSION 3.16)
+project(libai_c VERSION 1.0.0 LANGUAGES C CXX)
+include(GNUInstallDirs)
+option(BUILD_SHARED_LIBS "Build shared C ABI" ON)
+option(LIBAI_C_TESTS "Build portable bridge tests" ON)
+find_package(Threads REQUIRED)
+add_library(libai_c src/bridge.cpp src/builders.cpp src/json_writer.cpp)
+add_library(libai::c ALIAS libai_c)
+set_target_properties(libai_c PROPERTIES POSITION_INDEPENDENT_CODE ON OUTPUT_NAME ai_c EXPORT_NAME c VERSION 1.0.0 SOVERSION 1)
+target_compile_features(libai_c PUBLIC cxx_std_11)
+target_include_directories(libai_c PUBLIC
+ $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+ $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(libai_c PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_link_libraries(libai_c PRIVATE Threads::Threads)
+target_compile_definitions(libai_c PRIVATE LIBAI_C_BUILD)
+if(BUILD_SHARED_LIBS)
+ target_compile_definitions(libai_c PUBLIC LIBAI_C_SHARED)
+endif()
+install(TARGETS libai_c EXPORT libai_cTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES include/libai.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+if(LIBAI_C_TESTS)
+ enable_testing()
+ add_executable(libai_c_test tests/bridge_test.c)
+ target_link_libraries(libai_c_test PRIVATE libai_c)
+ if(MSVC)
+  target_compile_options(libai_c_test PRIVATE /UNDEBUG)
+ else()
+  target_compile_options(libai_c_test PRIVATE -UNDEBUG)
+ endif()
+ add_test(NAME libai_c_bridge COMMAND libai_c_test)
+endif()
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(libai_cConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/libai_cConfig.cmake"
+ INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libai_c")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/libai_cConfigVersion.cmake"
+ VERSION ${PROJECT_VERSION} COMPATIBILITY SameMajorVersion)
+install(EXPORT libai_cTargets NAMESPACE libai:: DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libai_c")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libai_cConfig.cmake"
+ "${CMAKE_CURRENT_BINARY_DIR}/libai_cConfigVersion.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libai_c")

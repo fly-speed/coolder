@@ -12,7 +12,8 @@ except ImportError:
     sys.exit("Install tooling: python3 -m pip install -r coolder/tools/style-requirements.txt")
 
 ROOT = Path(__file__).resolve().parents[2]
-EXTENSIONS = {".cpp", ".cc", ".cxx", ".h", ".hh", ".hpp"}
+EXTENSIONS = {".c", ".cpp", ".cc", ".cxx", ".h", ".hh", ".hpp"}
+SOURCE_TREES = ("libai", "coolder", "libai-c", "libai-java")
 EXCLUDED = {"build", "obj", "lib", "CMakeFiles"}
 
 
@@ -61,7 +62,7 @@ def main():
     args.add_argument("paths", nargs="*", type=Path, help="Optional source files; default: both source trees")
     options = args.parse_args()
     files = options.paths or sorted(
-        path for folder in (ROOT / "libai", ROOT / "coolder")
+        path for folder in (ROOT / name for name in SOURCE_TREES)
         for path in folder.rglob("*")
         if path.suffix in EXTENSIONS and not EXCLUDED.intersection(path.relative_to(ROOT).parts)
     )

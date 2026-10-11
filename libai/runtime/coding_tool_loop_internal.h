@@ -22,6 +22,7 @@ struct coding_turn_t {
 	webcool::ai::completion_result_t output{};
 	// Per-attempt telemetry before retry usage is merged into billable totals.
 	webcool::ai::completion_result_t retry_usage{};
+	// Whether a failed attempt supplied usage that must still be accounted for.
 	bool has_retry_usage = false;
 	// Whether investigation requires a summary before more reads.
 	bool investigation_checkpoint{};

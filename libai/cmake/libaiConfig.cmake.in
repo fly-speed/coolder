@@ -1,4 +1,6 @@
 @PACKAGE_INIT@
-include("${CMAKE_CURRENT_LIST_DIR}/Dependencies.cmake")
+if(NOT @AI_CODING_SDK_ONLY@)
+ include("${CMAKE_CURRENT_LIST_DIR}/Dependencies.cmake")
+endif()
 include("${CMAKE_CURRENT_LIST_DIR}/libaiTargets.cmake")
 check_required_components(libai)

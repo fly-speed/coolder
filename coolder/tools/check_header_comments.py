@@ -4,7 +4,7 @@
 import re
 import sys
 
-from check_cpp_structure import ROOT, EXCLUDED, Language, Parser, tree_sitter_cpp, walk
+from check_cpp_structure import ROOT, EXCLUDED, Language, Parser, tree_sitter_cpp, walk, SOURCE_TREES
 
 SCOPES = {
     "field_declaration_list", "declaration_list", "translation_unit",
@@ -61,7 +61,7 @@ def main():
     parser = Parser(Language(tree_sitter_cpp.language()))
     failures = []
     count = files = 0
-    for directory in (ROOT / "libai", ROOT / "coolder"):
+    for directory in (ROOT / name for name in SOURCE_TREES):
         for path in sorted(directory.rglob("*")):
             if path.suffix not in {".h", ".hh", ".hpp"}:
                 continue

@@ -4,6 +4,7 @@
 #include "../prompt/prompt_language.h"
 
 #include <algorithm>
+#include <map>
 
 namespace webcool
 {
@@ -68,6 +69,12 @@ std::string canonical_tool_name(const std::string &wire)
 void add_tool_parameters(acl::json &json, acl::json_node &parent,
     const char *field, const agent_tool_t &tool, bool uppercase, bool strict)
 {
+	if (!tool.parameters_json.empty()) {
+		acl::json schema(tool.parameters_json.c_str());
+		schema.finish(); // Validated before the payload is constructed.
+		parent.add_child(field, json.duplicate_node(schema.get_root()));
+		return;
+	}
 	acl::json_node &schema = json.create_node();
 	parent.add_child(field, schema);
 	schema.add_text("type", uppercase ? "OBJECT" : "object");
@@ -156,7 +163,8 @@ void add_completion_tools(acl::json &json, acl::json_node &root,
 				all_required =
 				    tool.parameters[j].required && all_required;
 			}
-			const bool strict = input.strict_tools && all_required;
+			const bool strict = input.strict_tools &&
+			    all_required && tool.parameters_json.empty();
 			// Qwen documents the flat Responses function schema but not OpenAI's
 			// strict extension. Omit unknown fields instead of relying on them being
 			// ignored by every DashScope gateway revision.
@@ -172,8 +180,11 @@ void add_completion_tools(acl::json &json, acl::json_node &root,
 		} else if (provider.protocol == "gemini_native") {
 			item.add_text("name", wire.c_str());
 			item.add_text("description", tool.description.c_str());
-			add_tool_parameters(
-			    json, item, "parameters", tool, true, false);
+			add_tool_parameters(json, item,
+			    tool.parameters_json.empty() ?
+			        "parameters" :
+			        "parametersJsonSchema",
+			    tool, true, false);
 		} else {
 			item.add_text("type", "function");
 			acl::json_node &function = json.create_node();
@@ -843,6 +854,13 @@ static void normalize_completion_reasoning(const provider_config_t &provider,
 bool build_completion_payload(const provider_config_t &provider,
     const completion_request_t &input, bool stream, std::string &payload)
 {
+	for (const auto &tool : input.tools) {
+		if (tool.parameters_json.empty())
+			continue;
+		acl::json schema(tool.parameters_json.c_str());
+		if (!schema.finish() || !schema.get_root().is_object())
+			return false;
+	}
 	std::string effective_thinking;
 	std::string effective_effort;
 	normalize_completion_reasoning(
@@ -870,6 +888,9 @@ bool build_completion_payload(const provider_config_t &provider,
 		add_chat_payload(provider, input, stream, effective_thinking,
 		    effective_effort, encoded_images, json, root);
 	}
+	if (!input.messages.empty() &&
+	    !add_sdk_messages(provider, input, json, root))
+		return false;
 	add_completion_tools(json, root, provider, input);
 	const acl::string &serialized = root.to_string();
 	// Legacy checkpoints may contain a partial UTF-8 character from byte-based

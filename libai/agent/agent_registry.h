@@ -58,6 +58,9 @@ struct agent_tool_t {
 	std::string authorization;
 	// Parameter schema used to describe the tool to providers.
 	std::vector<agent_tool_parameter_t> parameters;
+	// Optional complete JSON object schema for application-defined tools.
+	// Empty retains the legacy string-parameter schema.
+	std::string parameters_json;
 };
 
 // Stable metadata for one agent type. Provider settings reference protocols,

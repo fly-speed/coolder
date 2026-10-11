@@ -4,6 +4,7 @@
 
 | 文档 | 内容 |
 |---|---|
+| [通用 Agent SDK](AGENT_SDK.md) | C++11 API、模型及工具扩展、编程工作区工具与运行控制 |
 | [AI编程静态库拆分说明](AI编程静态库拆分说明.md) | 初次从 webcool 提取静态库 |
 | [libai模块迁移说明](libai模块迁移说明.md) | 迁移至 aicool/libai |
 | [libai功能目录说明](libai功能目录说明.md) | 按功能整理目录 |

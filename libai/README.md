@@ -1,7 +1,27 @@
-# libai：独立 AI 编程静态库
+# libai：C++ 通用 Agent SDK 与 AI 编程库
 
-`aicool/libai/` 与 `aicool/webcool/` 是同级模块。libai 可独立构建、安装并供多个可执行程序链接，
-不需要编译 webcool。Unix/macOS 产物是 `libai.a`，Windows 是 `libai.lib`。
+新应用推荐从 `<libai/agent.h>` 和 `libai::agent_t` 开始。SDK 提供可插拔模型、自定义 JSON 工具、
+多轮会话、流式输出、权限回调、取消、期限和运行预算。完整包中的 `provider_model_t` 复用已有模型客户端，
+`add_workspace_tools` 为编程助手提供受限目录内的文件读取、搜索及带摘要校验的修改。
+现有 `<libai/coding.h>` 与 `webcool::ai` 接口继续兼容。
+
+详见 [通用 Agent API、集成示例与边界](docs/AGENT_SDK.md)。
+`examples/agent` 是无需网络和密钥的完整工具调用示例。
+
+仅使用自己的模型后端时，可独立构建无外部依赖的 C++11 SDK：
+
+```sh
+cmake -S libai -B libai/build-sdk -DAI_CODING_SDK_ONLY=ON -DAI_CODING_BUILD_TESTS=ON
+cmake --build libai/build-sdk
+ctest --test-dir libai/build-sdk --output-on-failure
+cmake --install libai/build-sdk --prefix /absolute/path/to/libai-sdk
+```
+
+消费方 `find_package(libai CONFIG REQUIRED)` 后链接 `libai::agent`。
+使用现有 provider、工作区工具或编程运行时则安装默认完整构建并链接 `libai::ai`。
+
+`libai/` 与 `coolder/` 是同级模块。libai 可独立构建、安装并供多个可执行程序链接，
+不需要编译 coolder。Unix/macOS 产物是 `libai.a`，Windows 是 `libai.lib`。
 推荐 CMake 目标为 `libai::ai`，公开聚合头文件为 `<libai/coding.h>`。
 
 ## 目录结构
@@ -10,7 +30,8 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| `agent/` | Agent 注册、协议、执行模式、调度与运行策略 |
+| `sdk/` | 通用 API 类型、模型扩展、运行循环及可复用工作区工具 |
+| `agent/` | agent_t 注册、协议、执行模式、调度与运行策略 |
 | `provider/` | 模型客户端、请求/响应/流处理、限流及 Provider 配置 |
 | `storage/` | 会话、运行记录、检查点、草稿、结果和工作流持久化 |
 | `project/` | 项目元数据、索引、规划、脚手架、工具链与诊断 |
@@ -28,7 +49,7 @@
 
 ## 模块边界
 
-本目录包含模型协议与传输、Provider 配置及密钥存储、Agent 协议、项目/会话/运行记录、
+本目录包含模型协议与传输、Provider 配置及密钥存储、agent_t 协议、项目/会话/运行记录、
 工作区修改与审核、工具链、沙盒执行，以及 `runtime/` 中的编程循环、调度、暂停、取消、
 恢复和后台 worker。图片助手共用运行时，也归库所有。
 
@@ -42,7 +63,7 @@ ACL/fiber、OpenSSL 是外部依赖，不合并进归档。宿主负责 ACL/fibe
 
 ## 独立构建
 
-在 `aicool/` 下执行（默认复用同级 `third-party/` 中的依赖）：
+在仓库根目录下执行（默认复用同级 `third-party/` 中的依赖）：
 
 ```sh
 cmake -S libai -B libai/build -DCMAKE_BUILD_TYPE=Release \
@@ -121,3 +142,22 @@ webcool 原有头文件转发到库版本。
 ## 开发与重构记录
 
 模块提取、目录整理、公共能力抽象及功能拆分说明统一收录于 [docs/README.md](docs/README.md)。
+
+## Language bindings and mobile platforms
+
+The portable agent SDK is exposed through a shared C ABI. Sibling projects provide
+language-specific owning facades and mobile packages:
+
+| Directory | Interface / artifact |
+| --- | --- |
+| [libai-c](../libai-c/README.md) | C ABI, shared/static library and CMake package |
+| [libai-java](../libai-java/README.md) | Java 8+ Agent and JNI library |
+| [libai-python](../libai-python/README.md) | Python 3.9+ ctypes package |
+| [libai-rust](../libai-rust/README.md) | Rust path dependency, static C++ runtime |
+| [libai-objc](../libai-objc/README.md) | Objective-C Foundation / ARC API |
+| [Android](../Android/README.md) | Offline NDK build and AAR packaging |
+| [iOS](../iOS/README.md) | Device / simulator XCFramework packaging |
+
+All facades share sessions, tools, authorization, streaming and run budgets.
+Applications supply model transport callbacks and platform-specific tools.
+Mobile packages include the portable runtime; ACL/OpenSSL provider adapters are not included.
