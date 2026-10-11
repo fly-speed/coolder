@@ -1,22 +1,10 @@
 #pragma once
 #include "stdafx.h"
-#include "libai/workspace/agent_change_limits.h"
+#include <libai_cpp/coding.h>
 #include "ai_workspace_actions.h"
 #include "ai_agent_actions_internal.h"
 #include "action/actions.h"
 #include "action/action_util.h"
-#include "libai/workspace/agent_workspace.h"
-#include "libai/common/ai_error_log.h"
-#include "libai/agent/ai_admin_policy.h"
-#include "libai/sandbox/program_sandbox.h"
-#include "libai/project/project_diagnostics.h"
-#include "libai/project/agent_project_store.h"
-#include "libai/project/project_scaffold.h"
-#include "libai/project/project_plan_template.h"
-#include "libai/project/project_toolchain.h"
-#include "libai/sandbox/sandbox_execution.h"
-#include "libai/workspace/workspace_patch.h"
-#include "libai/workspace/workspace_change_set.h"
 #include "common/webcool_mutex.h"
 
 #include <atomic>
@@ -74,7 +62,7 @@ struct sandbox_runtime_task_t {
 	// Filesystem root belonging to the authenticated user.
 	std::string user_root;
 	// Confirmed command plan owned by this asynchronous execution.
-	webcool::ai::sandbox_execution_plan_t plan;
+	libai::cpp::coding::sandbox_execution_plan_t plan;
 	// Cancellation flag checked at safe execution boundaries.
 	std::atomic<bool> cancel_requested;
 	// Whether processing has reached a terminal state.
@@ -86,7 +74,7 @@ struct sandbox_runtime_task_t {
 	// Finish time as seconds since the Unix epoch.
 	long long finished_at = 0;
 	// Result collected from the completed operation.
-	webcool::ai::sandbox_result_t result;
+	libai::cpp::coding::sandbox_result_t result;
 
 	// Initialize sandbox runtime task state from the supplied arguments.
 	sandbox_runtime_task_t()
@@ -96,7 +84,7 @@ struct sandbox_runtime_task_t {
 };
 
 // Protects the shared sandbox task registry and execution counts.
-extern webcool::mutex g_sandbox_runtime_mutex;
+extern libai::cpp::Mutex g_sandbox_runtime_mutex;
 // Live sandbox tasks keyed by authenticated user and run identifier.
 extern std::map<std::string, std::shared_ptr<sandbox_runtime_task_t>>
     g_sandbox_runtime_tasks;
@@ -143,7 +131,7 @@ struct sandbox_runtime_snapshot_t {
 	// Finish time as seconds since the Unix epoch.
 	long long finished_at = 0;
 	// Result collected from the completed operation.
-	webcool::ai::sandbox_result_t result;
+	libai::cpp::coding::sandbox_result_t result;
 };
 
 // Copy a user's live sandbox state for an HTTP status response.
@@ -160,7 +148,7 @@ void run_async_sandbox_task(
 
 // Serialize sandbox resource ceilings into the capability response.
 void add_limits(acl::json &json, acl::json_node &root,
-    const webcool::ai::sandbox_limits_t &limits);
+    const libai::cpp::coding::sandbox_limits_t &limits);
 
 }
 }

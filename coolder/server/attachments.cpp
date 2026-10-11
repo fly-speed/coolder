@@ -1,8 +1,7 @@
 #include "stdafx.h"
 #include "attachments.h"
 #include "action/action_util.h"
-#include "libai/runtime/coding_runtime.h"
-#include "libai/common/identifiers.h"
+#include <libai_cpp/coding.h>
 #include <openssl/evp.h>
 #include <filesystem>
 #include <fstream>
@@ -127,7 +126,7 @@ bool attachment_route(
 	if (!files || !files->first_child()) {
 		return fail(res, 400, "attachments required");
 	}
-	const auto id = webcool::ai::identifiers::new_id();
+	const auto id = libai::cpp::coding::identifiers::new_id();
 	if (id.empty()) {
 		return fail(res, 500, "cannot create attachment draft");
 	}
@@ -179,7 +178,7 @@ bool attachment_route(
 		paths.add_child(
 		    json.create_array_text((draft + "/" + filename).c_str()));
 	}
-	std::vector<webcool::ai::completion_image_t> images;
+	std::vector<libai::cpp::coding::completion_image_t> images;
 	std::string context, err;
 	if (!load_temporary_attachments(&paths, draft,
 	        account_workspace(account), images, context, err)) {

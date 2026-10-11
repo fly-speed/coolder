@@ -1,6 +1,6 @@
 # coolder
 
-`aicool` 下独立的浏览器 AI 编程应用。后端为 C++17 + ACL 协程 HTTP 服务，链接同级 `libai`；前端为无 npm 依赖的 HTML/CSS/JavaScript。无需运行或构建 webcool。
+`aicool` 下独立的浏览器 AI 编程应用。后端为 C++17 + ACL 协程 HTTP 服务，仅链接同级 `libai-c++` 完整封装；前端为无 npm 依赖的 HTML/CSS/JavaScript。无需运行或构建 webcool。
 
 ## 构建与启动
 
@@ -39,7 +39,7 @@ Linux 上，libai 自动查找并链接 liburing（优先 `uring-ffi`，其次 `
 直接打开本目录的 `coolder.sln`，将 `coolder` 设为启动项目。工程沿用 webcool 的 v143 工具集和同级依赖工程，无需编译 webcool 主程序。
 
 1. 安装 Visual Studio 2022 的“使用 C++ 的桌面开发”、Windows SDK 和“用于 Windows 的 C++ CMake 工具”（用于合并前端脚本）。如选择 ARM64 / ARM64EC，需要安装相应的 MSVC 编译工具。
-2. 保持 `aicool/coolder`、`aicool/libai`、`aicool/third-party/acl` 和 `aicool/third-party/zlib-1.2.11` 的目录结构。解决方案会自动构建 libai、ACL、ACL 协程库及 zlib。
+2. 保持 `aicool/coolder`、`aicool/libai-c++`、`aicool/libai`、`aicool/third-party/acl` 和 `aicool/third-party/zlib-1.2.11` 的目录结构。解决方案会自动构建 libai-c++、ACL、ACL 协程库及 zlib。
 3. 准备目标架构的 Windows OpenSSL：头文件放在 `third-party/openssl/include`，`libssl.lib`、`libcrypto.lib` 放在 `third-party/openssl/lib`，动态库放在其 `bin` 或 `lib` 目录。不能使用 macOS/Linux 的 `.a` 文件。头文件与库须为相同版本，架构须匹配所选平台；使用静态 OpenSSL 时还需匹配工程的运行库（Debug 为 /MDd，Release 为 /MD）。
 4. 推荐先选择 `Release | x64`，生成解决方案，然后启动调试。在浏览器访问 `http://127.0.0.1:18095`。
 
@@ -213,3 +213,13 @@ Monaco 的运行时、语言模块和 Worker 保留原有按需加载：Worker �
 ### 页面生成与交互验收
 
 网页任务要求记录原始站点的访问协议、页面、初始存储、操作和实际结果。预览注入、模拟 DOM、构建成功及 HTTP 可访问不等价于真实页面交互通过。多页面主题或语言功能应覆盖各目标页、双向切换、刷新/返回及冲突旧存储。浏览器验收被禁用、未执行或证据过期时，运行时交付摘要会明确标注；通过的浏览器检查也仅覆盖已配置用例，不能证明未测试的访问方式。连续追问沿用任务契约中的网页需求。
+
+## AI 库依赖边界
+
+APP 仅包含 `libai_cpp/coding.h` 和 `libai_cpp/platform.h`，CMake 链接 `libai::cpp`，
+VS 解决方案引用 `libai-c++/libai-cpp.vcxproj`。C++ 封装内部复用 libai，并为 APP
+公开类型化的 provider、工作区、项目计划、会话、运行记录、沙箱与编码运行时接口。
+账号认证、HTTP 路由、网页展示和用户权限决定仍属于 APP。
+
+新应用可选择轻量 `Agent` 或共享 `CodingService`；Java/Python/Rust/Objective-C
+均提供后者。详见 [跨语言编码 API](../libai/docs/CODING_SERVICE.md)。

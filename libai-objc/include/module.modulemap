@@ -1,4 +1,5 @@
 module LibAI {
     header "LAIAgent.h"
+    header "LAICodingService.h"
     export *
 }

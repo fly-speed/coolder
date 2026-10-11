@@ -1,22 +1,10 @@
 #include "stdafx.h"
 #include "ai_workspace_actions_internal.h"
-#include "libai/workspace/agent_change_limits.h"
+#include <libai_cpp/coding.h>
 #include "ai_workspace_actions.h"
 #include "ai_agent_actions_internal.h"
 #include "action/actions.h"
 #include "action/action_util.h"
-#include "libai/workspace/agent_workspace.h"
-#include "libai/common/ai_error_log.h"
-#include "libai/agent/ai_admin_policy.h"
-#include "libai/sandbox/program_sandbox.h"
-#include "libai/project/project_diagnostics.h"
-#include "libai/project/agent_project_store.h"
-#include "libai/project/project_scaffold.h"
-#include "libai/project/project_plan_template.h"
-#include "libai/project/project_toolchain.h"
-#include "libai/sandbox/sandbox_execution.h"
-#include "libai/workspace/workspace_patch.h"
-#include "libai/workspace/workspace_change_set.h"
 #include "common/webcool_mutex.h"
 
 #include <atomic>
@@ -42,7 +30,7 @@ namespace workspace_action_detail
 void ai_workspace_json_error(response_t &res, int status, const char *message,
     bool keep_alive, const char *file, int line, const char *function)
 {
-	webcool::ai::ai_log_error("http.ai.workspace", "response",
+	libai::cpp::coding::ai_log_error("http.ai.workspace", "response",
 	    message ? message : "unspecified workspace action error");
 	action::json_error_at(
 	    res, status, message, keep_alive, file, line, function);
@@ -77,25 +65,12 @@ std::string request_text(request_t &req, const char *name)
 
 std::string json_text(acl::json_node *node)
 {
-	if (node == NULL)
-		return "";
-	const char *value = node->get_string();
-	if (!(value == NULL))
-		return value ? value : "";
-	value = node->get_text();
-	return value ? value : "";
+	return libai::cpp::coding::json_values::text(node);
 }
 
 bool json_bool(acl::json_node *node, bool fallback)
 {
-	if (node == NULL)
-		return fallback;
-	const std::string value = json_text(node);
-	if (value == "true" || value == "1")
-		return true;
-	if (!(value == "false" || value == "0"))
-		return fallback;
-	return false;
+	return libai::cpp::coding::json_values::boolean(node, fallback);
 }
 
 bool split_local_project_path(const std::string &input, std::string &parent,
@@ -131,7 +106,7 @@ bool split_local_project_path(const std::string &input, std::string &parent,
 		return false;
 	}
 	std::string normalized;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 	        raw, normalized, false, err))
 		return false;
 	logical = std::string("本地磁盘/") + normalized;
@@ -183,8 +158,8 @@ bool AiWorkspaceListAction::run(request_t &req, response_t &res)
 		workspace_root =
 		    runtime_upload_dir_get() + "/" + shared_folder_name();
 	}
-	webcool::ai::agent_workspace_t workspace(workspace_root);
-	std::vector<webcool::ai::workspace_entry_t> entries;
+	libai::cpp::coding::agent_workspace_t workspace(workspace_root);
+	std::vector<libai::cpp::coding::workspace_entry_t> entries;
 	if (!workspace.list(request_text(req, "path"), entries, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
@@ -210,7 +185,7 @@ bool AiWorkspaceReadAction::run(request_t &req, response_t &res)
 	std::string user_root;
 	if (!current_workspace(req, res, user_root))
 		return true;
-	webcool::ai::agent_workspace_t workspace(user_root);
+	libai::cpp::coding::agent_workspace_t workspace(user_root);
 	std::string content;
 	std::string err;
 	bool truncated = false;
@@ -233,8 +208,8 @@ bool AiWorkspaceSearchAction::run(request_t &req, response_t &res)
 	std::string user_root;
 	if (!current_workspace(req, res, user_root))
 		return true;
-	webcool::ai::agent_workspace_t workspace(user_root);
-	std::vector<webcool::ai::workspace_match_t> matches;
+	libai::cpp::coding::agent_workspace_t workspace(user_root);
+	std::vector<libai::cpp::coding::workspace_match_t> matches;
 	std::string err;
 	bool truncated = false;
 	if (!workspace.search(request_text(req, "path"), request_text(req, "q"),
@@ -412,13 +387,13 @@ bool AiWorkspaceProjectCreateAction::run(request_t &req, response_t &res)
 			return true;
 		}
 	}
-	webcool::ai::agent_workspace_t workspace(workspace_root);
+	libai::cpp::coding::agent_workspace_t workspace(workspace_root);
 	std::string normalized;
 	std::string err;
-	webcool::ai::project_scaffold_result_t scaffold;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	libai::cpp::coding::project_scaffold_result_t scaffold;
+	if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 	        scaffold_path, normalized, false, err) ||
-	    !webcool::ai::create_project_scaffold(
+	    !libai::cpp::coding::create_project_scaffold(
 	        workspace, normalized, language, platform, scaffold, err)) {
 		const int status = err == "workspace path already exists" ||
 		        err == "workspace project directory is not empty" ?
@@ -435,7 +410,7 @@ bool AiWorkspaceProjectCreateAction::run(request_t &req, response_t &res)
 		logical_path = normalized;
 	}
 	if (storage_scope != "personal" &&
-	    !webcool::ai::agent_workspace_t::register_project_root(
+	    !libai::cpp::coding::agent_workspace_t::register_project_root(
 	        user_root, logical_path, physical_project, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
@@ -462,8 +437,8 @@ bool AiWorkspaceProjectCreateAction::run(request_t &req, response_t &res)
 	const std::string title = slash == std::string::npos ?
 	    logical_path :
 	    logical_path.substr(slash + 1);
-	webcool::ai::agent_project_store_t project_store(user_root);
-	webcool::ai::agent_project_record_t project_record;
+	libai::cpp::coding::agent_project_store_t project_store(user_root);
+	libai::cpp::coding::agent_project_record_t project_record;
 	std::string project_err;
 	const bool planning_available = project_store.create(title,
 	    logical_path, language, platform, project_record, project_err);
@@ -473,11 +448,11 @@ bool AiWorkspaceProjectCreateAction::run(request_t &req, response_t &res)
 		// visible module boundaries and a ready first task before any model call,
 		// while remaining fully editable through versioned plan APIs.
 		std::string goal;
-		std::vector<webcool::ai::agent_project_module_t> modules;
-		std::vector<webcool::ai::agent_project_task_t> tasks;
-		webcool::ai::build_project_plan_template(
+		std::vector<libai::cpp::coding::agent_project_module_t> modules;
+		std::vector<libai::cpp::coding::agent_project_task_t> tasks;
+		libai::cpp::coding::build_project_plan_template(
 		    logical_path, language, platform, goal, modules, tasks);
-		webcool::ai::agent_project_record_t planned_record;
+		libai::cpp::coding::agent_project_record_t planned_record;
 		const bool plan_seeded = project_record.plan_version != 0 ||
 		    project_store.save_plan(project_record.id,
 		        project_record.plan_version, goal, modules, tasks,
@@ -489,12 +464,12 @@ bool AiWorkspaceProjectCreateAction::run(request_t &req, response_t &res)
 		root.add_number("plan_version", project_record.plan_version);
 		root.add_bool("plan_seeded", plan_seeded);
 		if (!plan_seeded) {
-			webcool::ai::ai_log_error("http.ai.workspace",
+			libai::cpp::coding::ai_log_error("http.ai.workspace",
 			    "seed-project-plan", project_err);
 			root.add_text("planning_warning", project_err.c_str());
 		}
 	} else {
-		webcool::ai::ai_log_error("http.ai.workspace",
+		libai::cpp::coding::ai_log_error("http.ai.workspace",
 		    "register-project-manifest", project_err);
 		root.add_text("planning_warning", project_err.c_str());
 	}
@@ -545,7 +520,7 @@ bool AiWorkspaceDirectoryCreateAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	std::string parent;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 	        parent_input, parent, true, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
@@ -560,7 +535,7 @@ bool AiWorkspaceDirectoryCreateAction::run(request_t &req, response_t &res)
 		workspace_root =
 		    runtime_upload_dir_get() + "/" + shared_folder_name();
 	}
-	webcool::ai::agent_workspace_t workspace(workspace_root);
+	libai::cpp::coding::agent_workspace_t workspace(workspace_root);
 	if (!workspace.create_directory_if_absent(child, err)) {
 		const int status =
 		    err == "workspace path already exists" ? 409 : 400;
@@ -592,8 +567,8 @@ bool AiWorkspacePatchPreviewAction::run(request_t &req, response_t &res)
 	}
 	const std::string path = json_text((*body)["path"]);
 	const std::string content = json_text((*body)["content"]);
-	webcool::ai::workspace_patch_store_t store(user_root);
-	webcool::ai::workspace_patch_preview_t preview;
+	libai::cpp::coding::workspace_patch_store_t store(user_root);
+	libai::cpp::coding::workspace_patch_preview_t preview;
 	std::string err;
 	if (!store.create(path, content, preview, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
@@ -624,8 +599,8 @@ bool AiWorkspacePatchApplyAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	const std::string patch_id = json_text((*body)["patch_id"]);
-	webcool::ai::workspace_patch_store_t store(user_root);
-	webcool::ai::workspace_patch_result_t result;
+	libai::cpp::coding::workspace_patch_store_t store(user_root);
+	libai::cpp::coding::workspace_patch_result_t result;
 	std::string err;
 	if (!store.apply(patch_id, result, err)) {
 		int status = 400;
@@ -663,15 +638,15 @@ bool AiWorkspaceChangeSetPreviewAction::run(request_t &req, response_t &res)
 		    res, 400, "changes must be an array", req.isKeepAlive());
 		return true;
 	}
-	std::vector<webcool::ai::workspace_change_input_t> changes;
-	for (acl::json_node *item = items->first_child();
-	     item != NULL && changes.size() <= webcool::ai::kMaxAgentChanges;
+	std::vector<libai::cpp::coding::workspace_change_input_t> changes;
+	for (acl::json_node *item = items->first_child(); item != NULL &&
+	     changes.size() <= libai::cpp::coding::kMaxAgentChanges;
 	     item = items->next_child()) {
 		acl::json_node *object =
 		    item->is_object() ? item : item->get_obj();
 		if (object == NULL || !object->is_object())
 			continue;
-		webcool::ai::workspace_change_input_t change;
+		libai::cpp::coding::workspace_change_input_t change;
 		change.operation = json_text((*object)["operation"]);
 		change.path = json_text((*object)["path"]);
 		change.target_path = json_text((*object)["target_path"]);
@@ -685,8 +660,8 @@ bool AiWorkspaceChangeSetPreviewAction::run(request_t &req, response_t &res)
 		    json_text((*object)["expected_current_content"]);
 		changes.push_back(change);
 	}
-	webcool::ai::workspace_change_set_store_t store(user_root);
-	webcool::ai::workspace_change_set_preview_t preview;
+	libai::cpp::coding::workspace_change_set_store_t store(user_root);
+	libai::cpp::coding::workspace_change_set_preview_t preview;
 	std::string err;
 	if (!store.create(changes, preview, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
@@ -698,7 +673,8 @@ bool AiWorkspaceChangeSetPreviewAction::run(request_t &req, response_t &res)
 	root.add_text("change_set_id", preview.id.c_str());
 	root.add_bool("requires_confirmation", true);
 	root.add_number("expires_in_seconds",
-	    webcool::ai::workspace_change_set_store_t::lifetime_seconds());
+	    libai::cpp::coding::workspace_change_set_store_t::
+	        lifetime_seconds());
 	acl::json_node &output = json.create_array();
 	root.add_child("changes", output);
 	for (size_t i = 0; i < preview.items.size(); ++i) {
@@ -742,8 +718,8 @@ bool AiWorkspaceChangeSetApplyAction::run(request_t &req, response_t &res)
 		    req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::workspace_change_set_store_t store(user_root);
-	std::vector<webcool::ai::workspace_change_result_t> results;
+	libai::cpp::coding::workspace_change_set_store_t store(user_root);
+	std::vector<libai::cpp::coding::workspace_change_result_t> results;
 	std::string err;
 	if (!store.apply(json_text((*body)["change_set_id"]), results, err)) {
 		int status = 409;

@@ -1,10 +1,7 @@
 #include "stdafx.h"
 #include "action/actions.h"
 #include "action/action_util.h"
-#include "libai/agent/ai_admin_policy.h"
-#include "libai/common/ai_error_log.h"
-#include "libai/provider/ai_provider_store.h"
-#include "libai/project/project_toolchain.h"
+#include <libai_cpp/coding.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -18,26 +15,12 @@ namespace
 
 std::string node_text(acl::json_node *node)
 {
-	if (node == NULL) {
-		return "";
-	}
-	const char *value = node->get_string();
-	if (!(value == NULL))
-		return value ? value : "";
-	value = node->get_text();
-
-	return value ? value : "";
+	return libai::cpp::coding::json_values::text(node);
 }
 
 bool node_bool(acl::json_node *node, bool fallback)
 {
-	const std::string value = node_text(node);
-	if (value == "true" || value == "1") {
-		return true;
-	}
-	if (!(value == "false" || value == "0"))
-		return fallback;
-	return false;
+	return libai::cpp::coding::json_values::boolean(node, fallback);
 }
 
 unsigned long node_ulong(acl::json_node *node, unsigned long fallback)
@@ -57,7 +40,7 @@ void append_executable(acl::json_node &root, const char *key, const char *tool,
     const std::string &configured)
 {
 	const std::string detected =
-	    webcool::ai::discover_language_executable(tool, configured);
+	    libai::cpp::coding::discover_language_executable(tool, configured);
 	root.add_text(key, configured.c_str());
 	root.add_text(
 	    (std::string(key) + "_detected").c_str(), detected.c_str());
@@ -66,7 +49,7 @@ void append_executable(acl::json_node &root, const char *key, const char *tool,
 }
 
 void append_policy(
-    acl::json_node &root, const webcool::ai::ai_admin_policy_t &policy)
+    acl::json_node &root, const libai::cpp::coding::ai_admin_policy_t &policy)
 {
 	root.add_bool("enabled", policy.enabled);
 	root.add_bool("allow_admin", policy.allow_admin);
@@ -159,8 +142,8 @@ void append_policy(
 bool AdminAiPolicyAction::run(
     request_t &req, response_t &res, const std::string &upload_root)
 {
-	webcool::ai::ai_admin_policy_store_t store(upload_root);
-	webcool::ai::ai_admin_policy_t policy;
+	libai::cpp::coding::ai_admin_policy_store_t store(upload_root);
+	libai::cpp::coding::ai_admin_policy_t policy;
 	std::string err;
 	if (!store.load(policy, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -169,7 +152,7 @@ bool AdminAiPolicyAction::run(
 	if (req.getMethod() == acl::HTTP_METHOD_POST) {
 		acl::json *body = req.getJson(64 * 1024);
 		if (body == NULL) {
-			webcool::ai::ai_log_error("http.admin.ai-policy",
+			libai::cpp::coding::ai_log_error("http.admin.ai-policy",
 			    "parse-json", "invalid JSON body");
 			json_error(
 			    res, 400, "invalid JSON body", req.isKeepAlive());
@@ -333,9 +316,9 @@ bool AdminAiPolicyAction::run(
 		}
 		// New runs must observe a successfully saved policy immediately. Existing
 		// runs keep the immutable snapshot captured at their own start boundary.
-		webcool::ai::ai_runtime_policy_set(policy);
+		libai::cpp::coding::ai_runtime_policy_set(policy);
 	} else {
-		webcool::ai::ai_runtime_policy_set(policy);
+		libai::cpp::coding::ai_runtime_policy_set(policy);
 	}
 	acl::json json;
 	acl::json_node &root = json.create_node();

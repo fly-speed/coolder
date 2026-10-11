@@ -189,3 +189,29 @@ class Agent:
 
     def __exit__(self, *args):
         self.close()
+
+
+class CodingService:
+    """Root-scoped desktop coding facilities; same operation protocol as C++/Java/Rust.
+
+    Host code must authorize mutating operations before invoking call().
+    Native operation failures return {"ok": False, "error": ...}.
+    ABI/availability failures raise RuntimeError.
+    """
+    def __init__(self, root, library=None):
+        self._lib = n.load(library)
+        self._root = n.utf8(str(root))
+
+    @property
+    def available(self):
+        return bool(self._lib.libai_coding_available())
+
+    def call(self, operation, arguments=None):
+        encoded = json.dumps({} if arguments is None else arguments, ensure_ascii=False)
+        pointer = self._lib.libai_coding_call(self._root, n.utf8(operation), n.utf8(encoded))
+        if not pointer:
+            raise RuntimeError(self._lib.libai_last_error().decode("utf-8"))
+        try:
+            return json.loads(c.string_at(pointer).decode("utf-8"))
+        finally:
+            self._lib.libai_string_free(pointer)

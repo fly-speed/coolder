@@ -13,7 +13,7 @@ namespace agent_detail
 void ai_agent_json_error(response_t &res, int status, const char *message,
     bool keep_alive, const char *file, int line, const char *function)
 {
-	webcool::ai::ai_log_error("http.ai.agent", "response",
+	libai::cpp::coding::ai_log_error("http.ai.agent", "response",
 	    message ? message : "unspecified agent action error");
 	action::json_error_at(
 	    res, status, message, keep_alive, file, line, function);
@@ -56,8 +56,8 @@ bool project_location_allowed(
 		err = "authentication required";
 		return false;
 	}
-	const webcool::ai::ai_admin_policy_t policy =
-	    webcool::ai::ai_runtime_policy_get();
+	const libai::cpp::coding::ai_admin_policy_t policy =
+	    libai::cpp::coding::ai_runtime_policy_get();
 	if (!admin &&
 	    ((scope == "shared" && !policy.allow_users_shared_projects) ||
 	        (scope == "local" && !policy.allow_users_local_projects))) {

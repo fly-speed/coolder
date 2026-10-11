@@ -58,18 +58,19 @@ struct run_start_state_t {
 	long long profiled_max_tokens{};
 	unsigned long policy_max_tokens{};
 	acl::json *body{};
-	const webcool::ai::agent_definition_t *agent{};
-	webcool::ai::agent_project_record_t project{};
-	webcool::ai::sandbox_limits_t sandbox_limits{};
-	std::vector<webcool::ai::provider_config_t> providers{};
-	const webcool::ai::provider_config_t *provider{};
-	webcool::ai::provider_config_t effective_provider{};
-	webcool::ai::provider_usage_probe_t usage_probe{};
-	std::vector<webcool::ai::completion_image_t> request_images{};
+	const libai::cpp::coding::agent_definition_t *agent{};
+	libai::cpp::coding::agent_project_record_t project{};
+	libai::cpp::coding::sandbox_limits_t sandbox_limits{};
+	std::vector<libai::cpp::coding::provider_config_t> providers{};
+	const libai::cpp::coding::provider_config_t *provider{};
+	libai::cpp::coding::provider_config_t effective_provider{};
+	libai::cpp::coding::provider_usage_probe_t usage_probe{};
+	std::vector<libai::cpp::coding::completion_image_t> request_images{};
 	std::shared_ptr<agent_runtime_task_t> runtime_task{};
-	std::unique_ptr<webcool::ai::provider_store_t> store;
-	std::unique_ptr<webcool::ai::agent_progress_store_t> progress_store;
-	std::unique_ptr<webcool::ai::agent_run_store_t> run_store;
+	std::unique_ptr<libai::cpp::coding::provider_store_t> store;
+	std::unique_ptr<libai::cpp::coding::agent_progress_store_t>
+	    progress_store;
+	std::unique_ptr<libai::cpp::coding::agent_run_store_t> run_store;
 };
 
 bool authenticate_start_request(
@@ -155,7 +156,8 @@ bool parse_start_request(
 	state.raw_document = json_text((*state.body)["document_path"]);
 	state.conversation_id = json_text((*state.body)["conversation_id"]);
 	if (state.assistant_chat &&
-	    !webcool::ai::assistant_session_id_valid(state.conversation_id)) {
+	    !libai::cpp::coding::assistant_session_id_valid(
+	        state.conversation_id)) {
 		json_error(res, 400, "invalid assistant conversation id",
 		    req.isKeepAlive());
 		return false;
@@ -206,8 +208,8 @@ bool configure_start_execution(
 {
 	// Capture one immutable policy snapshot so a concurrent administrator update
 	// cannot mix limits from two different policy versions in the same request.
-	const webcool::ai::ai_admin_policy_t runtime_policy =
-	    webcool::ai::ai_runtime_policy_get();
+	const libai::cpp::coding::ai_admin_policy_t runtime_policy =
+	    libai::cpp::coding::ai_runtime_policy_get();
 	state.policy_max_tokens = runtime_policy.max_output_tokens;
 	state.sandbox_limits = runtime_policy.sandbox_limits;
 	// The browser has no separate per-run token input, so the administrator's
@@ -219,10 +221,12 @@ bool configure_start_execution(
 	    static_cast<long long>(state.policy_max_tokens);
 	const long long requested_max_tokens =
 	    json_number((*state.body)["max_output_tokens"], default_max_tokens);
-	webcool::ai::agent_execution_profile_t execution_profile;
-	if (!webcool::ai::build_agent_execution_profile(state.execution_mode,
-	        static_cast<size_t>(webcool::ai::ai_tool_call_limit_for_mode(
-	            runtime_policy, state.execution_mode)),
+	libai::cpp::coding::agent_execution_profile_t execution_profile;
+	if (!libai::cpp::coding::build_agent_execution_profile(
+	        state.execution_mode,
+	        static_cast<size_t>(
+	            libai::cpp::coding::ai_tool_call_limit_for_mode(
+	                runtime_policy, state.execution_mode)),
 	        static_cast<size_t>(runtime_policy.max_no_progress_tool_calls),
 	        static_cast<size_t>(
 	            runtime_policy.tool_context_compaction_kib) *
@@ -240,7 +244,7 @@ bool configure_start_execution(
 	    execution_profile.context_compaction_bytes;
 	state.max_tokens = execution_profile.max_output_tokens;
 	state.profiled_max_tokens = state.max_tokens;
-	state.agent = webcool::ai::agent_registry_t::instance().find(
+	state.agent = libai::cpp::coding::agent_registry_t::instance().find(
 	    state.agent_id.empty() ? "coding" : state.agent_id);
 	if (state.agent == NULL || !state.agent->enabled) {
 		json_error(res, 404, "agent type not found or disabled",
@@ -264,14 +268,15 @@ bool resolve_start_project(run_start_state_t &state, request_t &req,
     response_t &res, operation_trace_t &trace)
 {
 	trace.phase("resolve_project");
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 	        state.raw_path, state.project_path, true, state.err)) {
 		json_error(res, 400, state.err.c_str(), req.isKeepAlive());
 		return false;
 	}
 	if (state.project_id.empty())
 		return true;
-	webcool::ai::agent_project_store_t project_store(state.user_root);
+	libai::cpp::coding::agent_project_store_t project_store(
+	    state.user_root);
 	if (!project_store.get(state.project_id, state.project, state.err)) {
 		json_error(res,
 		    state.err == "agent project not found" ? 404 : 500,
@@ -295,7 +300,7 @@ bool select_start_provider(run_start_state_t &state, request_t &req,
 		json_error(res, 500, state.err.c_str(), req.isKeepAlive());
 		return false;
 	}
-	state.store.reset(new webcool::ai::provider_store_t(
+	state.store.reset(new libai::cpp::coding::provider_store_t(
 	    state.upload_root, state.provider_root, state.provider_username));
 	if (!state.store->list(state.providers, state.err)) {
 		json_error(res, 500, state.err.c_str(), req.isKeepAlive());
@@ -373,7 +378,7 @@ bool select_start_provider(run_start_state_t &state, request_t &req,
 		    json_bool((*state.body)["stateless_requests"], false) ?
 		    "stateless" :
 		    "auto";
-	if (webcool::ai::provider_client_t::configure_response_state(
+	if (libai::cpp::coding::provider_client_t::configure_response_state(
 	        state.effective_provider, response_state_mode, state.err))
 		return true;
 	json_error(res, 400, state.err.c_str(), req.isKeepAlive());
@@ -392,8 +397,10 @@ bool preflight_start_provider(
 		json_error(res, 500, state.err.c_str(), req.isKeepAlive());
 		return false;
 	}
-	state.usage_ok = webcool::ai::provider_client_t::probe_usage_limits(
-	    *state.provider, usage_api_key, state.usage_probe, state.usage_err);
+	state.usage_ok =
+	    libai::cpp::coding::provider_client_t::probe_usage_limits(
+	        *state.provider, usage_api_key, state.usage_probe,
+	        state.usage_err);
 	std::fill(usage_api_key.begin(), usage_api_key.end(), '\0');
 	if (!state.usage_ok &&
 	    (state.usage_probe.http_status == 401 ||
@@ -412,7 +419,7 @@ bool preflight_start_provider(
 		return false;
 	}
 	if (!state.usage_ok) {
-		webcool::ai::ai_log_error("agent.runtime",
+		libai::cpp::coding::ai_log_error("agent.runtime",
 		    "usage-preflight-advisory", state.usage_err);
 	}
 	// DeepSeek V4 defaults to high-effort thinking when the request omits its
@@ -423,7 +430,7 @@ bool preflight_start_provider(
 	    (state.thinking_enabled ? "enabled" : "disabled") :
 	    "";
 	state.reasoning_effort =
-	    webcool::ai::provider_client_t::supports_reasoning_effort(
+	    libai::cpp::coding::provider_client_t::supports_reasoning_effort(
 	        *state.provider) &&
 	        state.thinking_mode != "disabled" ?
 	    state.requested_effort :
@@ -435,8 +442,9 @@ bool preflight_start_provider(
 bool restore_start_session(
     run_start_state_t &state, request_t &req, response_t &res)
 {
-	webcool::ai::agent_session_store_t session_store(state.user_root);
-	webcool::ai::agent_session_record_t session;
+	libai::cpp::coding::agent_session_store_t session_store(
+	    state.user_root);
+	libai::cpp::coding::agent_session_record_t session;
 	if (!state.session_id.empty()) {
 		if (!session_store.get(state.session_id, session, state.err)) {
 			const int status =
@@ -457,7 +465,7 @@ bool restore_start_session(
 		state.previous_summary = session.summary;
 	} else if (state.remember_session) {
 		const std::string title =
-		    webcool::ai::agent_session_task_title(state.prompt);
+		    libai::cpp::coding::agent_session_task_title(state.prompt);
 		if (!session_store.create(title, state.agent->id,
 		        state.provider->id, state.project_path, session,
 		        state.err)) {
@@ -467,14 +475,15 @@ bool restore_start_session(
 		}
 		state.session_id = session.id;
 	}
-	state.progress_store.reset(new webcool::ai::agent_progress_store_t(
-	    state.user_root, state.project_path, state.session_id));
+	state.progress_store.reset(
+	    new libai::cpp::coding::agent_progress_store_t(
+	        state.user_root, state.project_path, state.session_id));
 	if (!state.resume_from_progress)
 		return true;
 	// Never trust a browser-cached prompt as the recovery key. The checkpoint
 	// is private to this authenticated project/session and contains the exact
 	// original request that produced the saved transcript.
-	webcool::ai::agent_progress_t saved_progress;
+	libai::cpp::coding::agent_progress_t saved_progress;
 	bool progress_found = false;
 	if (!state.progress_store->load(
 	        saved_progress, progress_found, state.err)) {
@@ -484,7 +493,7 @@ bool restore_start_session(
 	if (!progress_found) {
 		state.err =
 		    "no recoverable coding-agent progress exists for this session";
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.runtime", "resume-progress-missing", state.err);
 		json_error(res, 409, state.err.c_str(), req.isKeepAlive());
 		return false;
@@ -494,7 +503,7 @@ bool restore_start_session(
 	    saved_progress.session_id != state.session_id) {
 		state.err =
 		    "coding-agent progress does not match the selected provider/project/session";
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.runtime", "resume-progress-mismatch", state.err);
 		json_error(res, 409, state.err.c_str(), req.isKeepAlive());
 		return false;
@@ -507,7 +516,7 @@ bool restore_start_session(
 bool prepare_start_context(run_start_state_t &state, request_t &req,
     response_t &res, operation_trace_t &trace)
 {
-	webcool::ai::agent_workspace_t workspace(state.user_root);
+	libai::cpp::coding::agent_workspace_t workspace(state.user_root);
 	if (!load_temporary_attachments((*state.body)["attachments"],
 	        state.attachment_draft, state.user_root, state.request_images,
 	        state.attachment_text_context, state.err)) {
@@ -562,7 +571,7 @@ bool register_start_task(run_start_state_t &state, request_t &req,
 		return false;
 	}
 	state.run_store.reset(
-	    new webcool::ai::agent_run_store_t(state.user_root));
+	    new libai::cpp::coding::agent_run_store_t(state.user_root));
 	state.runtime_task.reset(new agent_runtime_task_t());
 	state.runtime_task->id = state.run_id;
 	state.runtime_task->upload_root = state.upload_root;
@@ -573,7 +582,7 @@ bool register_start_task(run_start_state_t &state, request_t &req,
 	state.runtime_task->original_prompt = state.prompt;
 	state.runtime_task->ui_language = state.ui_language;
 	state.runtime_task->initial_session_title =
-	    webcool::ai::agent_session_task_title(state.prompt);
+	    libai::cpp::coding::agent_session_task_title(state.prompt);
 	state.runtime_task->session_id = state.session_id;
 	state.runtime_task->remember_session = state.remember_session;
 	state.runtime_task->text_preview = state.text_preview;
@@ -582,8 +591,8 @@ bool register_start_task(run_start_state_t &state, request_t &req,
 	if (state.text_preview && !state.assistant_chat &&
 	    state.effective_provider.allow_file_content) {
 		state.runtime_task->preview_context_directory =
-		    webcool::ai::preview_project_directory(state.user_root,
-		        state.raw_document,
+		    libai::cpp::coding::preview_project_directory(
+		        state.user_root, state.raw_document,
 		        json_bool((*state.body)["document_local"], false));
 	}
 	state.runtime_task->assistant_chat = state.assistant_chat;
@@ -603,7 +612,7 @@ bool register_start_task(run_start_state_t &state, request_t &req,
 		json_error(res, 429, state.err.c_str(), req.isKeepAlive());
 		return false;
 	}
-	webcool::ai::agent_run_record_t run_record;
+	libai::cpp::coding::agent_run_record_t run_record;
 	run_record.id = state.run_id;
 	run_record.agent_id = state.agent->id;
 	run_record.agent_version = state.agent->version;
@@ -621,7 +630,7 @@ bool register_start_task(run_start_state_t &state, request_t &req,
 
 	if (!state.assistant_chat)
 		return true;
-	webcool::ai::assistant_message_t message;
+	libai::cpp::coding::assistant_message_t message;
 	message.role = "user";
 	message.run_id = state.run_id;
 	message.text = json_text((*state.body)["displayed_message"]);
@@ -633,7 +642,7 @@ bool register_start_task(run_start_state_t &state, request_t &req,
 			message.text = state.prompt;
 	}
 	if (!(message.text.size() > 128 * 1024 ||
-	        !webcool::ai::assistant_session_store_t(state.user_root)
+	        !libai::cpp::coding::assistant_session_store_t(state.user_root)
 	             .append(state.conversation_id, message, state.err)))
 		return true;
 	remove_runtime_task(state.user_root, state.run_id);
@@ -688,7 +697,7 @@ bool save_start_checkpoint(
 {
 	if (!state.resume_after_restart)
 		return true;
-	webcool::ai::agent_checkpoint_t checkpoint;
+	libai::cpp::coding::agent_checkpoint_t checkpoint;
 	checkpoint.run_id = state.run_id;
 	checkpoint.provider_id = state.provider->id;
 	checkpoint.project_path = state.project_path;
@@ -702,14 +711,14 @@ bool save_start_checkpoint(
 	    state.effective_provider.response_state_mode;
 	checkpoint.execution_mode = state.execution_mode;
 	checkpoint.remember_session = state.remember_session;
-	webcool::ai::agent_checkpoint_store_t checkpoint_store(
+	libai::cpp::coding::agent_checkpoint_store_t checkpoint_store(
 	    state.upload_root, state.user_root, state.username);
 	if (checkpoint_store.save(checkpoint, state.err))
 		return true;
 	std::string audit_err;
 	if (!state.run_store->fail(state.run_id,
 	        "cannot create encrypted restart checkpoint", audit_err)) {
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.runtime", "audit-checkpoint-failure", audit_err);
 	}
 	remove_runtime_task(state.user_root, state.run_id);
@@ -739,7 +748,8 @@ void launch_start_worker(run_start_state_t &state)
 	auto &effective_provider = state.effective_provider;
 	auto &request_images = state.request_images;
 	auto &runtime_task = state.runtime_task;
-	webcool::ai::provider_config_t provider_copy = effective_provider;
+	libai::cpp::coding::provider_config_t provider_copy =
+	    effective_provider;
 	provider_copy.api_key_ciphertext.clear();
 	const std::shared_ptr<acl::fiber> worker = acl::gofiber(
 	    [runtime_task, provider_copy, api_key, project_path, prompt,

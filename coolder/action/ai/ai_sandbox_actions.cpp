@@ -4,7 +4,7 @@ namespace action
 {
 namespace workspace_action_detail
 {
-webcool::mutex g_sandbox_runtime_mutex;
+libai::cpp::Mutex g_sandbox_runtime_mutex;
 std::map<std::string, std::shared_ptr<sandbox_runtime_task_t>>
     g_sandbox_runtime_tasks;
 const size_t kMaxActiveSandboxRuns = 4;
@@ -59,7 +59,7 @@ void cleanup_sandbox_runtime_locked(long long now)
 bool reserve_sandbox_runtime(
     const std::shared_ptr<sandbox_runtime_task_t> &task, std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(g_sandbox_runtime_mutex);
 	cleanup_sandbox_runtime_locked(static_cast<long long>(time(NULL)));
 	size_t active = 0;
 	size_t user_active = 0;
@@ -91,14 +91,14 @@ bool reserve_sandbox_runtime(
 
 void remove_sandbox_runtime(const std::string &user_root, const std::string &id)
 {
-	std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(g_sandbox_runtime_mutex);
 	g_sandbox_runtime_tasks.erase(sandbox_runtime_key(user_root, id));
 }
 
 bool snapshot_sandbox_runtime(const std::string &user_root,
     const std::string &id, sandbox_runtime_snapshot_t &snapshot)
 {
-	std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(g_sandbox_runtime_mutex);
 	cleanup_sandbox_runtime_locked(static_cast<long long>(time(NULL)));
 	const std::map<std::string,
 	    std::shared_ptr<sandbox_runtime_task_t>>::const_iterator it =
@@ -122,7 +122,7 @@ bool snapshot_sandbox_runtime(const std::string &user_root,
 bool cancel_sandbox_runtime(
     const std::string &user_root, const std::string &id, bool &already_done)
 {
-	std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(g_sandbox_runtime_mutex);
 	const std::map<std::string,
 	    std::shared_ptr<sandbox_runtime_task_t>>::iterator it =
 	    g_sandbox_runtime_tasks.find(sandbox_runtime_key(user_root, id));
@@ -140,35 +140,37 @@ bool cancel_sandbox_runtime(
 void run_async_sandbox_task(const std::shared_ptr<sandbox_runtime_task_t> &task)
 {
 	{
-		std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+		std::lock_guard<libai::cpp::Mutex> guard(
+		    g_sandbox_runtime_mutex);
 		task->status = "running";
 		task->started_at = static_cast<long long>(time(NULL));
 	}
-	webcool::ai::sandbox_result_t result;
+	libai::cpp::coding::sandbox_result_t result;
 	bool dispatched = false;
 	try {
-		std::vector<webcool::ai::sandbox_command_t> commands(
+		std::vector<libai::cpp::coding::sandbox_command_t> commands(
 		    1, task->plan.command);
-		webcool::ai::program_sandbox_t sandbox(task->user_root,
+		libai::cpp::coding::program_sandbox_t sandbox(task->user_root,
 		    task->plan.project_path, commands, task->plan.limits);
-		webcool::ai::sandbox_request_t request;
+		libai::cpp::coding::sandbox_request_t request;
 		request.command_id = task->plan.command.id;
 		dispatched =
 		    sandbox.execute(request, result, &task->cancel_requested);
 	} catch (const std::exception &exception) {
 		result.error = exception.what();
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "sandbox.runtime", "exception", result.error);
 	} catch (...) {
 		result.error = "unexpected sandbox runtime exception";
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "sandbox.runtime", "unknown-exception", result.error);
 	}
-	webcool::ai::sandbox_execution_store_t store(task->user_root);
+	libai::cpp::coding::sandbox_execution_store_t store(task->user_root);
 	std::string audit_error;
 	(void)store.audit_finished(task->plan, result, audit_error);
 	{
-		std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+		std::lock_guard<libai::cpp::Mutex> guard(
+		    g_sandbox_runtime_mutex);
 		task->result = result;
 		task->done = true;
 		task->finished_at = static_cast<long long>(time(NULL));
@@ -183,7 +185,7 @@ void run_async_sandbox_task(const std::shared_ptr<sandbox_runtime_task_t> &task)
 }
 
 void add_limits(acl::json &json, acl::json_node &root,
-    const webcool::ai::sandbox_limits_t &limits)
+    const libai::cpp::coding::sandbox_limits_t &limits)
 {
 	acl::json_node &value = json.create_node();
 	root.add_child("limits", value);
@@ -210,8 +212,8 @@ bool AiSandboxCapabilitiesAction::run(request_t &req, response_t &res)
 	std::string user_root;
 	if (!current_workspace(req, res, user_root))
 		return true;
-	webcool::ai::project_toolchain_catalog_t catalog(user_root);
-	webcool::ai::project_toolchain_t toolchain;
+	libai::cpp::coding::project_toolchain_catalog_t catalog(user_root);
+	libai::cpp::coding::project_toolchain_t toolchain;
 	std::string err;
 	const std::string path = request_text(req, "path");
 	if (!catalog.discover(path, toolchain, err)) {
@@ -220,7 +222,8 @@ bool AiSandboxCapabilitiesAction::run(request_t &req, response_t &res)
 	}
 	std::string backend_reason;
 	const bool backend_available =
-	    webcool::ai::program_sandbox_t::backend_available(backend_reason);
+	    libai::cpp::coding::program_sandbox_t::backend_available(
+	        backend_reason);
 	acl::json json;
 	acl::json_node &root = json.create_node();
 	root.add_bool("ok", true);
@@ -271,7 +274,7 @@ bool AiSandboxPlanAction::run(request_t &req, response_t &res)
 	if (!current_workspace(req, res, user_root))
 		return true;
 	std::string backend_reason;
-	if (!webcool::ai::program_sandbox_t::backend_available(
+	if (!libai::cpp::coding::program_sandbox_t::backend_available(
 	        backend_reason)) {
 		json_error(res, 503, backend_reason.c_str(), req.isKeepAlive());
 		return true;
@@ -281,8 +284,8 @@ bool AiSandboxPlanAction::run(request_t &req, response_t &res)
 		json_error(res, 400, "invalid JSON body", req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::sandbox_execution_store_t store(user_root);
-	webcool::ai::sandbox_execution_plan_t plan;
+	libai::cpp::coding::sandbox_execution_store_t store(user_root);
+	libai::cpp::coding::sandbox_execution_plan_t plan;
 	std::string err;
 	if (!store.create(json_text((*body)["path"]),
 	        json_text((*body)["command_id"]), plan, err)) {
@@ -298,7 +301,7 @@ bool AiSandboxPlanAction::run(request_t &req, response_t &res)
 	root.add_text("executable", plan.command.executable.c_str());
 	root.add_bool("requires_confirmation", true);
 	root.add_number("expires_in_seconds",
-	    webcool::ai::sandbox_execution_store_t::lifetime_seconds());
+	    libai::cpp::coding::sandbox_execution_store_t::lifetime_seconds());
 	acl::json_node &arguments = json.create_array();
 	root.add_child("fixed_arguments", arguments);
 	for (size_t i = 0; i < plan.command.fixed_arguments.size(); ++i) {
@@ -337,8 +340,8 @@ bool AiSandboxExecuteAction::run(request_t &req, response_t &res)
 		json_error(res, 429, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::sandbox_execution_store_t store(user_root);
-	webcool::ai::sandbox_execution_plan_t plan;
+	libai::cpp::coding::sandbox_execution_store_t store(user_root);
+	libai::cpp::coding::sandbox_execution_plan_t plan;
 	if (!store.consume(plan_id, plan, err)) {
 		remove_sandbox_runtime(user_root, plan_id);
 		int status = 400;
@@ -359,7 +362,8 @@ bool AiSandboxExecuteAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	{
-		std::lock_guard<webcool::mutex> guard(g_sandbox_runtime_mutex);
+		std::lock_guard<libai::cpp::Mutex> guard(
+		    g_sandbox_runtime_mutex);
 		task->plan = plan;
 	}
 	// program_sandbox_t supervises native child pipes with poll(). Running that
@@ -420,12 +424,13 @@ bool AiSandboxRunStatusAction::run(request_t &req, response_t &res)
 	    "elapsed_ms", static_cast<long long>(snapshot.result.elapsed_ms));
 	root.add_text("stdout", snapshot.result.standard_output.c_str());
 	root.add_text("stderr", snapshot.result.standard_error.c_str());
-	std::vector<webcool::ai::project_diagnostic_t> diagnostics;
+	std::vector<libai::cpp::coding::project_diagnostic_t> diagnostics;
 	const std::string absolute_project = snapshot.project_path.empty() ?
 	    user_root :
 	    user_root + "/" + snapshot.project_path;
-	webcool::ai::parse_project_diagnostics(snapshot.result.standard_error +
-	        "\n" + snapshot.result.standard_output,
+	libai::cpp::coding::parse_project_diagnostics(
+	    snapshot.result.standard_error + "\n" +
+	        snapshot.result.standard_output,
 	    absolute_project, snapshot.project_path, diagnostics);
 	acl::json_node &diagnostic_items = json.create_array();
 	root.add_child("diagnostics", diagnostic_items);
@@ -472,8 +477,8 @@ bool AiSandboxRunHistoryAction::run(request_t &req, response_t &res)
 		}
 		limit = static_cast<size_t>(parsed);
 	}
-	webcool::ai::sandbox_execution_store_t store(user_root);
-	std::vector<webcool::ai::sandbox_run_history_t> runs;
+	libai::cpp::coding::sandbox_execution_store_t store(user_root);
+	std::vector<libai::cpp::coding::sandbox_run_history_t> runs;
 	std::string err;
 	if (!store.list_history(limit, runs, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());

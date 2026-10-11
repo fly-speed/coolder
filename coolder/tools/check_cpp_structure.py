@@ -13,7 +13,7 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parents[2]
 EXTENSIONS = {".c", ".cpp", ".cc", ".cxx", ".h", ".hh", ".hpp"}
-SOURCE_TREES = ("libai", "coolder", "libai-c", "libai-java")
+SOURCE_TREES = ("libai", "coolder", "libai-c", "libai-java", "libai-c++")
 EXCLUDED = {"build", "obj", "lib", "CMakeFiles"}
 
 

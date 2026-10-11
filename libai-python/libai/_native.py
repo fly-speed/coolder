@@ -37,6 +37,8 @@ def load(path=None):
         raise RuntimeError("Build libai-c and set LIBAI_LIBRARY to its shared library")
     lib = c.CDLL(path)
     signatures = {
+        "libai_coding_available": (c.c_int, []),
+        "libai_coding_call": (P, [c.c_char_p, c.c_char_p, c.c_char_p]),
         "libai_abi_version": (c.c_uint, []),
         "libai_last_error": (c.c_char_p, []),
         "libai_options_default": (None, [c.POINTER(Options)]),

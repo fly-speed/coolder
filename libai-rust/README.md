@@ -1,5 +1,9 @@
 # Rust binding
 
+推荐入口：`./build.sh`，也可用 `./build.sh /absolute/output/path` 指定输出目录。
+脚本可从任意工作目录调用，默认输出到本目录 `build/`。`./build.sh --help` 查看参数。
+额外参数透传给 `cargo build`；默认离线 release 构建，产物 `build/target/release/liblibai.rlib`，原生静态库在 target 的 build 子目录。
+
 没有第三方 crate 依赖，build.rs 用 CMake 将 C++ runtime 静态链接到应用。
 目前按仓库内 path dependency 使用，构建需要相邻 `libai-c` 和 `libai` 源码，不能仅复制 crate 目录。
 需要 Rust 1.77+（2021 edition）、CMake 和 C++11 编译器。
@@ -54,3 +58,22 @@ Agent 由 Drop 释放；可变借用串行化 run/reset/工具注册。Invocatio
 状态包括 `completed/cancelled/deadline_exceeded/budget_exceeded/model_error/protocol_error/callback_error`。
 工具失败会作为工具消息返回给模型；它不一定意味着整个 run 失败。
 需要审批的工具在缺少授权回调时默认拒绝。所有跨 ABI 字符串为无内嵌 NUL 的 UTF-8。
+
+## 清理构建产物
+
+运行 `./clean.sh` 清理默认构建输出；自定义输出目录使用
+`./clean.sh /absolute/output/path` 或 `./clean.sh --output /absolute/output/path`。
+只删除本绑定生成的目录和文件，保留输出目录中的其他文件；重复执行也可使用。
+
+## 完整编码功能
+
+`CodingService::new(root)`、`CodingService::available()` 和 `.call(operation, arguments_json)`
+与其他语言提供相同操作协议。使用下列环境变量启用桌面 backend：
+
+```sh
+LIBAI_CODING_FULL=ON ACL_PATH=/absolute/acl OPENSSL_ROOT_DIR=/absolute/openssl ./build.sh
+```
+
+完整模式生成并链接 `libai_c` 动态库，开发构建写入其 rpath；发布 APP 时将 native build 的
+install/lib 内动态库一并部署，并配置系统动态库搜索路径。默认模式仍链接 portable 静态桥接库。
+`available` 在轻量和移动端构建返回 false。详见 [统一操作协议](../libai/docs/CODING_SERVICE.md)。

@@ -1,10 +1,8 @@
 #include "stdafx.h"
 #include "auth.h"
-#include "libai/common/webcool_mutex.h"
-#include "libai/common/file_ops.h"
+#include <libai_cpp/coding.h>
 #include "host.h"
 #include "action/action_util.h"
-#include "libai/agent/ai_admin_policy.h"
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -32,7 +30,7 @@ struct attempt_t {
 	    std::chrono::steady_clock::now();
 };
 std::map<std::string, attempt_t> attempts;
-webcool::mutex accounts_mutex;
+libai::cpp::Mutex accounts_mutex;
 constexpr int iterations = 210000;
 
 bool equal(const std::string &a, const std::string &b)
@@ -121,7 +119,7 @@ void persist(const std::map<std::string, account_t> &updated)
 	    std::filesystem::perms::owner_read |
 	        std::filesystem::perms::owner_write,
 	    std::filesystem::perm_options::replace);
-	if (!webcool::ai::file_ops::replace_file(temporary, path)) {
+	if (!libai::cpp::coding::file_ops::replace_file(temporary, path)) {
 		throw std::runtime_error("cannot replace account store");
 	}
 }
@@ -266,13 +264,13 @@ void accounts_init()
 
 bool current_account(const request_t &req, account_t &out)
 {
-	std::lock_guard<webcool::mutex> guard(accounts_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(accounts_mutex);
 	return current_locked(req, out);
 }
 
 std::vector<account_t> project_accounts()
 {
-	std::lock_guard<webcool::mutex> guard(accounts_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(accounts_mutex);
 	std::vector<account_t> result;
 	for (const auto &entry : accounts) {
 		account_t identity;
@@ -294,7 +292,7 @@ std::string account_workspace(const account_t &a)
 
 std::string account_preferences(const std::string &username)
 {
-	std::lock_guard<webcool::mutex> guard(accounts_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(accounts_mutex);
 	auto a = accounts.find(username);
 	if (!(a == accounts.end()))
 		return a->second.admin ?
@@ -359,7 +357,8 @@ static bool handle_interface_preferences(response_t &res,
 		    std::filesystem::perms::owner_read |
 		        std::filesystem::perms::owner_write,
 		    std::filesystem::perm_options::replace);
-		if (!webcool::ai::file_ops::replace_file(temporary, filename)) {
+		if (!libai::cpp::coding::file_ops::replace_file(
+		        temporary, filename)) {
 			throw std::runtime_error(
 			    "cannot replace interface preferences");
 		}
@@ -381,7 +380,7 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 	        path != "/api/v1/auth/logout" ?
 	    req.getJson(8192) :
 	    nullptr;
-	std::lock_guard<webcool::mutex> guard(accounts_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(accounts_mutex);
 	account_t actor;
 	const bool logged_in = current_locked(req, actor);
 	if (path == "/api/v1/auth/status" && method == "GET") {
@@ -394,8 +393,9 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 			return action::sendJson(res, 200, root, false);
 		append_account(root, actor);
 		root.add_bool("ai_agent_allowed",
-		    webcool::ai::ai_agent_access_allowed(
-		        webcool::ai::ai_runtime_policy_get(), actor.admin));
+		    libai::cpp::coding::ai_agent_access_allowed(
+		        libai::cpp::coding::ai_runtime_policy_get(),
+		        actor.admin));
 
 		return action::sendJson(res, 200, root, false);
 	}

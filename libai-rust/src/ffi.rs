@@ -24,6 +24,12 @@ pub struct Hooks {
 }
 
 extern "C" {
+    pub fn libai_coding_available() -> c_int;
+    pub fn libai_coding_call(
+        root: *const c_char,
+        operation: *const c_char,
+        arguments: *const c_char,
+    ) -> *mut c_char;
     pub fn libai_abi_version() -> u32;
     pub fn libai_last_error() -> *const c_char;
     pub fn libai_options_default(options: *mut crate::Options);

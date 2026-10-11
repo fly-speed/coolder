@@ -2,10 +2,7 @@
 #include "ai_provider_actions.h"
 #include "action/actions.h"
 #include "action/action_util.h"
-#include "libai/agent/agent_registry.h"
-#include "libai/common/ai_error_log.h"
-#include "libai/provider/ai_provider_client.h"
-#include "libai/provider/ai_provider_store.h"
+#include <libai_cpp/coding.h>
 
 #include <string>
 #include <vector>
@@ -23,7 +20,7 @@ namespace
 void ai_provider_json_error(response_t &res, int status, const char *message,
     bool keep_alive, const char *file, int line, const char *function)
 {
-	webcool::ai::ai_log_error("http.ai.provider", "response",
+	libai::cpp::coding::ai_log_error("http.ai.provider", "response",
 	    message ? message : "unspecified provider action error");
 	action::json_error_at(
 	    res, status, message, keep_alive, file, line, function);
@@ -35,34 +32,17 @@ void ai_provider_json_error(response_t &res, int status, const char *message,
 
 std::string json_text(acl::json_node *node)
 {
-	if (node == NULL) {
-		return "";
-	}
-	const char *value = node->get_string();
-	if (!(value == NULL))
-		return value ? value : "";
-	value = node->get_text();
-
-	return value ? value : "";
+	return libai::cpp::coding::json_values::text(node);
 }
 
 bool json_bool(acl::json_node *node, bool fallback)
 {
-	if (node == NULL) {
-		return fallback;
-	}
-	const std::string value = json_text(node);
-	if (value == "true" || value == "1") {
-		return true;
-	}
-	if (!(value == "false" || value == "0"))
-		return fallback;
-	return false;
+	return libai::cpp::coding::json_values::boolean(node, fallback);
 }
 
 bool authenticated_store(request_t &req, response_t &res, std::string &username,
-    bool &admin, std::string &user_root, webcool::ai::provider_store_t *&store,
-    bool require_admin)
+    bool &admin, std::string &user_root,
+    libai::cpp::coding::provider_store_t *&store, bool require_admin)
 {
 	const std::string upload_root = runtime_upload_dir_get();
 	if (!auth_current_user(req, upload_root, username, admin)) {
@@ -81,13 +61,14 @@ bool authenticated_store(request_t &req, response_t &res, std::string &username,
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return false;
 	}
-	store = new webcool::ai::provider_store_t(
+	store = new libai::cpp::coding::provider_store_t(
 	    upload_root, user_root, provider_username);
 	return true;
 }
 
 void add_provider_json(acl::json_node &node,
-    const webcool::ai::provider_config_t &item, bool include_key_hint = true)
+    const libai::cpp::coding::provider_config_t &item,
+    bool include_key_hint = true)
 {
 	node.add_text("id", item.id.c_str());
 	node.add_text("name", item.name.c_str());
@@ -128,8 +109,8 @@ void add_provider_json(acl::json_node &node,
 	}
 }
 
-bool parse_provider_input(
-    request_t &req, webcool::ai::provider_input_t &input, std::string &err)
+bool parse_provider_input(request_t &req,
+    libai::cpp::coding::provider_input_t &input, std::string &err)
 {
 	acl::json *body = req.getJson(128 * 1024);
 	if (body == NULL) {
@@ -192,13 +173,13 @@ bool AiProviderListAction::run(request_t &req, response_t &res)
 	std::string username;
 	std::string user_root;
 	bool admin = false;
-	webcool::ai::provider_store_t *raw_store = NULL;
+	libai::cpp::coding::provider_store_t *raw_store = NULL;
 	if (!authenticated_store(
 	        req, res, username, admin, user_root, raw_store, false)) {
 		return true;
 	}
-	std::unique_ptr<webcool::ai::provider_store_t> store(raw_store);
-	std::vector<webcool::ai::provider_config_t> providers;
+	std::unique_ptr<libai::cpp::coding::provider_store_t> store(raw_store);
+	std::vector<libai::cpp::coding::provider_config_t> providers;
 	std::string err;
 	if (!store->list(providers, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -224,23 +205,24 @@ bool AiProviderSaveAction::run(request_t &req, response_t &res)
 	std::string username;
 	std::string user_root;
 	bool admin = false;
-	webcool::ai::provider_store_t *raw_store = NULL;
+	libai::cpp::coding::provider_store_t *raw_store = NULL;
 	if (!authenticated_store(
 	        req, res, username, admin, user_root, raw_store, true)) {
 		return true;
 	}
-	std::unique_ptr<webcool::ai::provider_store_t> store(raw_store);
-	webcool::ai::provider_input_t input;
+	std::unique_ptr<libai::cpp::coding::provider_store_t> store(raw_store);
+	libai::cpp::coding::provider_input_t input;
 	std::string err;
 	if (!parse_provider_input(req, input, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	if (!webcool::ai::provider_store_t::validate_input(input, false, err)) {
+	if (!libai::cpp::coding::provider_store_t::validate_input(
+	        input, false, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::provider_config_t saved;
+	libai::cpp::coding::provider_config_t saved;
 	if (!store->save(input, saved, err)) {
 		const int status = err == "AI provider not found" ? 404 : 500;
 		json_error(res, status, err.c_str(), req.isKeepAlive());
@@ -260,12 +242,12 @@ bool AiProviderDeleteAction::run(request_t &req, response_t &res)
 	std::string username;
 	std::string user_root;
 	bool admin = false;
-	webcool::ai::provider_store_t *raw_store = NULL;
+	libai::cpp::coding::provider_store_t *raw_store = NULL;
 	if (!authenticated_store(
 	        req, res, username, admin, user_root, raw_store, true)) {
 		return true;
 	}
-	std::unique_ptr<webcool::ai::provider_store_t> store(raw_store);
+	std::unique_ptr<libai::cpp::coding::provider_store_t> store(raw_store);
 	std::string id = req.getParameter("id") ? req.getParameter("id") : "";
 	if (id.empty() && req.getContentLength() > 0) {
 		acl::json *body = req.getJson(32 * 1024);
@@ -291,21 +273,21 @@ bool AiProviderTestAction::run(request_t &req, response_t &res)
 	std::string username;
 	std::string user_root;
 	bool admin = false;
-	webcool::ai::provider_store_t *raw_store = NULL;
+	libai::cpp::coding::provider_store_t *raw_store = NULL;
 	if (!authenticated_store(
 	        req, res, username, admin, user_root, raw_store, true)) {
 		return true;
 	}
-	std::unique_ptr<webcool::ai::provider_store_t> store(raw_store);
+	std::unique_ptr<libai::cpp::coding::provider_store_t> store(raw_store);
 	acl::json *body = req.getJson(32 * 1024);
 	const std::string id = body ? json_text((*body)["id"]) : "";
-	std::vector<webcool::ai::provider_config_t> providers;
+	std::vector<libai::cpp::coding::provider_config_t> providers;
 	std::string err;
 	if (!store->list(providers, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	const webcool::ai::provider_config_t *provider = NULL;
+	const libai::cpp::coding::provider_config_t *provider = NULL;
 	for (size_t i = 0; i < providers.size(); ++i) {
 		if (!(providers[i].id == id))
 			continue;
@@ -322,13 +304,13 @@ bool AiProviderTestAction::run(request_t &req, response_t &res)
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::provider_test_result_t result;
+	libai::cpp::coding::provider_test_result_t result;
 	result.http_status = 0;
 	result.latency_ms = 0;
-	webcool::ai::provider_usage_probe_t usage;
+	libai::cpp::coding::provider_usage_probe_t usage;
 	std::string usage_err;
 	const bool usage_ok =
-	    webcool::ai::provider_client_t::probe_usage_limits(
+	    libai::cpp::coding::provider_client_t::probe_usage_limits(
 	        *provider, api_key, usage, usage_err);
 	bool ok = false;
 	if (usage.supported && usage_ok && usage.checked) {
@@ -348,10 +330,10 @@ bool AiProviderTestAction::run(request_t &req, response_t &res)
 		result.endpoint = usage.endpoint;
 	} else {
 		if (usage.supported && !usage_ok) {
-			webcool::ai::ai_log_error("http.ai.provider",
+			libai::cpp::coding::ai_log_error("http.ai.provider",
 			    "usage-probe-fallback", usage_err);
 		}
-		ok = webcool::ai::provider_client_t::test_connection(
+		ok = libai::cpp::coding::provider_client_t::test_connection(
 		    *provider, api_key, result, err);
 	}
 	std::fill(api_key.begin(), api_key.end(), '\0');
@@ -418,10 +400,10 @@ bool AiAgentTypesAction::run(request_t &req, response_t &res)
 	root.add_bool("ok", true);
 	acl::json_node &agents = json.create_array();
 	root.add_child("agents", agents);
-	const std::vector<webcool::ai::agent_definition_t> &definitions =
-	    webcool::ai::agent_registry_t::instance().list();
+	const std::vector<libai::cpp::coding::agent_definition_t> &definitions =
+	    libai::cpp::coding::agent_registry_t::instance().list();
 	for (size_t i = 0; i < definitions.size(); ++i) {
-		const webcool::ai::agent_definition_t &definition =
+		const libai::cpp::coding::agent_definition_t &definition =
 		    definitions[i];
 		acl::json_node &item = agents.add_child(false, true);
 		item.add_text("id", definition.id.c_str());

@@ -16,11 +16,11 @@ struct result_decision_context_t {
 	std::string run_id{};
 	std::string decision{};
 	bool changes_applied{};
-	webcool::ai::agent_run_record_t record{};
-	webcool::ai::agent_result_t result{};
+	libai::cpp::coding::agent_run_record_t record{};
+	libai::cpp::coding::agent_result_t result{};
 	std::string err{};
 	bool verified_legacy_apply{};
-	std::unique_ptr<webcool::ai::agent_result_store_t> result_store;
+	std::unique_ptr<libai::cpp::coding::agent_result_store_t> result_store;
 };
 
 bool load_result_decision(result_decision_context_t &review, request_t &req,
@@ -38,7 +38,7 @@ bool load_result_decision(result_decision_context_t &review, request_t &req,
 	trace.phase("load_run_and_result");
 	review.decision = json_text((*body)["decision"]);
 	review.changes_applied = json_bool((*body)["changes_applied"], false);
-	webcool::ai::agent_run_store_t run_store(review.user_root);
+	libai::cpp::coding::agent_run_store_t run_store(review.user_root);
 	if (!load_review_run_record(review.user_root, review.run_id,
 	        json_text((*body)["session_id"]), review.record, review.err)) {
 		json_error(res, review.err == "agent run not found" ? 404 : 400,
@@ -50,7 +50,7 @@ bool load_result_decision(result_decision_context_t &review, request_t &req,
 		    req.isKeepAlive());
 		return false;
 	}
-	review.result_store.reset(new webcool::ai::agent_result_store_t(
+	review.result_store.reset(new libai::cpp::coding::agent_result_store_t(
 	    review.user_root, review.record.project_path));
 	bool found = false;
 	if (!review.result_store->load(
@@ -93,7 +93,7 @@ bool validate_result_decision(
 		review.err =
 		    "accept every pending file generation through the review endpoint "
 		    "before accepting the whole result";
-		webcool::ai::ai_log_error("agent.result",
+		libai::cpp::coding::ai_log_error("agent.result",
 		    "accept-result-with-pending-generations", review.err);
 		json_error(res, 409, review.err.c_str(), req.isKeepAlive());
 		return false;
@@ -106,7 +106,7 @@ bool validate_result_decision(
 		    "accept file generations through the review endpoint before "
 		    "accepting the whole result";
 	}
-	webcool::ai::ai_log_error(
+	libai::cpp::coding::ai_log_error(
 	    "agent.result", "verify-browser-applied-result", review.err);
 	json_error(res, 409, review.err.c_str(), req.isKeepAlive());
 	return false;
@@ -133,7 +133,7 @@ bool persist_result_decision(result_decision_context_t &review, request_t &req,
 	review.result.changes_apply_error.clear();
 	if (review.result_store->save(review.result, review.err))
 		return true;
-	webcool::ai::ai_log_error(
+	libai::cpp::coding::ai_log_error(
 	    "agent.result", "save-verified-legacy-apply", review.err);
 	json_error(res, 500, review.err.c_str(), req.isKeepAlive());
 	return false;
@@ -181,7 +181,7 @@ void retire_decided_worktree(
 		if (!schedule_reviewed_worktree_cleanup(review.user_root,
 		        review.record.project_path, review.run_id,
 		        cleanup_err)) {
-			webcool::ai::ai_log_error("agent.draft",
+			libai::cpp::coding::ai_log_error("agent.draft",
 			    "cleanup-decided-worktree", cleanup_err);
 		}
 	}
@@ -230,13 +230,14 @@ struct file_review_context_t {
 	std::string user_root{};
 	std::string run_id{};
 	acl::json *body{};
-	std::vector<webcool::ai::agent_change_review_t> reviews{};
-	webcool::ai::agent_run_record_t record{};
-	webcool::ai::agent_result_t result{};
+	std::vector<libai::cpp::coding::agent_change_review_t> reviews{};
+	libai::cpp::coding::agent_run_record_t record{};
+	libai::cpp::coding::agent_result_t result{};
 	std::string err{};
-	std::vector<webcool::ai::workspace_change_input_t> accepted_inputs{};
+	std::vector<libai::cpp::coding::workspace_change_input_t>
+	    accepted_inputs{};
 	bool accepted_write_proven{};
-	std::unique_ptr<webcool::ai::agent_result_store_t> result_store;
+	std::unique_ptr<libai::cpp::coding::agent_result_store_t> result_store;
 };
 
 long long retire_reviewed_worktree(
@@ -255,7 +256,7 @@ long long retire_reviewed_worktree(
 	if (schedule_reviewed_worktree_cleanup(context.user_root,
 	        context.record.project_path, context.run_id, cleanup_err))
 		return pending;
-	webcool::ai::ai_log_error(
+	libai::cpp::coding::ai_log_error(
 	    "agent.draft", "cleanup-reviewed-worktree", cleanup_err);
 
 	return pending;
@@ -286,12 +287,13 @@ bool parse_file_review_request(file_review_context_t &context, request_t &req,
 		acl::json_node *object =
 		    item->is_object() ? item : item->get_obj();
 		if (object == NULL ||
-		    context.reviews.size() >= webcool::ai::kMaxAgentChanges) {
+		    context.reviews.size() >=
+		        libai::cpp::coding::kMaxAgentChanges) {
 			json_error(res, 400, "reviews contains invalid entries",
 			    req.isKeepAlive());
 			return false;
 		}
-		webcool::ai::agent_change_review_t review;
+		libai::cpp::coding::agent_change_review_t review;
 		review.path = json_text((*object)["path"]);
 		review.generation = static_cast<unsigned long long>(
 		    json_number((*object)["generation"], 0));
@@ -320,7 +322,7 @@ bool parse_file_review_request(file_review_context_t &context, request_t &req,
 bool load_file_review_result(file_review_context_t &context, request_t &req,
     response_t &res, operation_trace_t &trace)
 {
-	webcool::ai::agent_run_store_t run_store(context.user_root);
+	libai::cpp::coding::agent_run_store_t run_store(context.user_root);
 	if (!load_review_run_record(context.user_root, context.run_id,
 	        json_text((*context.body)["session_id"]), context.record,
 	        context.err)) {
@@ -334,7 +336,7 @@ bool load_file_review_result(file_review_context_t &context, request_t &req,
 		    req.isKeepAlive());
 		return false;
 	}
-	context.result_store.reset(new webcool::ai::agent_result_store_t(
+	context.result_store.reset(new libai::cpp::coding::agent_result_store_t(
 	    context.user_root, context.record.project_path));
 	bool found = false;
 	if (!context.result_store->load(
@@ -353,15 +355,15 @@ bool load_file_review_result(file_review_context_t &context, request_t &req,
 // Match the exact proposal generation before inferring a parent-directory
 // dependency; a review of an older draft cannot authorize a newer child edit.
 static bool review_requires_directory(const file_review_context_t &context,
-    const webcool::ai::agent_change_proposal_t &directory)
+    const libai::cpp::coding::agent_change_proposal_t &directory)
 {
 	bool required = false;
 	for (size_t r = 0; r < context.reviews.size() && !required; ++r) {
 		if (context.reviews[r].decision != "accepted")
 			continue;
 		for (size_t p = 0; p < context.result.changes.size(); ++p) {
-			const webcool::ai::agent_change_proposal_t &selected =
-			    context.result.changes[p];
+			const libai::cpp::coding::agent_change_proposal_t
+			    &selected = context.result.changes[p];
 			if (selected.path != context.reviews[r].path ||
 			    selected.generation !=
 			        context.reviews[r].generation ||
@@ -387,9 +389,10 @@ void include_review_directory_dependencies(file_review_context_t &context)
 	// Older browsers and direct API clients may review only the file, so complete
 	// the accepted transaction server-side instead of failing with a missing
 	// parent path. Directory dependencies are generation-bound just like the file.
-	std::vector<webcool::ai::agent_change_review_t> dependency_reviews;
+	std::vector<libai::cpp::coding::agent_change_review_t>
+	    dependency_reviews;
 	for (size_t c = 0; c < context.result.changes.size(); ++c) {
-		const webcool::ai::agent_change_proposal_t &directory =
+		const libai::cpp::coding::agent_change_proposal_t &directory =
 		    context.result.changes[c];
 		if ((directory.operation != "mkdir" &&
 		        directory.operation !=
@@ -413,7 +416,7 @@ void include_review_directory_dependencies(file_review_context_t &context)
 		    review_requires_directory(context, directory);
 		if (!required)
 			continue;
-		webcool::ai::agent_change_review_t review;
+		libai::cpp::coding::agent_change_review_t review;
 		review.path = directory.path;
 		review.generation = directory.generation;
 		review.draft_hash = directory.draft_hash;
@@ -453,7 +456,7 @@ bool prepare_accepted_file_changes(
 			    req.isKeepAlive());
 			return false;
 		}
-		const webcool::ai::agent_change_proposal_t &change =
+		const libai::cpp::coding::agent_change_proposal_t &change =
 		    context.result.changes[match];
 		if (change.review_status == "superseded") {
 			json_error(res, 409,
@@ -470,7 +473,7 @@ bool prepare_accepted_file_changes(
 		}
 		if (context.reviews[i].decision != "accepted")
 			continue;
-		webcool::ai::workspace_change_input_t input;
+		libai::cpp::coding::workspace_change_input_t input;
 		input.operation =
 		    context.reviews[i].resolved_operation.empty() ?
 		    change.operation :
@@ -502,7 +505,7 @@ bool prepare_accepted_file_changes(
 		if (!below_planned_directory &&
 		    !workspace_change_matches(context.user_root, input,
 		        already_materialized, context.err)) {
-			webcool::ai::ai_log_error("agent.result",
+			libai::cpp::coding::ai_log_error("agent.result",
 			    "inspect-generation-review", context.err);
 			json_error(
 			    res, 409, context.err.c_str(), req.isKeepAlive());
@@ -515,7 +518,7 @@ bool prepare_accepted_file_changes(
 		if (change.review_status == "accepted") {
 			context.err =
 			    "accepted coding-agent generation no longer matches formal source";
-			webcool::ai::ai_log_error("agent.result",
+			libai::cpp::coding::ai_log_error("agent.result",
 			    "verify-accepted-generation", context.err);
 			json_error(
 			    res, 409, context.err.c_str(), req.isKeepAlive());
@@ -540,13 +543,13 @@ bool apply_accepted_file_changes(file_review_context_t &context, request_t &req,
 	// Acceptance is the write confirmation. Apply all selected generations in
 	// one rollback-safe transaction before persisting their accepted state, so
 	// the API can never report accepted merely because metadata was updated.
-	webcool::ai::workspace_change_set_store_t change_store(
+	libai::cpp::coding::workspace_change_set_store_t change_store(
 	    context.user_root);
-	webcool::ai::workspace_change_set_preview_t preview;
-	std::vector<webcool::ai::workspace_change_result_t> applied;
+	libai::cpp::coding::workspace_change_set_preview_t preview;
+	std::vector<libai::cpp::coding::workspace_change_result_t> applied;
 	if (!change_store.create_and_apply(
 	        context.accepted_inputs, preview, applied, context.err)) {
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.result", "apply-generation-review", context.err);
 		json_error(res, 409, context.err.c_str(), req.isKeepAlive());
 		return false;
@@ -579,7 +582,7 @@ bool persist_file_review_state(file_review_context_t &context, request_t &req,
 	context.result.changes_apply_error.clear();
 	if (context.result_store->save(context.result, context.err))
 		return true;
-	webcool::ai::ai_log_error(
+	libai::cpp::coding::ai_log_error(
 	    "agent.result", "save-generation-apply-state", context.err);
 	json_error(res, 500, context.err.c_str(), req.isKeepAlive());
 	return false;
@@ -617,7 +620,7 @@ void publish_file_review_state(
 				        context.reviews[i]
 				            .resolved_content.size()));
 				review_event.add_text("resolved_content_sha256",
-				    webcool::ai::agent_workspace_t::
+				    libai::cpp::coding::agent_workspace_t::
 				        content_sha256(
 				            context.reviews[i].resolved_content)
 				            .c_str());
@@ -679,8 +682,8 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 	const std::string run_id = json_text((*body)["run_id"]);
 	trace.bind(find_runtime_task(user_root, run_id));
 	trace.phase("load_run_and_result");
-	webcool::ai::agent_run_store_t run_store(user_root);
-	webcool::ai::agent_run_record_t record;
+	libai::cpp::coding::agent_run_store_t run_store(user_root);
+	libai::cpp::coding::agent_run_record_t record;
 	std::string err;
 	if (!run_store.get(run_id, record, err)) {
 		json_error(res, err == "agent run not found" ? 404 : 400,
@@ -692,9 +695,9 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 		    req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_result_store_t result_store(
+	libai::cpp::coding::agent_result_store_t result_store(
 	    user_root, record.project_path);
-	webcool::ai::agent_result_t result;
+	libai::cpp::coding::agent_result_t result;
 	bool found = false;
 	if (!result_store.load(run_id, result, found, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -730,10 +733,11 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 			    req.isKeepAlive());
 			return true;
 		}
-		std::vector<webcool::ai::workspace_change_input_t> inputs;
+		std::vector<libai::cpp::coding::workspace_change_input_t>
+		    inputs;
 		inputs.reserve(result.changes.size());
 		for (size_t i = 0; i < result.changes.size(); ++i) {
-			webcool::ai::workspace_change_input_t input;
+			libai::cpp::coding::workspace_change_input_t input;
 			input.operation = result.changes[i].operation;
 			input.path = result.changes[i].path;
 			input.target_path = result.changes[i].target_path;
@@ -741,10 +745,11 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 			input.reason = result.changes[i].reason;
 			inputs.push_back(input);
 		}
-		webcool::ai::workspace_change_set_store_t change_store(
+		libai::cpp::coding::workspace_change_set_store_t change_store(
 		    user_root);
-		webcool::ai::workspace_change_set_preview_t preview;
-		std::vector<webcool::ai::workspace_change_result_t> applied;
+		libai::cpp::coding::workspace_change_set_preview_t preview;
+		std::vector<libai::cpp::coding::workspace_change_result_t>
+		    applied;
 		trace.phase("apply_file_transaction");
 		const bool applied_ok = change_store.create_and_apply(
 		    inputs, preview, applied, err);
@@ -753,10 +758,10 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 			result.changes_apply_error = err;
 			std::string save_err;
 			if (!result_store.save(result, save_err)) {
-				webcool::ai::ai_log_error("agent.result",
+				libai::cpp::coding::ai_log_error("agent.result",
 				    "save-apply-error", save_err);
 			}
-			webcool::ai::ai_log_error(
+			libai::cpp::coding::ai_log_error(
 			    "agent.result", "recover-auto-apply", err);
 			json_error(res, 409, err.c_str(), req.isKeepAlive());
 			return true;
@@ -772,7 +777,7 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 			result.changes[i].review_status = "accepted";
 		}
 		if (!result_store.save(result, err)) {
-			webcool::ai::ai_log_error(
+			libai::cpp::coding::ai_log_error(
 			    "agent.result", "save-applied-state", err);
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
 			return true;
@@ -790,7 +795,7 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 	std::string cleanup_err;
 	if (!schedule_reviewed_worktree_cleanup(
 	        user_root, record.project_path, run_id, cleanup_err)) {
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.draft", "cleanup-applied-worktree", cleanup_err);
 	}
 	acl::json json;

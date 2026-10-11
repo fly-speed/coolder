@@ -1,8 +1,7 @@
 #include "stdafx.h"
 #include "server/host.h"
 #include "server/auth.h"
-#include "libai/agent/ai_admin_policy.h"
-#include "libai/runtime/coding_runtime.h"
+#include <libai_cpp/coding.h>
 #include <filesystem>
 #include <iostream>
 #include <csignal>
@@ -89,7 +88,7 @@ static void serve_connection(acl::socket_stream *conn)
 
 static void cancel_active_runs()
 {
-	std::lock_guard<webcool::mutex> guard(
+	std::lock_guard<libai::cpp::Mutex> guard(
 	    action::agent_detail::g_agent_runtime_mutex);
 	for (auto &item : action::agent_detail::g_agent_runtime_tasks) {
 		item.second->cancel_requested = true;
@@ -115,8 +114,8 @@ static void accept_connections(acl::server_socket &server)
 	}
 }
 
-static bool parse_server_options(int argc, char **argv, unsigned &port,
-    std::string &log_file)
+static bool parse_server_options(
+    int argc, char **argv, unsigned &port, std::string &log_file)
 {
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
@@ -161,15 +160,16 @@ static void open_server_log(const std::string &filename)
 {
 	if (filename.empty() || filename.find('|') != std::string::npos)
 		throw std::runtime_error("invalid log file path");
-	const auto path = std::filesystem::absolute(std::filesystem::u8path(filename));
+	const auto path =
+	    std::filesystem::absolute(std::filesystem::u8path(filename));
 #ifdef _WIN32
 	FILE *file = _wfopen(path.c_str(), L"a");
 #else
 	FILE *file = std::fopen(path.c_str(), "a");
 #endif
 	if (!file)
-		throw std::runtime_error("cannot open log file " + path.u8string() +
-		    ": " + std::strerror(errno));
+		throw std::runtime_error("cannot open log file " +
+		    path.u8string() + ": " + std::strerror(errno));
 	std::cout.flush();
 	std::cerr.flush();
 	std::fflush(stdout);
@@ -184,7 +184,8 @@ static void open_server_log(const std::string &filename)
 	const int saved_errno = errno;
 	std::fclose(file);
 	if (out < 0 || error < 0)
-		throw std::runtime_error("cannot redirect output to log file: " +
+		throw std::runtime_error(
+		    "cannot redirect output to log file: " +
 		    std::string(std::strerror(saved_errno)));
 	std::setvbuf(stdout, nullptr, _IOLBF, 0);
 	std::setvbuf(stderr, nullptr, _IONBF, 0);
@@ -258,10 +259,10 @@ int main(int argc, char **argv)
 			       "COOLDER_LIBSSL for HTTPS providers.\n";
 		}
 
-		webcool::ai::ai_admin_policy_t policy;
+		libai::cpp::coding::ai_admin_policy_t policy;
 		policy.language_tools = "python,javascript,go,java,rust,swift";
 		policy.allow_browser_debug = false;
-		webcool::ai::ai_admin_policy_store_t policy_store(
+		libai::cpp::coding::ai_admin_policy_store_t policy_store(
 		    coolder::data_dir);
 		std::string policy_error;
 		if (fs::exists(coolder::data_dir +
@@ -275,7 +276,7 @@ int main(int argc, char **argv)
 		policy.allow_browser_debug = false;
 		policy.allow_users_shared_projects = false;
 		policy.allow_users_local_projects = false;
-		webcool::ai::ai_runtime_policy_set(policy);
+		libai::cpp::coding::ai_runtime_policy_set(policy);
 		coolder::accounts_init();
 
 		coolder::authority = "127.0.0.1:" + std::to_string(port);

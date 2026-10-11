@@ -3,12 +3,11 @@
 #include "auth.h"
 #include "project_sharing.h"
 #include "attachments.h"
-#include "libai/agent/ai_admin_policy.h"
+#include <libai_cpp/coding.h>
 #include "action/action_util.h"
 #include "action/ai/ai_agent_actions.h"
 #include "action/ai/ai_provider_actions.h"
 #include "action/ai/ai_workspace_actions.h"
-#include "libai/workspace/agent_workspace.h"
 #include <fstream>
 #include <sstream>
 #include <map>
@@ -39,15 +38,17 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 	res.setHeader("Cache-Control", "no-store");
 	unsigned char nonce_bytes[16];
 	if (RAND_bytes(nonce_bytes, sizeof(nonce_bytes)) != 1)
-		return reply(res, 500, "secure random unavailable", "text/plain");
+		return reply(
+		    res, 500, "secure random unavailable", "text/plain");
 	std::string preview_nonce;
 	const char *hex = "0123456789abcdef";
 	for (unsigned char value : nonce_bytes) {
 		preview_nonce += hex[value >> 4];
 		preview_nonce += hex[value & 15];
 	}
-	const std::string csp = "default-src 'self'; script-src 'self' 'nonce-" +
-	    preview_nonce + "'; style-src 'self' 'unsafe-inline'; "
+	const std::string csp =
+	    "default-src 'self'; script-src 'self' 'nonce-" + preview_nonce +
+	    "'; style-src 'self' 'unsafe-inline'; "
 	    "worker-src 'self'; font-src 'self' data:; connect-src 'self'; "
 	    "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'";
 	res.setHeader("Content-Security-Policy", csp.c_str());
@@ -74,7 +75,7 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 	// tree.
 	if (method == "GET" &&
 	    (path.compare(0, 22, "/vendor/monaco-editor/") == 0 ||
-	     path.compare(0, 19, "/vendor/monaco-vim/") == 0)) {
+	        path.compare(0, 19, "/vendor/monaco-vim/") == 0)) {
 		const std::filesystem::path relative(path.substr(1));
 		std::filesystem::path filename(html_dir);
 		for (const auto &component : relative) {
@@ -154,8 +155,9 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 		if (path == "/") {
 			const auto head = page.find("</head>");
 			if (head != std::string::npos)
-				page.insert(head, "<meta name=\"preview-script-nonce\" content=\"" +
-				    preview_nonce + "\">\n");
+				page.insert(head,
+				    "<meta name=\"preview-script-nonce\" content=\"" +
+				        preview_nonce + "\">\n");
 		}
 		return reply(res, 200, page,
 		    path == "/" ? "text/html; charset=utf-8" :
@@ -186,8 +188,8 @@ bool dispatch(request_t &req, response_t &res, const std::string &method)
 	const bool provider_management =
 	    account.admin && path.compare(0, 20, "/api/v1/ai/providers") == 0;
 	if (path.compare(0, 11, "/api/v1/ai/") == 0 && !provider_management &&
-	    !webcool::ai::ai_agent_access_allowed(
-	        webcool::ai::ai_runtime_policy_get(), account.admin)) {
+	    !libai::cpp::coding::ai_agent_access_allowed(
+	        libai::cpp::coding::ai_runtime_policy_get(), account.admin)) {
 		return reply(res, 403,
 		    "{\"error\":\"管理员已关闭当前账户的 AI 编程权限\"}");
 	}
@@ -332,7 +334,7 @@ bool save_user_prefs(const std::string &, const std::string &username,
 bool normalize_relative_path(
     const char *p, std::string &normalized, std::string &err, bool empty)
 {
-	return webcool::ai::agent_workspace_t::normalize_path(
+	return libai::cpp::coding::agent_workspace_t::normalize_path(
 	    p ? p : "", normalized, empty, err);
 }
 

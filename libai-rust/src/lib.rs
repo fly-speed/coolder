@@ -141,3 +141,37 @@ impl Drop for Agent {
 fn native_error() -> Error {
     Error(unsafe { callbacks::text(ffi::libai_last_error()) })
 }
+
+/// Root-confined coding facilities; the host owns authorization and JSON decoding.
+pub struct CodingService {
+    root: std::ffi::CString,
+}
+impl CodingService {
+    /// Select a trusted existing directory; arguments cannot change this scope.
+    pub fn new(root: &str) -> Result<Self, Error> {
+        Ok(Self {
+            root: cstring(root)?,
+        })
+    }
+    /// Portable and mobile builds return false.
+    pub fn available() -> bool {
+        unsafe { ffi::libai_coding_available() != 0 }
+    }
+    /// Return {ok,...} JSON; operation failures use ok=false. ABI failures return Err.
+    pub fn call(&self, operation: &str, arguments_json: &str) -> Result<String, Error> {
+        let operation = cstring(operation)?;
+        let arguments = cstring(arguments_json)?;
+        unsafe {
+            let result =
+                ffi::libai_coding_call(self.root.as_ptr(), operation.as_ptr(), arguments.as_ptr());
+            if result.is_null() {
+                return Err(native_error());
+            }
+            let text = std::ffi::CStr::from_ptr(result)
+                .to_string_lossy()
+                .into_owned();
+            ffi::libai_string_free(result);
+            Ok(text)
+        }
+    }
+}

@@ -55,6 +55,8 @@ int main()
 	user.text = "follow up";
 	source.messages.push_back(user);
 	auto request = libai::provider_model_t::request(source);
+	assert(request.user_prompt == "follow up");
+	assert(request.messages.size() == source.messages.size());
 
 	for (const std::string protocol : { "openai_chat", "openai_responses",
 	         "anthropic_messages", "gemini_native", "ollama" }) {

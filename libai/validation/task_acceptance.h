@@ -16,6 +16,7 @@ inline bool needs_browser_interaction(std::string request)
     if (request.find(term) != std::string::npos) return true;
   return false;
 }
+// Summarize the available browser evidence without claiming untested coverage.
 inline std::string browser_evidence_summary(bool current,
     const std::string &status, bool chinese)
 {

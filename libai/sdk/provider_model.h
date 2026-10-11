@@ -29,6 +29,14 @@ public:
 		webcool::ai::completion_request_t target;
 		target.system_prompt = source.instructions;
 		target.messages = source.messages;
+		// The native transport validates this legacy field even for typed transcripts.
+		// Protocol writers use messages above, preserving tool exchanges without duplication.
+		target.user_prompt = "Continue.";
+		for (const auto &message : source.messages) {
+			if (message.role == message_t::role_t::user &&
+			    !message.text.empty())
+				target.user_prompt = message.text;
+		}
 		target.max_output_tokens =
 		    static_cast<long long>(source.max_output_tokens);
 		target.store = false;

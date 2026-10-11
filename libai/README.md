@@ -150,6 +150,7 @@ language-specific owning facades and mobile packages:
 
 | Directory | Interface / artifact |
 | --- | --- |
+| [libai-c++](../libai-c++/README.md) | C++11 owning facade, shared/static library and CMake package |
 | [libai-c](../libai-c/README.md) | C ABI, shared/static library and CMake package |
 | [libai-java](../libai-java/README.md) | Java 8+ Agent and JNI library |
 | [libai-python](../libai-python/README.md) | Python 3.9+ ctypes package |
@@ -161,3 +162,7 @@ language-specific owning facades and mobile packages:
 All facades share sessions, tools, authorization, streaming and run budgets.
 Applications supply model transport callbacks and platform-specific tools.
 Mobile packages include the portable runtime; ACL/OpenSSL provider adapters are not included.
+
+APP 集成推荐使用同级 `libai-c++` 的编译封装。`coding/` 提供跨语言共享的 JSON 编码服务，
+复用工作区、项目、provider、会话和运行记录；`common/json_values.h` 统一从 APP 提取的 JSON 标量转换。
+详见 [CODING_SERVICE.md](docs/CODING_SERVICE.md)。

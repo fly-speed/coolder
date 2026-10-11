@@ -1,5 +1,9 @@
 # Objective-C binding
 
+推荐入口：`./build.sh`，也可用 `./build.sh /absolute/output/path` 指定输出目录。
+脚本可从任意工作目录调用，默认输出到本目录 `build/`。`./build.sh --help` 查看参数。
+额外参数透传给 CMake；支持 `CMAKE`、`BUILD_TYPE`、`JOBS` 环境变量。安装产物在 `build/install/`。
+
 Foundation + ARC 的 Objective-C/Objective-C++ 接口，公共头文件 `LAIAgent.h`。
 支持 macOS 和 iOS，包含 Clang module `LibAI`；iOS 分发见 `../iOS`。
 静态库将 C bridge 和 C++ runtime 一起打包。
@@ -48,3 +52,17 @@ reset 清空会话；cancel 可跨线程；close/dealloc 释放原生资源。�
 状态包括 `completed/cancelled/deadline_exceeded/budget_exceeded/model_error/protocol_error/callback_error`。
 工具失败会作为工具消息返回给模型；它不一定意味着整个 run 失败。
 需要审批的工具在缺少授权回调时默认拒绝。所有跨 ABI 字符串为无内嵌 NUL 的 UTF-8。
+
+## 清理构建产物
+
+运行 `./clean.sh` 清理默认构建输出；自定义输出目录使用
+`./clean.sh /absolute/output/path` 或 `./clean.sh --output /absolute/output/path`。
+只删除本绑定生成的目录和文件，保留输出目录中的其他文件；重复执行也可使用。
+
+## 完整编码功能
+
+`[LAICodingService available] / initWithRoot: / call:arguments:error:` 暴露同一套工作区、项目、provider、会话与运行审计功能。
+桌面构建传入 `-DLIBAI_CODING_FULL=ON -DACL_PATH=/absolute/acl -DOPENSSL_PATH=/absolute/openssl`；
+默认轻量及移动端构建的 available 返回 false，调用会报告未启用完整组件。
+
+详见 [统一操作协议和调用示例](../libai/docs/CODING_SERVICE.md)。

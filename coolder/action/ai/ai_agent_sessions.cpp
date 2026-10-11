@@ -1,16 +1,37 @@
 #include "stdafx.h"
-#include "libai/storage/agent_run_store.h"
+#include <libai_cpp/coding.h>
 #include "ai_agent_actions_internal.h"
 namespace action
 {
 using namespace agent_detail;
+static bool session_cache_usage_available(const std::string &root,
+    const std::string &project_path, const std::string &run_id)
+{
+	libai::cpp::coding::agent_request_store_t store(
+	    root, project_path, run_id);
+	std::string log, error, line;
+	if (!store.operation_log(log, false, error))
+		return false;
+	std::istringstream lines(log);
+	while (std::getline(lines, line)) {
+		acl::json event(line.c_str());
+		if (!event.finish())
+			continue;
+		const auto *cache = event["cache_usage_available"];
+		if (cache && cache->get_bool() && *cache->get_bool())
+			return true;
+	}
+	return false;
+}
+
 static bool append_session_message(
-    const webcool::ai::agent_session_record_t &session, size_t j,
+    const libai::cpp::coding::agent_session_record_t &session, size_t j,
     acl::json &json, acl::json_node &messages, const std::string &user_root,
-    const std::vector<webcool::ai::agent_run_record_t> &runs)
+    const std::vector<libai::cpp::coding::agent_run_record_t> &runs)
 {
 
-	const webcool::ai::agent_session_message_t &saved = session.messages[j];
+	const libai::cpp::coding::agent_session_message_t &saved =
+	    session.messages[j];
 	acl::json_node &message = messages.add_child(false, true);
 	message.add_text(
 	    "message_id", (saved.run_id + ":" + saved.role).c_str());
@@ -39,30 +60,22 @@ static bool append_session_message(
 	}
 	if (saved.role == "assistant") {
 		for (const auto &run : runs) {
-			if (run.id == saved.run_id && run.project_path == session.project_path &&
-			    run.finished_at >= run.started_at && run.started_at > 0)
-				message.add_number("elapsed_ms", (run.finished_at - run.started_at) * 1000);
+			if (run.id == saved.run_id &&
+			    run.project_path == session.project_path &&
+			    run.finished_at >= run.started_at &&
+			    run.started_at > 0)
+				message.add_number("elapsed_ms",
+				    (run.finished_at - run.started_at) * 1000);
 		}
 	}
 	message.add_number("duration_ms", saved.duration_ms);
 	message.add_number("input_tokens", saved.input_tokens);
 	message.add_number("cached_input_tokens", saved.cached_input_tokens);
 	if (saved.role == "assistant") {
-		bool cache_available = saved.cached_input_tokens > 0;
-		if (!cache_available) {
-			webcool::ai::agent_request_store_t store(user_root, session.project_path, saved.run_id);
-			std::string log, err, line;
-			if (store.operation_log(log, false, err)) {
-				std::istringstream lines(log);
-				while (std::getline(lines, line)) {
-					acl::json event(line.c_str());
-					if (!event.finish()) continue;
-					const auto *cache = event["cache_usage_available"];
-					if (cache && cache->get_bool() && *cache->get_bool()) { cache_available = true; break; }
-				}
-			}
-		}
-		message.add_bool("cache_usage_available", cache_available);
+		message.add_bool("cache_usage_available",
+		    saved.cached_input_tokens > 0 ||
+		        session_cache_usage_available(
+		            user_root, session.project_path, saved.run_id));
 	}
 
 	message.add_number("output_tokens", saved.output_tokens);
@@ -73,18 +86,19 @@ static bool append_session_message(
 	acl::json_node &files = json.create_array();
 	message.add_child("changes", files);
 	if (saved.role == "assistant") {
-		webcool::ai::agent_result_store_t results(
+		libai::cpp::coding::agent_result_store_t results(
 		    user_root, session.project_path);
-		webcool::ai::agent_result_t result;
+		libai::cpp::coding::agent_result_t result;
 		bool found = false;
 		std::string result_err;
 		if (!results.load(saved.run_id, result, found, result_err)) {
-			webcool::ai::ai_log_error(
+			libai::cpp::coding::ai_log_error(
 			    "agent.session", "load-message-files", result_err);
 		} else if (found && result.session_id == session.id) {
 			for (size_t k = 0; k < result.changes.size(); ++k) {
-				const webcool::ai::agent_change_proposal_t
-				    &change = result.changes[k];
+				const libai::cpp::coding::
+				    agent_change_proposal_t &change =
+				        result.changes[k];
 				acl::json_node &file =
 				    files.add_child(false, true);
 				file.add_text(
@@ -116,8 +130,9 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 	const char *raw_path = req.getParameter("path");
 	const char *raw_detail_session_id = req.getParameter("session_id");
 	if (raw_project_id != NULL && *raw_project_id != '\0') {
-		webcool::ai::agent_project_store_t project_store(user_root);
-		webcool::ai::agent_project_record_t project;
+		libai::cpp::coding::agent_project_store_t project_store(
+		    user_root);
+		libai::cpp::coding::agent_project_record_t project;
 		if (!project_store.get(raw_project_id, project, path_err)) {
 			json_error(res,
 			    path_err == "agent project not found" ? 404 : 500,
@@ -126,13 +141,13 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 		}
 		requested_path = project.project_path;
 	} else if (raw_path != NULL &&
-	    !webcool::ai::agent_workspace_t::normalize_path(
+	    !libai::cpp::coding::agent_workspace_t::normalize_path(
 	        raw_path, requested_path, false, path_err)) {
 		json_error(res, 400, path_err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_session_store_t store(user_root);
-	std::vector<webcool::ai::agent_session_record_t> sessions;
+	libai::cpp::coding::agent_session_store_t store(user_root);
+	std::vector<libai::cpp::coding::agent_session_record_t> sessions;
 	std::string err;
 	if (!store.list(50, sessions, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -140,8 +155,8 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 	}
 	// Session messages are persisted at completion. Use the run audit for the
 	// user's submission time rather than presenting completion as submission.
-	webcool::ai::agent_run_store_t run_store(user_root);
-	std::vector<webcool::ai::agent_run_record_t> runs;
+	libai::cpp::coding::agent_run_store_t run_store(user_root);
+	std::vector<libai::cpp::coding::agent_run_record_t> runs;
 	std::string run_err;
 	run_store.list(100, runs, run_err);
 	acl::json json;
@@ -171,12 +186,12 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 		item.add_number("turn_count", sessions[i].turn_count);
 		bool recovery_available = false;
 		std::string recovery_err;
-		webcool::ai::agent_progress_store_t progress_store(
+		libai::cpp::coding::agent_progress_store_t progress_store(
 		    user_root, sessions[i].project_path, sessions[i].id);
 		if (!progress_store.exists(recovery_available, recovery_err)) {
 			// Conversation history is still useful when one malformed checkpoint
 			// cannot be inspected; log the precise problem and expose no resume action.
-			webcool::ai::ai_log_error(
+			libai::cpp::coding::ai_log_error(
 			    "agent.session", "probe-progress", recovery_err);
 			recovery_available = false;
 		}
@@ -214,8 +229,8 @@ bool AiAgentSessionSaveAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	const std::string id = json_text((*body)["session_id"]);
-	webcool::ai::agent_session_store_t store(user_root);
-	webcool::ai::agent_session_record_t session;
+	libai::cpp::coding::agent_session_store_t store(user_root);
+	libai::cpp::coding::agent_session_record_t session;
 	std::string err;
 	if (!store.get(id, session, err)) {
 		int status = 500;
@@ -241,7 +256,7 @@ bool AiAgentSessionSaveAction::run(request_t &req, response_t &res)
 	     << "Created: " << session.created_at << "\n"
 	     << "Updated: " << session.updated_at << "\n\n";
 	for (size_t i = 0; i < session.messages.size(); ++i) {
-		const webcool::ai::agent_session_message_t &message =
+		const libai::cpp::coding::agent_session_message_t &message =
 		    session.messages[i];
 		text << "[" << message.role << "]";
 		if (message.created_at > 0)
@@ -266,9 +281,9 @@ bool AiAgentSessionSaveAction::run(request_t &req, response_t &res)
 	const std::string relative_path = session.project_path.empty() ?
 	    filename :
 	    session.project_path + "/" + filename;
-	webcool::ai::agent_workspace_t workspace(user_root);
+	libai::cpp::coding::agent_workspace_t workspace(user_root);
 	if (!workspace.save_generated_text(relative_path, content, err)) {
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.session", "save-transcript", err);
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
@@ -293,7 +308,7 @@ bool AiAgentSessionDeleteAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	const std::string id = json_text((*body)["session_id"]);
-	webcool::ai::agent_session_store_t store(user_root);
+	libai::cpp::coding::agent_session_store_t store(user_root);
 	std::string err;
 	if (!store.remove(id, err)) {
 		int status = 500;
@@ -305,11 +320,11 @@ bool AiAgentSessionDeleteAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	size_t removed_workflows = 0;
-	webcool::ai::agent_workflow_store_t workflow_store(user_root);
+	libai::cpp::coding::agent_workflow_store_t workflow_store(user_root);
 	if (!workflow_store.remove_for_session(id, removed_workflows, err)) {
 		// The requested conversation is already gone. Do not falsely report the
 		// delete as failed, but leave an operator-visible cleanup error.
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "http.ai.session", "remove-workflows", err);
 	}
 	acl::json json;

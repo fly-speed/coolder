@@ -7,34 +7,42 @@ using namespace agent_detail;
 // Read the authenticated run's bounded journal after releasing runtime locks.
 // The same durable source supports live snapshots and expired runtime entries.
 static void add_model_interactions_json(acl::json_node &root,
-    const std::string &user_root, const webcool::ai::agent_run_record_t &record,
+    const std::string &user_root,
+    const libai::cpp::coding::agent_run_record_t &record,
     const std::shared_ptr<agent_runtime_task_t> &task)
 {
 	std::string log, err;
 	if (task) {
-		std::lock_guard<webcool::mutex> guard(task->operation_log_mutex);
+		std::lock_guard<libai::cpp::Mutex> guard(
+		    task->operation_log_mutex);
 		log = task->operation_log;
 	} else {
-		webcool::ai::agent_request_store_t store(
+		libai::cpp::coding::agent_request_store_t store(
 		    user_root, record.project_path, record.id);
 		store.operation_log(log, false, err);
 	}
 	std::istringstream lines(log);
 	std::string line, entries = "[";
-	bool truncated = false, cache_available = record.cached_input_tokens > 0;
+	bool truncated = false,
+	     cache_available = record.cached_input_tokens > 0;
 	while (std::getline(lines, line)) {
 		acl::json event(line.c_str());
-		if (!event.finish()) continue;
+		if (!event.finish())
+			continue;
 		const std::string name = json_text(event["event"]);
 		const auto *cache = event["cache_usage_available"];
-		if (cache && cache->get_bool() && *cache->get_bool()) cache_available = true;
-		if (name == "operation_log_truncated") truncated = true;
+		if (cache && cache->get_bool() && *cache->get_bool())
+			cache_available = true;
+		if (name == "operation_log_truncated")
+			truncated = true;
 		if (name != "model_request_started" &&
 		    name != "model_response_completed" &&
 		    name != "model_request_failed" &&
 		    name != "tool_arguments_recovery" &&
-		    name != "model_stream_interrupted_before_retry") continue;
-		if (entries.size() > 1) entries += ",";
+		    name != "model_stream_interrupted_before_retry")
+			continue;
+		if (entries.size() > 1)
+			entries += ",";
 		entries += line;
 	}
 	entries += "]";
@@ -56,7 +64,7 @@ public:
 	{
 		if (!active_)
 			return;
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::cpp::Mutex> guard(g_agent_runtime_mutex);
 		if (task_->event_subscribers > 0)
 			--task_->event_subscribers;
 	}
@@ -80,10 +88,10 @@ bool AiAgentRunListAction::run(request_t &req, response_t &res)
 	const char *pending_flag = req.getParameter("pending_review");
 	const bool pending_only =
 	    pending_flag && std::string(pending_flag) == "1";
-	webcool::ai::agent_session_record_t review_session;
+	libai::cpp::coding::agent_session_record_t review_session;
 	if (pending_only) {
 		const char *session_id = req.getParameter("session_id");
-		webcool::ai::agent_session_store_t sessions(user_root);
+		libai::cpp::coding::agent_session_store_t sessions(user_root);
 		std::string session_err;
 		if (!session_id ||
 		    !sessions.get(session_id, review_session, session_err)) {
@@ -105,8 +113,8 @@ bool AiAgentRunListAction::run(request_t &req, response_t &res)
 		}
 		limit = static_cast<size_t>(parsed);
 	}
-	webcool::ai::agent_run_store_t store(user_root);
-	std::vector<webcool::ai::agent_run_record_t> records;
+	libai::cpp::coding::agent_run_store_t store(user_root);
+	std::vector<libai::cpp::coding::agent_run_record_t> records;
 	std::string err;
 	if (!store.list(pending_only ? 100 : limit, records, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -118,9 +126,9 @@ bool AiAgentRunListAction::run(request_t &req, response_t &res)
 	acl::json_node &items = json.create_array();
 	root.add_child("runs", items);
 	if (pending_only) {
-		webcool::ai::agent_result_store_t results(
+		libai::cpp::coding::agent_result_store_t results(
 		    user_root, review_session.project_path);
-		std::vector<webcool::ai::agent_pending_result_t> pending;
+		std::vector<libai::cpp::coding::agent_pending_result_t> pending;
 		if (!results.list_pending(review_session.id, pending, err)) {
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
 			return true;
@@ -133,7 +141,8 @@ bool AiAgentRunListAction::run(request_t &req, response_t &res)
 			    "pending_review_count", saved.pending_count);
 			const auto record =
 			    std::find_if(records.begin(), records.end(),
-			        [&saved](const webcool::ai::agent_run_record_t
+			        [&saved](
+			            const libai::cpp::coding::agent_run_record_t
 			                &candidate) {
 				return candidate.id == saved.run_id;
 			});
@@ -147,7 +156,7 @@ bool AiAgentRunListAction::run(request_t &req, response_t &res)
 			add_run_record_json(item, records[i]);
 			// Running tasks have an exact session owner; project/provider matches
 			// cannot distinguish two conversations in different browser windows.
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::cpp::Mutex> guard(
 			    g_agent_runtime_mutex);
 			const auto task = g_agent_runtime_tasks.find(
 			    runtime_task_key(user_root, records[i].id));
@@ -170,8 +179,8 @@ bool AiAgentRunStatusAction::run(request_t &req, response_t &res)
 	const std::string id = raw_id ? raw_id : "";
 	const char *raw_session_id = req.getParameter("session_id");
 	const std::string session_hint = raw_session_id ? raw_session_id : "";
-	webcool::ai::agent_run_store_t store(user_root);
-	webcool::ai::agent_run_record_t record;
+	libai::cpp::coding::agent_run_store_t store(user_root);
+	libai::cpp::coding::agent_run_record_t record;
 	std::string err;
 	if (!load_review_run_record(user_root, id, session_hint, record, err)) {
 		int status = 500;
@@ -185,7 +194,7 @@ bool AiAgentRunStatusAction::run(request_t &req, response_t &res)
 	std::shared_ptr<agent_runtime_task_t> runtime_task =
 	    find_runtime_task(user_root, id);
 	if (record.status == "running" && !runtime_task) {
-		webcool::ai::agent_checkpoint_store_t checkpoint_store(
+		libai::cpp::coding::agent_checkpoint_store_t checkpoint_store(
 		    runtime_upload_dir_get(), user_root, username);
 		if (checkpoint_store.exists(id)) {
 			// Recovery is lazy: the first status or SSE request after startup
@@ -221,11 +230,11 @@ bool AiAgentRunStatusAction::run(request_t &req, response_t &res)
 		// Terminal tasks remain cached for traces and usage. Their review state
 		// may have been superseded by another run; use the same durable view as
 		// the pending list and review endpoint, without discarding runtime data.
-		webcool::ai::agent_result_t persisted;
+		libai::cpp::coding::agent_result_t persisted;
 		bool found = false;
 		if (record.status != "running" &&
 		    reviewable_agent_run_status(record.status)) {
-			webcool::ai::agent_result_store_t result_store(
+			libai::cpp::coding::agent_result_store_t result_store(
 			    user_root, record.project_path);
 			if (!result_store.load(
 			        record.id, persisted, found, err)) {
@@ -237,9 +246,9 @@ bool AiAgentRunStatusAction::run(request_t &req, response_t &res)
 		add_runtime_result_json(
 		    root, runtime_task, found ? &persisted : NULL);
 	} else if (reviewable_agent_run_status(record.status)) {
-		webcool::ai::agent_result_store_t result_store(
+		libai::cpp::coding::agent_result_store_t result_store(
 		    user_root, record.project_path);
-		webcool::ai::agent_result_t persisted;
+		libai::cpp::coding::agent_result_t persisted;
 		bool found = false;
 		if (!result_store.load(record.id, persisted, found, err)) {
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -277,8 +286,8 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 	}
 	const std::string run_id = json_text((*body)["run_id"]);
 	const std::string session_id = json_text((*body)["session_id"]);
-	webcool::ai::agent_run_store_t run_store(user_root);
-	webcool::ai::agent_run_record_t record;
+	libai::cpp::coding::agent_run_store_t run_store(user_root);
+	libai::cpp::coding::agent_run_record_t record;
 	std::string err;
 	if (!run_store.get(run_id, record, err)) {
 		json_error(res, err == "agent run not found" ? 404 : 400,
@@ -293,9 +302,9 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 	if (reasoning.empty() && record.status == "completed") {
 		// Completed runtime entries expire after a bounded retention period. Load
 		// the durable project result so saving still works after service restart.
-		webcool::ai::agent_result_store_t result_store(
+		libai::cpp::coding::agent_result_store_t result_store(
 		    user_root, record.project_path);
-		webcool::ai::agent_result_t result;
+		libai::cpp::coding::agent_result_t result;
 		bool found = false;
 		if (!result_store.load(run_id, result, found, err)) {
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -308,8 +317,9 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 		// Failed/cancelled runtimes may have no result artifact, but their bounded
 		// reasoning is retained with the private session transcript. Require both
 		// the run id and project path to match before using that fallback.
-		webcool::ai::agent_session_store_t session_store(user_root);
-		webcool::ai::agent_session_record_t session;
+		libai::cpp::coding::agent_session_store_t session_store(
+		    user_root);
+		libai::cpp::coding::agent_session_record_t session;
 		if (!session_store.get(session_id, session, err)) {
 			json_error(res,
 			    err == "agent session not found" ? 404 : 400,
@@ -319,7 +329,7 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 		if (session.project_path != record.project_path) {
 			err =
 			    "AI run does not belong to the selected session project";
-			webcool::ai::ai_log_error(
+			libai::cpp::coding::ai_log_error(
 			    "agent.reasoning", "validate-session-project", err);
 			json_error(res, 409, err.c_str(), req.isKeepAlive());
 			return true;
@@ -334,7 +344,8 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 	}
 	if (reasoning.empty()) {
 		err = "this AI run has no reasoning text to save";
-		webcool::ai::ai_log_error("agent.reasoning", "save-empty", err);
+		libai::cpp::coding::ai_log_error(
+		    "agent.reasoning", "save-empty", err);
 		json_error(res, 409, err.c_str(), req.isKeepAlive());
 		return true;
 	}
@@ -342,7 +353,7 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 	const std::string relative_path = record.project_path.empty() ?
 	    filename :
 	    record.project_path + "/" + filename;
-	webcool::ai::agent_workspace_t workspace(user_root);
+	libai::cpp::coding::agent_workspace_t workspace(user_root);
 	if (!workspace.save_generated_text(relative_path, reasoning, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
@@ -381,8 +392,8 @@ bool AiAgentRunEventsAction::run(request_t &req, response_t &res)
 	const std::string id = raw_id ? raw_id : "";
 	const char *raw_session_id = req.getParameter("session_id");
 	const std::string session_hint = raw_session_id ? raw_session_id : "";
-	webcool::ai::agent_run_store_t store(user_root);
-	webcool::ai::agent_run_record_t record;
+	libai::cpp::coding::agent_run_store_t store(user_root);
+	libai::cpp::coding::agent_run_record_t record;
 	std::string err;
 	if (!store.get(id, record, err)) {
 		int status = 500;
@@ -396,7 +407,7 @@ bool AiAgentRunEventsAction::run(request_t &req, response_t &res)
 	std::shared_ptr<agent_runtime_task_t> runtime_task =
 	    find_runtime_task(user_root, id);
 	if (record.status == "running" && !runtime_task) {
-		webcool::ai::agent_checkpoint_store_t checkpoint_store(
+		libai::cpp::coding::agent_checkpoint_store_t checkpoint_store(
 		    runtime_upload_dir_get(), user_root, username);
 		if (checkpoint_store.exists(id)) {
 			runtime_task =
@@ -466,7 +477,8 @@ bool AiAgentRunEventsAction::run(request_t &req, response_t &res)
 				add_durable_recovery_json(
 				    root, user_root, record, session_hint);
 			}
-			add_model_interactions_json(root, user_root, record, runtime_task);
+			add_model_interactions_json(
+			    root, user_root, record, runtime_task);
 			const std::string data = serialize_json(root);
 			std::ostringstream frame;
 			frame << "id: " << version << "\n"
@@ -496,9 +508,9 @@ bool AiAgentRunEventsAction::run(request_t &req, response_t &res)
 }
 
 static void clear_session_recovery(const std::string &user_root,
-    const webcool::ai::agent_session_record_t &session)
+    const libai::cpp::coding::agent_session_record_t &session)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::cpp::Mutex> guard(g_agent_runtime_mutex);
 	for (auto &item : g_agent_runtime_tasks) {
 		if (!(item.second->user_root == user_root &&
 		        item.second->session_id == session.id))
@@ -523,14 +535,14 @@ bool AiAgentRunCancelAction::run(request_t &req, response_t &res)
 	    json_text((*body)["cancel_recovery_session_id"]);
 	if (!recovery_session.empty()) {
 		std::string err;
-		webcool::ai::agent_session_record_t session;
-		if (!webcool::ai::agent_session_store_t(user_root).get(
+		libai::cpp::coding::agent_session_record_t session;
+		if (!libai::cpp::coding::agent_session_store_t(user_root).get(
 		        recovery_session, session, err)) {
 			json_error(res, 404, err.c_str(), req.isKeepAlive());
 			return true;
 		}
-		std::vector<webcool::ai::agent_run_record_t> runs;
-		if (!webcool::ai::agent_run_store_t(user_root).list(
+		std::vector<libai::cpp::coding::agent_run_record_t> runs;
+		if (!libai::cpp::coding::agent_run_store_t(user_root).list(
 		        0, runs, err)) {
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
 			return true;
@@ -545,15 +557,15 @@ bool AiAgentRunCancelAction::run(request_t &req, response_t &res)
 			    req.isKeepAlive());
 			return true;
 		}
-		webcool::ai::agent_progress_store_t progress_store(
+		libai::cpp::coding::agent_progress_store_t progress_store(
 		    user_root, session.project_path, session.id);
-		webcool::ai::agent_progress_t progress;
+		libai::cpp::coding::agent_progress_t progress;
 		bool found = false;
 		if (!progress_store.load(progress, found, err)) {
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
 			return true;
 		}
-		webcool::ai::agent_checkpoint_store_t checkpoints(
+		libai::cpp::coding::agent_checkpoint_store_t checkpoints(
 		    runtime_upload_dir_get(), user_root, username);
 		for (const auto &run_id :
 		    { session.last_run_id, progress.source_run_id }) {
@@ -579,8 +591,8 @@ bool AiAgentRunCancelAction::run(request_t &req, response_t &res)
 		return sendJson(res, 200, root, req.isKeepAlive());
 	}
 	const std::string id = json_text((*body)["run_id"]);
-	webcool::ai::agent_run_store_t store(user_root);
-	webcool::ai::agent_run_record_t record;
+	libai::cpp::coding::agent_run_store_t store(user_root);
+	libai::cpp::coding::agent_run_record_t record;
 	std::string err;
 	if (!store.get(id, record, err)) {
 		int status = 500;
@@ -608,7 +620,7 @@ bool AiAgentRunCancelAction::run(request_t &req, response_t &res)
 		// A running record without an in-memory task came from an interrupted
 		// service process. Remove its encrypted recovery material before closing
 		// the audit record so cancellation cannot restart it later.
-		webcool::ai::agent_checkpoint_store_t checkpoint_store(
+		libai::cpp::coding::agent_checkpoint_store_t checkpoint_store(
 		    runtime_upload_dir_get(), user_root, username);
 		if (!checkpoint_store.remove(id, err)) {
 			json_error(res, 500, err.c_str(), req.isKeepAlive());
@@ -655,8 +667,8 @@ bool AiAgentRunPauseAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	const bool paused = *paused_value;
-	webcool::ai::agent_run_store_t store(user_root);
-	webcool::ai::agent_run_record_t record;
+	libai::cpp::coding::agent_run_store_t store(user_root);
+	libai::cpp::coding::agent_run_record_t record;
 	std::string err;
 	if (!store.get(id, record, err)) {
 		const int status = err == "invalid agent run id" ? 400 :
@@ -676,7 +688,7 @@ bool AiAgentRunPauseAction::run(request_t &req, response_t &res)
 	        user_root, id, paused, already_done, pause_requested)) {
 		err =
 		    "agent run cannot be paused because its live worker is unavailable";
-		webcool::ai::ai_log_error(
+		libai::cpp::coding::ai_log_error(
 		    "agent.runtime", "pause-worker-missing", err);
 		json_error(res, 409, err.c_str(), req.isKeepAlive());
 		return true;

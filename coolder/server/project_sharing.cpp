@@ -2,10 +2,7 @@
 #include "project_sharing.h"
 #include "host.h"
 #include "action/action_util.h"
-#include "libai/project/agent_project_store.h"
-#include "libai/workspace/agent_workspace.h"
-#include "libai/common/file_ops.h"
-#include "libai/common/webcool_mutex.h"
+#include <libai_cpp/coding.h>
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
@@ -17,13 +14,13 @@ namespace coolder
 {
 namespace
 {
-using webcool::ai::agent_project_record_t;
-using webcool::ai::agent_project_store_t;
-using webcool::ai::agent_workspace_t;
+using libai::cpp::coding::agent_project_record_t;
+using libai::cpp::coding::agent_project_store_t;
+using libai::cpp::coding::agent_workspace_t;
 using grant_key = std::tuple<std::string, std::string, std::string>;
 using grants_t = std::map<grant_key, std::string>;
 // Serialize membership changes and collaborative writes through their commit.
-webcool::mutex sharing_mutex;
+libai::cpp::Mutex sharing_mutex;
 
 std::string text(acl::json *body, const char *key)
 {
@@ -46,7 +43,7 @@ grants_t load_grants()
 	const auto path = data_dir + "/auth/project-members.v1";
 	std::ifstream in(path);
 	if (!in) {
-		if (webcool::ai::file_ops::path_entry_exists(path))
+		if (libai::cpp::coding::file_ops::path_entry_exists(path))
 			throw std::runtime_error("cannot read memberships");
 		return grants;
 	}
@@ -77,7 +74,8 @@ void save_grants(const grants_t &grants)
 		    << std::quoted(grant.second) << '\n';
 	}
 	out.close();
-	if (!out || !webcool::ai::file_ops::replace_file(path + ".tmp", path))
+	if (!out ||
+	    !libai::cpp::coding::file_ops::replace_file(path + ".tmp", path))
 		throw std::runtime_error("cannot save memberships");
 }
 
@@ -124,7 +122,7 @@ bool list_projects(response_t &res, const account_t &actor,
 		std::vector<agent_project_record_t> projects;
 		std::string err;
 		if (!agent_project_store_t(account_workspace(owner))
-		        .list(0, projects, err))
+		         .list(0, projects, err))
 			return error(res, 500, err);
 		for (const auto &project : projects) {
 			const auto permission =
@@ -224,7 +222,7 @@ bool files(request_t &req, response_t &res, acl::json *body,
 	root.add_bool("ok", true);
 	root.add_text("path", normalized.c_str());
 	if (operation == "list") {
-		std::vector<webcool::ai::workspace_entry_t> entries;
+		std::vector<libai::cpp::coding::workspace_entry_t> entries;
 		if (!workspace.list(normalized, entries, err))
 			return error(res, 400, err);
 		auto &items = json.create_array();
@@ -246,9 +244,12 @@ bool files(request_t &req, response_t &res, acl::json *body,
 		root.add_bool("truncated", truncated);
 	} else if (operation == "preview-asset") {
 		const auto dot = normalized.rfind('.');
-		std::string ext = dot == std::string::npos ? "" : normalized.substr(dot);
-		std::transform(ext.begin(), ext.end(), ext.begin(),
-		    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		std::string ext =
+		    dot == std::string::npos ? "" : normalized.substr(dot);
+		std::transform(
+		    ext.begin(), ext.end(), ext.begin(), [](unsigned char ch) {
+			return static_cast<char>(std::tolower(ch));
+		});
 		const std::map<std::string, std::string> types = {
 			{ ".png", "image/png" }, { ".jpg", "image/jpeg" },
 			{ ".jpeg", "image/jpeg" }, { ".gif", "image/gif" },
@@ -257,7 +258,8 @@ bool files(request_t &req, response_t &res, acl::json *body,
 			{ ".woff2", "font/woff2" }, { ".ttf", "font/ttf" }
 		};
 		const auto type = types.find(ext);
-		if (type == types.end()) return error(res, 400, "unsupported preview asset");
+		if (type == types.end())
+			return error(res, 400, "unsupported preview asset");
 		std::string content;
 		if (!workspace.read_preview_asset(normalized, content, err))
 			return error(res, 400, err);
@@ -288,7 +290,7 @@ bool project_sharing_route(request_t &req, response_t &res,
 		return error(res, 405, "unsupported method");
 	// Account locks are released before acquiring the collaboration lock.
 	const auto accounts = project_accounts();
-	std::lock_guard<webcool::mutex> lock(sharing_mutex);
+	std::lock_guard<libai::cpp::Mutex> lock(sharing_mutex);
 	auto grants = load_grants();
 	if (operation == "projects" && method == "GET")
 		return list_projects(res, actor, accounts, grants);
@@ -315,7 +317,7 @@ bool project_sharing_route(request_t &req, response_t &res,
 	agent_project_record_t project;
 	std::string err;
 	if (!agent_project_store_t(account_workspace(*owner))
-	        .get(project_id, project, err))
+	         .get(project_id, project, err))
 		return error(res, 404, "project not found");
 	if (operation == "settings")
 		return settings(res, body, method, actor, *owner, project,

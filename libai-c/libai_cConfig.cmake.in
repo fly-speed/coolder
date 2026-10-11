@@ -1,4 +1,7 @@
 @PACKAGE_INIT@
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)
+if(@LIBAI_CODING_FULL@)
+ find_dependency(libai CONFIG)
+endif()
 include("${CMAKE_CURRENT_LIST_DIR}/libai_cTargets.cmake")

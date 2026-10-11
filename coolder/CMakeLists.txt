@@ -15,14 +15,15 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(LIBAI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libai"
-	CACHE PATH "libai sources")
-add_subdirectory("${LIBAI_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/libai")
+set(LIBAI_CPP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libai-c++"
+ CACHE PATH "C++ AI application facade")
+set(LIBAI_CPP_FULL ON CACHE BOOL "Coolder needs the full coding component" FORCE)
+add_subdirectory("${LIBAI_CPP_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/libai-cpp")
 
 file(GLOB COOLDER_ACTIONS CONFIGURE_DEPENDS action/ai/*.cpp)
 add_executable(coolder main.cpp server/host.cpp server/attachments.cpp server/auth.cpp server/project_sharing.cpp server/ai_policy.cpp ${COOLDER_ACTIONS})
 target_include_directories(coolder PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(coolder PRIVATE libai::ai)
+target_link_libraries(coolder PRIVATE libai::cpp)
 target_precompile_headers(coolder PRIVATE stdafx.h)
 target_compile_definitions(coolder PRIVATE
 	COOLDER_HTML_DIR="${CMAKE_CURRENT_SOURCE_DIR}/html")
@@ -57,6 +58,7 @@ install(DIRECTORY html/ DESTINATION share/coolder/html)
 enable_testing()
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+ add_test(NAME coolder_facade_boundary COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/facade_dependency_test.py")
 	add_test(NAME coolder_logging
 		COMMAND "${Python3_EXECUTABLE}"
 			"${CMAKE_CURRENT_SOURCE_DIR}/tests/logging_test.py"

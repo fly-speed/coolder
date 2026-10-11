@@ -19,8 +19,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..;$(CoolderOpenSSLRoot)\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;COOLDER_HTML_DIR="html";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\libai-c++\include;$(ProjectDir);$(ProjectDir)..;$(CoolderOpenSSLRoot)\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;COOLDER_HTML_DIR="html";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <Link>

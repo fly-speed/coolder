@@ -21,7 +21,8 @@ void add_string_array_json(acl::json_node &parent, const char *name,
 }
 
 void add_project_json(acl::json_node &item,
-    const webcool::ai::agent_project_record_t &project, bool include_plan)
+    const libai::cpp::coding::agent_project_record_t &project,
+    bool include_plan)
 {
 	item.add_text("project_id", project.id.c_str());
 	item.add_text("title", project.title.c_str());
@@ -66,7 +67,7 @@ void add_project_json(acl::json_node &item,
 		task.add_text("module_id", project.tasks[i].module_id.c_str());
 		task.add_text("status", project.tasks[i].status.c_str());
 		task.add_bool("ready",
-		    webcool::ai::agent_project_store_t::task_ready(
+		    libai::cpp::coding::agent_project_store_t::task_ready(
 		        project, project.tasks[i]));
 		add_string_array_json(
 		    task, "dependencies", project.tasks[i].dependencies);
@@ -78,7 +79,7 @@ void add_project_json(acl::json_node &item,
 }
 
 void add_project_index_json(acl::json_node &item,
-    const webcool::ai::agent_project_index_snapshot_t &snapshot)
+    const libai::cpp::coding::agent_project_index_snapshot_t &snapshot)
 {
 	item.add_text("project_id", snapshot.project_id.c_str());
 	item.add_text("path", snapshot.project_path.c_str());
@@ -97,7 +98,7 @@ void add_project_index_json(acl::json_node &item,
 	// full 20k-file project map. The model uses a separate token-bounded summary.
 	const size_t count = std::min<size_t>(snapshot.files.size(), 500);
 	for (size_t i = 0; i < count; ++i) {
-		const webcool::ai::agent_project_index_entry_t &indexed =
+		const libai::cpp::coding::agent_project_index_entry_t &indexed =
 		    snapshot.files[i];
 		acl::json_node &file = files.add_child(false, true);
 		file.add_text("path", indexed.path.c_str());
@@ -156,7 +157,7 @@ bool AiAgentProjectListAction::run(request_t &req, response_t &res)
 	std::string user_root;
 	if (!current_user_root(req, res, user_root))
 		return true;
-	webcool::ai::agent_project_store_t store(user_root);
+	libai::cpp::coding::agent_project_store_t store(user_root);
 	const std::string id =
 	    req.getParameter("id") ? req.getParameter("id") : "";
 	const std::string path =
@@ -172,7 +173,7 @@ bool AiAgentProjectListAction::run(request_t &req, response_t &res)
 	root.add_bool("local_project_location_allowed",
 	    project_location_allowed(req, "local", location_err));
 	if (!id.empty() || !path.empty()) {
-		webcool::ai::agent_project_record_t project;
+		libai::cpp::coding::agent_project_record_t project;
 		const bool found = !id.empty() ?
 		    store.get(id, project, err) :
 		    store.find_by_path(path, project, err);
@@ -184,7 +185,7 @@ bool AiAgentProjectListAction::run(request_t &req, response_t &res)
 		add_project_json(root, project, true);
 		return sendJson(res, 200, root, req.isKeepAlive());
 	}
-	std::vector<webcool::ai::agent_project_record_t> projects;
+	std::vector<libai::cpp::coding::agent_project_record_t> projects;
 	if (!store.list(0, projects, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
 		    req.isKeepAlive());
@@ -210,8 +211,8 @@ bool AiAgentProjectDeleteAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	const std::string project_id = json_text((*body)["project_id"]);
-	webcool::ai::agent_project_store_t project_store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t project_store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	std::string err;
 	if (!project_store.get(project_id, project, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
@@ -221,26 +222,26 @@ bool AiAgentProjectDeleteAction::run(request_t &req, response_t &res)
 
 	// Delete only bounded AI metadata. No workspace/file API is called here,
 	// which makes retaining the user's virtual-disk project an invariant.
-	webcool::ai::agent_session_store_t session_store(user_root);
+	libai::cpp::coding::agent_session_store_t session_store(user_root);
 	size_t removed_sessions = 0;
 	if (!session_store.remove_for_project(
 	        project.project_path, removed_sessions, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_project_index_store_t index_store(user_root);
+	libai::cpp::coding::agent_project_index_store_t index_store(user_root);
 	if (!index_store.remove(project.id, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
 	}
 	size_t removed_workflows = 0;
-	webcool::ai::agent_workflow_store_t workflow_store(user_root);
+	libai::cpp::coding::agent_workflow_store_t workflow_store(user_root);
 	if (!workflow_store.remove_for_project(
 	        project.id, removed_workflows, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_project_record_t removed;
+	libai::cpp::coding::agent_project_record_t removed;
 	if (!project_store.remove(project.id, removed, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
 		    req.isKeepAlive());
@@ -251,9 +252,10 @@ bool AiAgentProjectDeleteAction::run(request_t &req, response_t &res)
 	    removed.project_path.compare(0, strlen("本地磁盘/"), "本地磁盘/") ==
 	        0) {
 		std::string unregister_err;
-		if (!webcool::ai::agent_workspace_t::unregister_project_root(
-		        user_root, removed.project_path, unregister_err)) {
-			webcool::ai::ai_log_error("http.ai.project",
+		if (!libai::cpp::coding::agent_workspace_t::
+		        unregister_project_root(
+		            user_root, removed.project_path, unregister_err)) {
+			libai::cpp::coding::ai_log_error("http.ai.project",
 			    "unregister-external-root", unregister_err);
 		}
 	}
@@ -315,7 +317,7 @@ bool AiAgentProjectImportGitAction::run(request_t &req, response_t &res)
 			}
 		}
 		std::string normalized;
-		if (!webcool::ai::agent_workspace_t::normalize_path(
+		if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 		        scoped_path, normalized, false, err)) {
 			json_error(res, 400, err.c_str(), req.isKeepAlive());
 			return true;
@@ -353,7 +355,7 @@ bool AiAgentProjectImportGitAction::run(request_t &req, response_t &res)
 		}
 	}
 	if (storage_scope != "personal" &&
-	    !webcool::ai::agent_workspace_t::register_project_root(
+	    !libai::cpp::coding::agent_workspace_t::register_project_root(
 	        user_root, project_path, physical_path, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
@@ -361,8 +363,8 @@ bool AiAgentProjectImportGitAction::run(request_t &req, response_t &res)
 
 	// Discovery is read-only and treats .git as a protected marker. Git config,
 	// hooks, credentials and object contents are never returned to the browser.
-	webcool::ai::project_toolchain_catalog_t catalog(user_root);
-	webcool::ai::project_toolchain_t toolchain;
+	libai::cpp::coding::project_toolchain_catalog_t catalog(user_root);
+	libai::cpp::coding::project_toolchain_t toolchain;
 	bool git_repository = false;
 	if (!catalog.is_git_repository(project_path, git_repository, err) ||
 	    !catalog.discover(project_path, toolchain, err)) {
@@ -388,8 +390,8 @@ bool AiAgentProjectImportGitAction::run(request_t &req, response_t &res)
 	if (title.empty())
 		title = project_title_from_path(project_path);
 
-	webcool::ai::agent_project_store_t store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	if (!store.create(
 	        title, project_path, language, platform, project, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
@@ -398,16 +400,16 @@ bool AiAgentProjectImportGitAction::run(request_t &req, response_t &res)
 	}
 	if (project.plan_version == 0) {
 		std::string goal;
-		std::vector<webcool::ai::agent_project_module_t> modules;
-		std::vector<webcool::ai::agent_project_task_t> tasks;
-		webcool::ai::build_project_plan_template(
+		std::vector<libai::cpp::coding::agent_project_module_t> modules;
+		std::vector<libai::cpp::coding::agent_project_task_t> tasks;
+		libai::cpp::coding::build_project_plan_template(
 		    project_path, language, platform, goal, modules, tasks);
-		webcool::ai::agent_project_record_t planned;
+		libai::cpp::coding::agent_project_record_t planned;
 		if (store.save_plan(project.id, project.plan_version, goal,
 		        modules, tasks, planned, err)) {
 			project = planned;
 		} else {
-			webcool::ai::ai_log_error(
+			libai::cpp::coding::ai_log_error(
 			    "http.ai.project", "seed-import-plan", err);
 		}
 	}
@@ -453,7 +455,7 @@ bool AiAgentProjectEnsureAction::run(request_t &req, response_t &res)
 			json_error(res, 400, err.c_str(), req.isKeepAlive());
 			return true;
 		}
-	} else if (!webcool::ai::agent_workspace_t::normalize_path(
+	} else if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 	               requested_path, path, false, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
@@ -461,11 +463,11 @@ bool AiAgentProjectEnsureAction::run(request_t &req, response_t &res)
 	const std::string language = json_text((*body)["language"]);
 	const std::string platform = json_text((*body)["platform"]);
 	if ((!language.empty() &&
-	        !webcool::ai::supported_project_language(language)) ||
+	        !libai::cpp::coding::supported_project_language(language)) ||
 	    (!platform.empty() &&
-	        !webcool::ai::supported_project_platform(platform)) ||
+	        !libai::cpp::coding::supported_project_platform(platform)) ||
 	    (!language.empty() && !platform.empty() &&
-	        !webcool::ai::project_language_supports_platform(
+	        !libai::cpp::coding::project_language_supports_platform(
 	            language, platform))) {
 		json_error(res, 400, "unsupported project language or platform",
 		    req.isKeepAlive());
@@ -475,13 +477,13 @@ bool AiAgentProjectEnsureAction::run(request_t &req, response_t &res)
 	// workspace directory to exist and pass the same symlink/reparse checks used
 	// by model tools.
 	if (storage_scope == "local" &&
-	    !webcool::ai::agent_workspace_t::register_project_root(
+	    !libai::cpp::coding::agent_workspace_t::register_project_root(
 	        user_root, path, physical, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_workspace_t workspace(user_root);
-	std::vector<webcool::ai::workspace_entry_t> entries;
+	libai::cpp::coding::agent_workspace_t workspace(user_root);
+	std::vector<libai::cpp::coding::workspace_entry_t> entries;
 	if (!workspace.list(path, entries, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
@@ -489,8 +491,8 @@ bool AiAgentProjectEnsureAction::run(request_t &req, response_t &res)
 	std::string title = json_text((*body)["title"]);
 	if (title.empty())
 		title = project_title_from_path(path);
-	webcool::ai::agent_project_store_t store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	if (!store.create(title, path, language, platform, project, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
 		    req.isKeepAlive());
@@ -521,7 +523,7 @@ bool AiAgentProjectPlanSaveAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	std::string err;
-	std::vector<webcool::ai::agent_project_module_t> modules;
+	std::vector<libai::cpp::coding::agent_project_module_t> modules;
 	for (acl::json_node *item = module_items->first_child(); item != NULL;
 	     item = module_items->next_child()) {
 		acl::json_node *object =
@@ -531,11 +533,11 @@ bool AiAgentProjectPlanSaveAction::run(request_t &req, response_t &res)
 			    req.isKeepAlive());
 			return true;
 		}
-		webcool::ai::agent_project_module_t module;
+		libai::cpp::coding::agent_project_module_t module;
 		module.id = json_text((*object)["id"]);
 		module.name = json_text((*object)["name"]);
 		module.layer = json_text((*object)["layer"]);
-		if (!webcool::ai::agent_workspace_t::normalize_path(
+		if (!libai::cpp::coding::agent_workspace_t::normalize_path(
 		        json_text((*object)["path"]), module.path, false,
 		        err)) {
 			json_error(res, 400, err.c_str(), req.isKeepAlive());
@@ -550,7 +552,7 @@ bool AiAgentProjectPlanSaveAction::run(request_t &req, response_t &res)
 		}
 		modules.push_back(module);
 	}
-	std::vector<webcool::ai::agent_project_task_t> tasks;
+	std::vector<libai::cpp::coding::agent_project_task_t> tasks;
 	for (acl::json_node *item = task_items->first_child(); item != NULL;
 	     item = task_items->next_child()) {
 		acl::json_node *object =
@@ -560,7 +562,7 @@ bool AiAgentProjectPlanSaveAction::run(request_t &req, response_t &res)
 			    req.isKeepAlive());
 			return true;
 		}
-		webcool::ai::agent_project_task_t task;
+		libai::cpp::coding::agent_project_task_t task;
 		task.id = json_text((*object)["id"]);
 		task.title = json_text((*object)["title"]);
 		task.module_id = json_text((*object)["module_id"]);
@@ -578,8 +580,8 @@ bool AiAgentProjectPlanSaveAction::run(request_t &req, response_t &res)
 		}
 		tasks.push_back(task);
 	}
-	webcool::ai::agent_project_store_t store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	if (!store.save_plan(json_text((*body)["project_id"]),
 	        json_number((*body)["plan_version"], -1),
 	        json_text((*body)["goal"]), modules, tasks, project, err)) {
@@ -604,8 +606,8 @@ bool AiAgentProjectPlanProposeAction::run(request_t &req, response_t &res)
 		json_error(res, 400, "invalid JSON body", req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_project_store_t store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	std::string err;
 	if (!store.get(json_text((*body)["project_id"]), project, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
@@ -613,12 +615,13 @@ bool AiAgentProjectPlanProposeAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	std::string goal;
-	std::vector<webcool::ai::agent_project_module_t> modules;
-	std::vector<webcool::ai::agent_project_task_t> tasks;
-	if (!webcool::ai::build_project_plan_proposal(project.project_path,
-	        project.language, project.platform, json_text((*body)["goal"]),
-	        json_text((*body)["scale"]), goal, modules, tasks, err) ||
-	    !webcool::ai::agent_project_store_t::validate_plan(
+	std::vector<libai::cpp::coding::agent_project_module_t> modules;
+	std::vector<libai::cpp::coding::agent_project_task_t> tasks;
+	if (!libai::cpp::coding::build_project_plan_proposal(
+	        project.project_path, project.language, project.platform,
+	        json_text((*body)["goal"]), json_text((*body)["scale"]), goal,
+	        modules, tasks, err) ||
+	    !libai::cpp::coding::agent_project_store_t::validate_plan(
 	        modules, tasks, err)) {
 		json_error(res, 400, err.c_str(), req.isKeepAlive());
 		return true;
@@ -633,7 +636,7 @@ bool AiAgentProjectPlanProposeAction::run(request_t &req, response_t &res)
 			break;
 		}
 	}
-	webcool::ai::agent_project_record_t proposal = project;
+	libai::cpp::coding::agent_project_record_t proposal = project;
 	proposal.goal = goal;
 	proposal.modules = modules;
 	proposal.tasks = tasks;
@@ -656,8 +659,8 @@ bool AiAgentProjectTaskStatusAction::run(request_t &req, response_t &res)
 		json_error(res, 400, "invalid JSON body", req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_project_store_t store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	std::string err;
 	if (!store.update_task_status(json_text((*body)["project_id"]),
 	        json_text((*body)["task_id"]), json_text((*body)["status"]),
@@ -680,8 +683,8 @@ bool validate_workflow_owner(const std::string &user_root,
     const std::string &project_id, const std::string &session_id,
     const std::string &task_id, std::string &err)
 {
-	webcool::ai::agent_project_store_t project_store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t project_store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	if (!project_store.get(project_id, project, err))
 		return false;
 	bool task_found = false;
@@ -695,8 +698,8 @@ bool validate_workflow_owner(const std::string &user_root,
 		err = "agent project task not found";
 		return false;
 	}
-	webcool::ai::agent_session_store_t session_store(user_root);
-	webcool::ai::agent_session_record_t session;
+	libai::cpp::coding::agent_session_store_t session_store(user_root);
+	libai::cpp::coding::agent_session_record_t session;
 	if (!session_store.get(session_id, session, err))
 		return false;
 	if (!(session.project_path != project.project_path))
@@ -706,7 +709,7 @@ bool validate_workflow_owner(const std::string &user_root,
 }
 
 void add_workflow_json(acl::json_node &root,
-    const webcool::ai::agent_workflow_checkpoint_t &checkpoint)
+    const libai::cpp::coding::agent_workflow_checkpoint_t &checkpoint)
 {
 	root.add_text("project_id", checkpoint.project_id.c_str());
 	root.add_text("session_id", checkpoint.session_id.c_str());
@@ -755,8 +758,8 @@ bool AiAgentProjectWorkflowGetAction::run(request_t &req, response_t &res)
 		    err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_workflow_store_t store(user_root);
-	webcool::ai::agent_workflow_checkpoint_t checkpoint;
+	libai::cpp::coding::agent_workflow_store_t store(user_root);
+	libai::cpp::coding::agent_workflow_checkpoint_t checkpoint;
 	bool found = false;
 	if (!store.load(
 	        project_id, session_id, task_id, checkpoint, found, err)) {
@@ -783,7 +786,7 @@ bool AiAgentProjectWorkflowSaveAction::run(request_t &req, response_t &res)
 		json_error(res, 400, "invalid JSON body", req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_workflow_checkpoint_t checkpoint;
+	libai::cpp::coding::agent_workflow_checkpoint_t checkpoint;
 	checkpoint.project_id = json_text((*body)["project_id"]);
 	checkpoint.session_id = json_text((*body)["session_id"]);
 	checkpoint.task_id = json_text((*body)["task_id"]);
@@ -795,7 +798,7 @@ bool AiAgentProjectWorkflowSaveAction::run(request_t &req, response_t &res)
 		    err.c_str(), req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_workflow_store_t store(user_root);
+	libai::cpp::coding::agent_workflow_store_t store(user_root);
 	const bool remove = json_bool((*body)["remove"], false);
 	if (remove) {
 		if (!store.remove(checkpoint.project_id, checkpoint.session_id,
@@ -830,7 +833,8 @@ bool AiAgentProjectWorkflowSaveAction::run(request_t &req, response_t &res)
 				    req.isKeepAlive());
 				return true;
 			}
-			webcool::ai::agent_workflow_diagnostic_t diagnostic;
+			libai::cpp::coding::agent_workflow_diagnostic_t
+			    diagnostic;
 			diagnostic.path = json_text((*object)["path"]);
 			diagnostic.line = json_number((*object)["line"], 0);
 			diagnostic.column = json_number((*object)["column"], 0);
@@ -863,8 +867,8 @@ bool AiAgentProjectIndexGetAction::run(request_t &req, response_t &res)
 	const std::string project_id =
 	    req.getParameter("id") ? req.getParameter("id") : "";
 	trace.phase("load_project");
-	webcool::ai::agent_project_store_t project_store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t project_store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	std::string err;
 	if (!project_store.get(project_id, project, err)) {
 		json_error(res, project_error_status(err), err.c_str(),
@@ -873,8 +877,8 @@ bool AiAgentProjectIndexGetAction::run(request_t &req, response_t &res)
 	}
 	trace.project_id(project.id);
 	trace.phase("index_load");
-	webcool::ai::agent_project_index_store_t index_store(user_root);
-	webcool::ai::agent_project_index_snapshot_t snapshot;
+	libai::cpp::coding::agent_project_index_store_t index_store(user_root);
+	libai::cpp::coding::agent_project_index_snapshot_t snapshot;
 	if (!index_store.load(project, snapshot, err)) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());
 		return true;
@@ -904,8 +908,8 @@ bool AiAgentProjectIndexRefreshAction::run(request_t &req, response_t &res)
 		return true;
 	}
 	trace.phase("load_project");
-	webcool::ai::agent_project_store_t project_store(user_root);
-	webcool::ai::agent_project_record_t project;
+	libai::cpp::coding::agent_project_store_t project_store(user_root);
+	libai::cpp::coding::agent_project_record_t project;
 	std::string err;
 	if (!project_store.get(
 	        json_text((*body)["project_id"]), project, err)) {
@@ -913,11 +917,11 @@ bool AiAgentProjectIndexRefreshAction::run(request_t &req, response_t &res)
 		    req.isKeepAlive());
 		return true;
 	}
-	webcool::ai::agent_workspace_t workspace(user_root);
+	libai::cpp::coding::agent_workspace_t workspace(user_root);
 	trace.project_id(project.id);
 	trace.phase("index_load");
-	webcool::ai::agent_project_index_store_t index_store(user_root);
-	webcool::ai::agent_project_index_snapshot_t snapshot;
+	libai::cpp::coding::agent_project_index_store_t index_store(user_root);
+	libai::cpp::coding::agent_project_index_snapshot_t snapshot;
 	if (!index_store.refresh(project, workspace, snapshot, err,
 	        [&trace](const char *phase) { trace.phase(phase); })) {
 		json_error(res, 500, err.c_str(), req.isKeepAlive());

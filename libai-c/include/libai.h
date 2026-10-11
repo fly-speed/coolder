@@ -108,6 +108,14 @@ LIBAI_API int libai_invocation_stopped(const libai_invocation *);
 /* Forward one UTF-8 model text delta; false means stop producing output. */
 LIBAI_API int libai_invocation_emit(libai_invocation *, const char *);
 
+/* Whether the library includes the optional desktop coding backend. */
+LIBAI_API int libai_coding_available(void);
+/* Root-scoped coding operation; returns owned JSON freed by libai_string_free.
+ * NULL indicates ABI/availability errors; operation errors are {ok:false,error} JSON.
+ * Host must authorize calls. Arguments are UTF-8 JSON objects. */
+LIBAI_API char *libai_coding_call(
+    const char *root, const char *operation, const char *arguments);
+
 #ifdef __cplusplus
 }
 #endif
