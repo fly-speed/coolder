@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(libai_cpp_app LANGUAGES CXX)
+if(NOT TARGET libai::cpp)
+ find_package(libai_cpp 1 CONFIG REQUIRED)
+endif()
+add_executable(libai_cpp_app main.cpp)
+target_link_libraries(libai_cpp_app PRIVATE libai::cpp)

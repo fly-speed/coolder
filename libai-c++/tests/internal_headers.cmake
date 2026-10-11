@@ -1,0 +1,13 @@
+# The facade keeps adapters only; maintained core declarations stay in libai.
+foreach(_module agent provider storage project workspace sandbox context prompt validation common runtime coding)
+ if(EXISTS "${LIBAI_CPP_SOURCE_ROOT}/src/${_module}")
+  message(FATAL_ERROR "Duplicated core declarations in src/${_module}")
+ endif()
+endforeach()
+file(GLOB_RECURSE _headers "${LIBAI_CPP_SOURCE_ROOT}/include/*.h")
+foreach(_header IN LISTS _headers)
+ file(READ "${_header}" _source)
+ if(_source MATCHES "#[ 	]*include[ 	]*[<\"]libai/" OR _source MATCHES "webcool::|action::agent_detail|coding_host.h")
+  message(FATAL_ERROR "Public facade leaks a core dependency: ${_header}")
+ endif()
+endforeach()

@@ -1,0 +1,439 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="DebugDll|ARM64">
+      <Configuration>DebugDll</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="DebugDll|ARM64EC">
+      <Configuration>DebugDll</Configuration>
+      <Platform>ARM64EC</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="DebugDll|Win32">
+      <Configuration>DebugDll</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="DebugDll|x64">
+      <Configuration>DebugDll</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64EC">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64EC</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseDll|ARM64">
+      <Configuration>ReleaseDll</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseDll|ARM64EC">
+      <Configuration>ReleaseDll</Configuration>
+      <Platform>ARM64EC</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseDll|Win32">
+      <Configuration>ReleaseDll</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseDll|x64">
+      <Configuration>ReleaseDll</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64EC">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64EC</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{EB57A209-9505-467B-A747-46428C55D287}</ProjectGuid>
+    <RootNamespace>libai_cpp</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|ARM64EC'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64EC'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|ARM64EC'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64EC'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)lib\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>libai_cpp</TargetName>
+    <LibaiCppCMake Condition="'$(LibaiCppCMake)'=='' And Exists('$(VSInstallDir)Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe')">$(VSInstallDir)Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe</LibaiCppCMake>
+    <LibaiCppCMake Condition="'$(LibaiCppCMake)'==''">cmake</LibaiCppCMake>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|ARM64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|ARM64EC'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDll|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64EC'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|ARM64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|ARM64EC'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDll|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64EC'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_WINDOWS;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..;$(ProjectDir)..\libai;$(ProjectDir)src;$(ProjectDir);$(ProjectDir)..\third-party\openssl\include;$(ProjectDir)..\third-party\acl\lib_acl\include;$(ProjectDir)..\third-party\acl\lib_acl_cpp\include;$(ProjectDir)..\third-party\acl\lib_protocol\include;$(ProjectDir)..\third-party\acl\lib_fiber\c\include;$(ProjectDir)..\third-party\acl\lib_fiber\cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBAI_CPP_FULL;LIBAI_CPP_HOST_INTERNAL;LIBAI_CODING_FULL;WIN32;ACL_USE_CPP11;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <ClCompile Include="..\libai\common\native_runtime.cpp" />
+    <ClCompile Include="..\libai\agent\agent_execution_mode.cpp" />
+    <ClCompile Include="..\libai\agent\agent_progress_supervisor.cpp" />
+    <ClCompile Include="..\libai\agent\agent_protocol.cpp" />
+    <ClCompile Include="..\libai\agent\agent_registry.cpp" />
+    <ClCompile Include="..\libai\agent\agent_run_scheduler.cpp" />
+    <ClCompile Include="..\libai\agent\ai_admin_policy.cpp" />
+    <ClCompile Include="..\libai\coding\coding_projects.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\libai\coding\coding_providers.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\libai\coding\coding_service.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\libai\coding\coding_storage.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\libai\coding\coding_workspace.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\libai\project\agent_project_index.cpp" />
+    <ClCompile Include="..\libai\project\agent_project_store.cpp" />
+    <ClCompile Include="..\libai\project\preview_project_context.cpp" />
+    <ClCompile Include="..\libai\project\project_diagnostics.cpp" />
+    <ClCompile Include="..\libai\project\project_plan_template.cpp" />
+    <ClCompile Include="..\libai\project\project_scaffold.cpp" />
+    <ClCompile Include="..\libai\project\project_toolchain.cpp" />
+    <ClCompile Include="..\libai\project\project_toolchain_build.cpp" />
+    <ClCompile Include="..\libai\project\project_toolchain_languages.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_client.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_common.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_diagnostics.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_records.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_request.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_response.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_sdk_messages.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_secrets.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_service.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_store.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_stream.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_transport.cpp" />
+    <ClCompile Include="..\libai\provider\ai_provider_transport_stream.cpp" />
+    <ClCompile Include="..\libai\provider\provider_request_scheduler.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_context.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_drafts.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_events.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_loop.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_results.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_runtime.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_batch.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_context.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_edits.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_proposals.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_protocol.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_read.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_search.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_tools_validation.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_validation.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_worker.cpp" />
+    <ClCompile Include="..\libai\runtime\assistant_images.cpp" />
+    <ClCompile Include="..\libai\runtime\browser_debug.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_acceptance.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_context.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_feedback.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_repair.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_request.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_response.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_startup.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_tools.cpp" />
+    <ClCompile Include="..\libai\runtime\coding_tool_loop_transport.cpp" />
+    <ClCompile Include="..\libai\runtime\runtime_common.cpp" />
+    <ClCompile Include="..\libai\sandbox\program_sandbox.cpp" />
+    <ClCompile Include="..\libai\sandbox\program_sandbox_process.cpp" />
+    <ClCompile Include="..\libai\sandbox\sandbox_execution.cpp" />
+    <ClCompile Include="..\libai\stdafx.cpp" />
+    <ClCompile Include="..\libai\storage\agent_checkpoint_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_draft_dependencies.cpp" />
+    <ClCompile Include="..\libai\storage\agent_draft_files.cpp" />
+    <ClCompile Include="..\libai\storage\agent_draft_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_progress_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_request_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_result_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_run_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_session_store.cpp" />
+    <ClCompile Include="..\libai\storage\agent_workflow_store.cpp" />
+    <ClCompile Include="..\libai\storage\assistant_session_store.cpp" />
+    <ClCompile Include="..\libai\storage\task_contract_store.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_review_state.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace_dependencies.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace_fingerprint.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace_io.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace_mutations.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace_query.cpp" />
+    <ClCompile Include="..\libai\workspace\agent_workspace_roots.cpp" />
+    <ClCompile Include="..\libai\workspace\workspace_change_journal.cpp" />
+    <ClCompile Include="..\libai\workspace\workspace_change_records.cpp" />
+    <ClCompile Include="..\libai\workspace\workspace_change_set.cpp" />
+    <ClCompile Include="..\libai\workspace\workspace_patch.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\agent.cpp" />
+    <ClCompile Include="src\coding_service.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\provider_model.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\libai_cpp\agent.h" />
+    <ClInclude Include="include\libai_cpp\coding.h" />
+    <ClInclude Include="include\libai_cpp\coding_service.h" />
+    <ClInclude Include="include\libai_cpp\export.h" />
+    <ClInclude Include="include\libai_cpp\provider_config.h" />
+    <ClInclude Include="include\libai_cpp\provider_model.h" />
+    <ClInclude Include="src\coding_host.h" />
+    <ClInclude Include="src\value_bridge.h" />
+    <ClInclude Include="src\platform.h" />
+    <ClInclude Include="include\libai_cpp\types.h" />
+  </ItemGroup>
+</Project>
