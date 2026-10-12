@@ -12,6 +12,7 @@
 #include <chrono>
 #include <map>
 #include <set>
+#include <algorithm>
 
 namespace coolder
 {
@@ -184,6 +185,78 @@ void migrate_provider_preferences(const std::string &path)
 	    std::filesystem::perm_options::replace);
 	if (!libai::cpp::coding::file_ops::replace_file(temp, path))
 		throw std::runtime_error("cannot install provider preferences");
+}
+
+bool has_admin()
+{
+    return std::any_of(accounts.begin(), accounts.end(),
+        [](const auto &item) { return item.second.admin; });
+}
+
+void remember_admin(const std::map<std::string, account_t> &rows)
+{
+    for (const auto &item : rows) {
+        if (!item.second.admin) continue;
+        const auto path = data_dir + "/auth/administrator-identity.v1";
+        if (std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+            throw std::runtime_error("administrator identity is a symlink");
+        const auto temp = path + "." + random_hex();
+        acl::json json;
+        auto &root = json.create_node();
+        root.add_text("id", item.second.id.c_str());
+        std::ofstream out(temp);
+        out << root.to_string().c_str();
+        out.close();
+        if (!out) throw std::runtime_error("cannot save administrator identity");
+        std::filesystem::permissions(temp, std::filesystem::perms::owner_read |
+            std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+        if (!libai::cpp::coding::file_ops::replace_file(temp, path))
+            throw std::runtime_error("cannot install administrator identity");
+    }
+}
+
+std::string recovery_id()
+{
+    const auto marker = data_dir + "/auth/administrator-identity.v1";
+    const bool saved = std::filesystem::exists(marker);
+    const auto path = saved ? marker : data_dir + "/auth/accounts.v1.legacy";
+    std::string candidate;
+    if (std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+        throw std::runtime_error("administrator recovery file is a symlink");
+    if (std::filesystem::exists(path)) {
+        std::ifstream in(path);
+        std::string source((std::istreambuf_iterator<char>(in)), {});
+        if (saved || (source.find_first_not_of(" \t\r\n") != std::string::npos &&
+            source[source.find_first_not_of(" \t\r\n")] == '{')) {
+            acl::json json(source.c_str());
+            if (!json.finish() || !json.get_root().is_object())
+                throw std::runtime_error("invalid administrator recovery JSON");
+            auto &root = json.get_root();
+            if (saved) candidate = libai::cpp::coding::json_values::text(root["id"]);
+            else for (auto *entry = root.first_child(); entry; entry = root.next_child()) {
+                auto *row = entry->is_object() ? entry : entry->get_obj();
+                if (row && (*row)["admin"] && (*row)["admin"]->get_bool() &&
+                    *(*row)["admin"]->get_bool()) {
+                    candidate = libai::cpp::coding::json_values::text((*row)["id"]);
+                    break;
+                }
+            }
+        } else {
+            std::istringstream rows(source);
+            std::string version; int rounds = 0;
+            rows >> version >> rounds;
+            if (version == "coolder-accounts-v1" && rounds == iterations) {
+                account_t a;
+                while (rows >> a.username >> a.id >> a.admin >> a.enabled >> a.salt >> a.digest)
+                    if (a.admin) { candidate = a.id; break; }
+            }
+        }
+    }
+    if (candidate.empty()) return random_hex();
+    if (!valid_hex(candidate) || std::any_of(accounts.begin(), accounts.end(),
+        [&](const auto &item) { return item.second.id == candidate; }))
+        throw std::runtime_error("invalid or occupied administrator recovery identity");
+    return candidate;
 }
 
 void persist(const std::map<std::string, account_t> &updated)
@@ -397,9 +470,9 @@ void accounts_init()
 		}
 		accounts[a.username] = a;
 	}
-	if (admins != 1 && (legacy || !accounts.empty())) {
+	if (admins > 1) {
 		throw std::runtime_error(
-		    "account store must contain one administrator");
+		    "account store cannot contain multiple administrators");
 	}
 	if (legacy) {
 		const auto backup = path + ".legacy";
@@ -415,6 +488,7 @@ void accounts_init()
 		}
 		persist(accounts);
 	}
+	remember_admin(accounts);
 	for (const auto &a : accounts) {
 		migrate_preferences(
 		    data_dir + "/auth/ui-" + a.second.id + ".v1");
@@ -588,7 +662,7 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 		acl::json json;
 		auto &root = json.create_node();
 		root.add_bool("ok", true);
-		root.add_bool("initialized", !accounts.empty());
+		root.add_bool("initialized", has_admin());
 		root.add_bool("authenticated", logged_in);
 		if (!logged_in)
 			return action::sendJson(res, 200, root, false);
@@ -646,7 +720,7 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 	if ((creating || updating) && !actor.admin) {
 		return error(res, 403, "需要管理员权限");
 	}
-	if (registration && !accounts.empty()) {
+	if (registration && has_admin()) {
 		return error(res, 409, "管理员已经创建，请登录");
 	}
 	if (!body) {
@@ -686,11 +760,16 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 		login(res, a->second);
 		return reply(res, 200, "{\"ok\":true}");
 	}
-	if ((registration || creating || password_change ||
-	        !password.empty()) &&
-	    (password.size() < 10 || password.size() > 128 ||
+	const bool setting_password = registration || creating || password_change || !password.empty();
+	// Count UTF-8 code points, so multibyte characters cannot bypass the minimum.
+	const auto password_characters = std::count_if(password.begin(), password.end(),
+	    [](unsigned char c) { return (c & 0xc0) != 0x80; });
+	if (setting_password && password_characters < 6)
+		return error(res, 400, "密码至少需要 6 个字符");
+	if (setting_password &&
+	    (password.size() > 128 ||
 	        password.find('\0') != std::string::npos)) {
-		return error(res, 400, "密码长度须为 10–128 字节");
+		return error(res, 400, "密码长度不能超过 128 字节，且不能包含空字符");
 	}
 	auto updated = accounts;
 	if (registration || creating) {
@@ -704,7 +783,7 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 		}
 		account_t a;
 		a.username = username;
-		a.id = random_hex();
+		a.id = registration ? recovery_id() : random_hex();
 		a.admin = registration;
 		a.salt = random_hex();
 		a.digest = password_hash(password, a.salt);
@@ -738,6 +817,7 @@ bool auth_route(request_t &req, response_t &res, const std::string &method)
 			    password_hash(password, a->second.salt);
 		}
 	}
+	remember_admin(updated);
 	persist(updated);
 	accounts.swap(updated);
 	revoke(username);

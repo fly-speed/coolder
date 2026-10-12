@@ -233,7 +233,7 @@
   "项目路径": "Project path",
   "预览差异": "Preview diff",
   "额外敏感路径（相对路径前缀，逗号分隔）": "Extra sensitive paths (relative prefixes, comma-separated)",
-  "首次使用，请创建管理员账户。随后可在管理控制台创建普通用户。密码至少 10 字节。": "Create the first administrator, then add users in the admin console. Passwords need at least 10 bytes.",
+  "首次使用，请创建管理员账户。随后可在管理控制台创建普通用户。密码至少 6 个字符。": "Create the first administrator, then add users in the admin console. Passwords need at least 6 characters.",
   "默认暗色": "Default dark",
   "（内容已截断）": " (truncated)",
   "已添加的模型": "Added models",
@@ -410,5 +410,6 @@
   "缓存未命中输入 tokens": "Uncached input tokens",
   "会话滚动": "Conversation scrolling",
   "到顶": "Go to top",
-  "到底": "Go to bottom"
+  "到底": "Go to bottom",
+  "密码至少需要 6 个字符": "Password must contain at least 6 characters."
 }

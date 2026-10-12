@@ -3857,15 +3857,41 @@ async function authStatus() {
   );
   uiText($('login-description'), () =>
     needsSetup
-      ? t('首次使用，请创建管理员账户。随后可在管理控制台创建普通用户。密码至少 10 字节。')
+      ? t('首次使用，请创建管理员账户。随后可在管理控制台创建普通用户。密码至少 6 个字符。')
       : t('使用管理员为你创建的账户登录。')
   );
   $('confirm-label').hidden = !needsSetup;
   const form = $('login-form');
   form.elements.confirm.required = needsSetup;
+  form.elements.password.minLength = needsSetup ? 6 : 0;
+  if (!needsSetup) form.elements.password.setCustomValidity('');
   form.elements.password.autocomplete = needsSetup ? 'new-password' : 'current-password';
   if (!identity && !$('login-dialog').open) $('login-dialog').showModal();
   return status;
+}
+
+function checkPasswordMinimum(input, required = true) {
+  const short = required && Array.from(input.value).length < 6;
+  input.setCustomValidity(short ? t('密码至少需要 6 个字符') : '');
+  return !short;
+}
+
+for (const id of ['login-form', 'user-create-form', 'user-reset-form', 'password-form']) {
+  const input = $(id).elements.password;
+  const check = () => {
+    const valid = checkPasswordMinimum(input, id !== 'login-form' || needsSetup);
+    if (id === 'login-form') {
+      if (!valid) {
+        plainText($('login-error'), t('密码至少需要 6 个字符'));
+        $('login-error').dataset.passwordError = 'true';
+      } else if ($('login-error').dataset.passwordError) {
+        plainText($('login-error'), '');
+        delete $('login-error').dataset.passwordError;
+      }
+    }
+  };
+  input.addEventListener('input', check);
+  input.addEventListener('invalid', check);
 }
 
 $('login-form').onsubmit = async e => {
@@ -3874,6 +3900,7 @@ $('login-form').onsubmit = async e => {
   submit.disabled = true;
   try {
     const data = Object.fromEntries(new FormData(e.target));
+    if (needsSetup && Array.from(data.password).length < 6) throw new Error(t('密码至少需要 6 个字符'));
     if (needsSetup && data.password !== data.confirm) throw new Error(t('两次输入的密码不一致'));
     await request(needsSetup ? '/api/v1/auth/register' : '/api/v1/auth/login', data);
     e.target.reset();

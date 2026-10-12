@@ -127,9 +127,12 @@ pub fn load(path: &Path) -> Result<Value> {
             }
         }
     }
-    if (legacy || !rows.is_empty()) && admins != 1 {
-        return Err(Error::bad("account store must contain one administrator"));
+    if admins > 1 {
+        return Err(Error::bad(
+            "account store cannot contain multiple administrators",
+        ));
     }
+    remember_admin(path, &accounts)?;
     migrate_members(&path.parent().unwrap().join("project-members.v1"))?;
     for a in rows.values() {
         preferences(
@@ -173,4 +176,80 @@ pub fn preferences(path: &Path) -> Result<Value> {
     backup(path)?;
     write(path, &v)?;
     Ok(v)
+}
+
+pub fn has_admin(accounts: &Value) -> bool {
+    accounts
+        .as_object()
+        .unwrap()
+        .values()
+        .any(|a| flag(a, "admin", false))
+}
+pub fn remember_admin(path: &Path, accounts: &Value) -> Result<()> {
+    if let Some(a) = accounts
+        .as_object()
+        .unwrap()
+        .values()
+        .find(|a| flag(a, "admin", false))
+    {
+        write(
+            &path.parent().unwrap().join("administrator-identity.v1"),
+            &json!({"id":a["id"]}),
+        )?;
+    }
+    Ok(())
+}
+pub fn recovery_id(path: &Path, accounts: &Value) -> Result<String> {
+    let marker = path.parent().unwrap().join("administrator-identity.v1");
+    let mut candidate = String::new();
+    if marker.exists() {
+        candidate = text(&read(&marker, json!({}))?, "id").into();
+    } else {
+        let backup = path.with_file_name("accounts.v1.legacy");
+        if backup.exists() {
+            if fs::symlink_metadata(&backup)?.file_type().is_symlink() {
+                return Err(Error::bad("account backup is a symlink"));
+            }
+            let source = fs::read_to_string(backup)?;
+            if source.trim_start().starts_with('{') {
+                let old: Value = serde_json::from_str(&source)
+                    .map_err(|_| Error::bad("invalid account backup"))?;
+                if let Some(a) = old
+                    .as_object()
+                    .and_then(|rows| rows.values().find(|a| flag(a, "admin", false)))
+                {
+                    candidate = text(a, "id").into();
+                }
+            } else {
+                let fields: Vec<_> = source.split_whitespace().collect();
+                if fields.len() >= 2 && fields[0] == "coolder-accounts-v1" && fields[1] == "210000"
+                {
+                    for row in fields[2..].chunks_exact(6) {
+                        if row[2] == "1" {
+                            candidate = row[1].into();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if candidate.is_empty() {
+        return Ok(id());
+    }
+    if candidate.len() != 64
+        || !candidate
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        || accounts
+            .as_object()
+            .unwrap()
+            .values()
+            .any(|a| text(a, "id") == candidate)
+    {
+        return Err(Error::bad(
+            "invalid or occupied administrator recovery identity",
+        ));
+    }
+    Ok(candidate)
 }

@@ -39,10 +39,12 @@ fn validate(name: &str, password: &str) -> Result<()> {
         || !name
             .bytes()
             .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
-        || password.len() < 8
         || password.len() > 1024
     {
         return Err(Error::bad("invalid username or password"));
+    }
+    if password.chars().count() < 6 {
+        return Err(Error::bad("密码至少需要 6 个字符"));
     }
     Ok(())
 }
@@ -72,17 +74,23 @@ pub fn route(
     let pass = text(b, "password");
     if op == "status" {
         return Ok(
-            json!({"initialized":!s.accounts.as_object().unwrap().is_empty(),"authenticated":actor.is_some(),"username":actor.as_ref().map(|a|text(a,"username")).unwrap_or(""),"admin":actor.as_ref().map(|a|flag(a,"admin",false)).unwrap_or(false),"ai_agent_allowed":actor.as_ref().map(|a|flag(&s.policy,"enabled",true) && flag(&s.policy,if flag(a,"admin",false) {"allow_admin"} else {"allow_users"},true)).unwrap_or(false)}),
+            json!({"initialized":crate::accounts::has_admin(&s.accounts),"authenticated":actor.is_some(),"username":actor.as_ref().map(|a|text(a,"username")).unwrap_or(""),"admin":actor.as_ref().map(|a|flag(a,"admin",false)).unwrap_or(false),"ai_agent_allowed":actor.as_ref().map(|a|flag(&s.policy,"enabled",true) && flag(&s.policy,if flag(a,"admin",false) {"allow_admin"} else {"allow_users"},true)).unwrap_or(false)}),
         );
     }
     if op == "register" && method == "POST" {
-        if !s.accounts.as_object().unwrap().is_empty() {
+        if crate::accounts::has_admin(&s.accounts) {
             return Err(Error::new(409, "already initialized"));
         }
+        if s.accounts.get(name).is_some() {
+            return Err(Error::new(409, "username already exists"));
+        }
         validate(name, pass)?;
+        let account_id =
+            crate::accounts::recovery_id(&s.data.join("auth/accounts.v1"), &s.accounts)?;
         let salt = id();
-        let a = json!({"username":name,"id":id(),"admin":true,"enabled":true,"salt":salt,"digest":password(pass,&salt)});
+        let a = json!({"username":name,"id":account_id,"admin":true,"enabled":true,"salt":salt,"digest":password(pass,&salt)});
         s.accounts[name] = a.clone();
+        crate::accounts::remember_admin(&s.data.join("auth/accounts.v1"), &s.accounts)?;
         write(&s.data.join("auth/accounts.v1"), &s.accounts)?;
         s.root(&a)?;
         return Ok(session(s, &a, out));

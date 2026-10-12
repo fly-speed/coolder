@@ -6,9 +6,9 @@
 
 **Coolder 是一个本地部署、通过浏览器使用的 AI 编程智能体。** 它将大模型、项目上下文、代码操作工具、构建验证和变更审核整合到同一个工作台，让用户以自然语言描述需求，在真实项目中完成代码理解、功能开发、问题修复和迭代维护。
 
-Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订，在隔离草稿中尝试构建和修复，再由用户审核并写入正式项目。应用采用 **C++17 + ACL 协程 HTTP 服务 + 原生 Web 前端**，核心编程能力由可独立复用的 **libai** 静态库提供。
+Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订，在隔离草稿中尝试构建和修复，再由用户审核并写入正式项目。应用采用 **C++17 + ACL 协程 HTTP 服务 + 原生 Web 前端**，C++ APP 通过 **libai-c++** 封装复用 **libai** 核心，并提供 C、Java、Python、Rust、Objective-C 绑定及 Android/iOS 打包支持。
 
-**阅读导航：** [运行截图](#运行截图) · [架构设计](#架构设计) · [推理机制](#智能体推理机制) · [功能组成](#功能组成) · [快速开始](#快速开始) · [任务实践](#任务实践) · [常见问题](#常见问题) · [第三方集成](#第三方应用集成-libai) · [开发文档](#开发验证与文档)
+**阅读导航：** [运行截图](#运行截图) · [架构设计](#架构设计) · [推理机制](#智能体推理机制) · [功能组成](#功能组成) · [快速开始](#快速开始) · [任务实践](#任务实践) · [常见问题](#常见问题) · [多语言绑定](#多语言绑定与平台支持) · [第三方集成](#第三方应用集成-libai) · [开发文档](#开发验证与文档)
 
 ## 核心特点
 
@@ -20,9 +20,11 @@ Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订
 - **账户与策略管理**：管理员统一配置模型、用户、语言工具、并发额度和执行限制；各账户拥有独立工作区。
 - **轻量浏览器工作台**：集成 Monaco 编辑器、项目文件浏览、会话、任务进展和差异审核；前端构建不需要 npm，编辑器资源由本机提供。
 
+- **多语言 SDK 与移动平台**：C++、C、Java、Python、Rust、Objective-C 接口共享通用 Agent 和可选桌面编码服务；提供 Android AAR、iOS XCFramework，以及独立 Java/Rust 示例 APP。
+
 ## 运行截图
 
-以下截图来自 macOS 上独立启动的 Coolder 演示实例，使用中文界面、演示账户和 `hello-coolder` 项目。任务输入尚未提交给模型；代码编辑与差异为手动操作示例。
+下面四张工作台截图来自 macOS 上独立启动的 Coolder 演示实例，使用中文界面、演示账户和 `hello-coolder` 项目。演示任务尚未提交给模型，代码编辑与差异为手动操作示例；随后展示的是使用 coolder-rust 配合智谱 AI，以及使用 coolder 开发的贪吃蛇游戏案例。
 
 ### 项目工作台
 
@@ -47,6 +49,18 @@ Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订
 管理员集中管理用户、智能体策略和模型厂商；图中展示智能体开关与角色权限设置。
 
 ![Coolder 管理控制台：智能体设置与角色权限](docs/screenshots/agent-settings.jpg)
+
+### 实际案例：coolder-rust + 智谱 AI 多人贪吃蛇
+
+该多人在线小游戏由 **coolder-rust APP 调用智谱 AI 大模型开发**。以下为用户提供的游戏运行截图，展示浏览器中的贪吃蛇游戏区域、房间与玩家信息、得分、排行榜、食物数量滑杆和速度选择。
+
+![使用 coolder-rust 和智谱 AI 开发的多人在线贪吃蛇游戏](docs/screenshots/coolder-rust-zhipu-multiplayer-snake.png)
+
+### 实际案例：coolder 开发的贪吃蛇小游戏
+
+该贪吃蛇小游戏由 **coolder APP 开发**。以下为用户提供的游戏运行截图，展示房间信息、贪吃蛇游戏区域、慢/中/快三档速度、食物数量调节和玩家排行榜。
+
+![使用 coolder APP 开发的贪吃蛇小游戏](docs/screenshots/coolder-snake-game.png)
 
 ## 架构设计
 
@@ -394,7 +408,17 @@ coolder/
 │   ├── sandbox/              # 沙盒辅助进程入口
 │   ├── tests/                # HTTP、账户与前端回归测试
 │   └── tools/                # 前端脚本合并工具
-├── libai/                    # 可独立复用的 AI 编程静态库
+├── coolder-java/             # 使用 Java/JNI 绑定的独立 APP
+├── coolder-rust/             # 使用 Rust 绑定的独立 APP
+├── libai-c++/                # 独立公共类型的 C++ 封装，默认静态库
+├── libai-c/                  # C ABI 与跨语言原生桥接
+├── libai-java/               # Java/JNI：Agent、CodingService
+├── libai-python/             # Python ctypes：Agent、CodingService
+├── libai-rust/               # Rust：Agent、CodingService
+├── libai-objc/               # Foundation/ARC Objective-C 接口
+├── Android/                  # Java/JNI AAR 打包
+├── iOS/                      # Objective-C/Swift XCFramework 打包
+├── libai/                    # 通用 Agent 与完整桌面编码核心
 │   ├── agent/、runtime/      # 智能体协议、调度与执行循环
 │   ├── provider/、context/   # 模型接入与上下文管理
 │   ├── project/、workspace/  # 项目、工具与变更管理
@@ -404,22 +428,88 @@ coolder/
 └── third-party/              # ACL、OpenSSL、zlib 与构建脚本
 ```
 
-libai 公开聚合头文件为 `<libai/coding.h>`，推荐链接 CMake 目标 `libai::ai`，可独立构建、安装并集成到其他程序。宿主负责 ACL/fiber 初始化、线程生命周期、鉴权及工作目录授权，执行工具还需部署沙盒辅助进程。
+第三方 C++ APP 推荐包含 `<libai_cpp/agent.h>` / `<libai_cpp/coding.h>` 并链接 `libai::cpp`，公共头文件只暴露独立类型。其他语言使用各自绑定。原始核心的 `<libai/coding.h>` / `libai::ai` 保留为底层源码集成入口；完整桌面宿主仍须管理 ACL/fiber、鉴权、目录授权及沙盒辅助进程。
 
 库保留 `webcool::ai` 等命名空间、内部 `.webcool_*` 存储格式，以及 `webcool-sandbox-helper` 辅助程序名作为兼容约定；Coolder 可以独立构建和运行，无需构建 webcool 应用。
 
 前端源脚本由 CMake 自动合并为 `coolder/html/coolder.js`，请修改原始脚本，不要直接编辑生成文件。详细集成方式见 [libai 文档](libai/README.md)。
 
+## 多语言绑定与平台支持
+
+libai 同时提供通用 Agent SDK 和可选的桌面完整编码服务。C++、C、Java、Python、Rust、Objective-C 共享同一套模型与工具循环；各语言提供自己的类型、回调和资源管理接口。第三方 APP 不需要启动 Coolder 服务。
+
+### 各语言接口与产物
+
+| 语言 | 目录与接口 | 主要产物及集成方式 |
+| --- | --- | --- |
+| C++ | [libai-c++](libai-c++/README.md)：`libai::cpp::Agent`、`NativeProviderModel`、`CodingService` | 独立公共类型与 Pimpl，公开头文件不引用原始 libai 头文件；安装后链接 `libai::cpp`。默认静态库，传入 `-DBUILD_SHARED_LIBS=ON` 生成动态库 |
+| C | [libai-c](libai-c/README.md)：`libai.h`、`libai_agent_*`、`libai_coding_*` | C ABI、句柄、模型/工具回调和显式内存释放；安装后链接 `libai::c`，也作为 Python/Rust 的原生桥接层 |
+| Java | [libai-java](libai-java/README.md)：`io.coolder.libai.Agent`、`CodingService` | `libai-java.jar` 与 JNI 动态库；Java 8+，模型请求及编码操作使用 JSON，支持 `AutoCloseable` 和独立取消令牌 |
+| Python | [libai-python](libai-python/README.md)：`Agent`、`Cancellation`、`CodingService` | Python 3.9+、标准库 ctypes、字典形式的请求/结果；提供 wheel，需另外部署 C ABI 动态库并配置 `LIBAI_LIBRARY` |
+| Rust | [libai-rust](libai-rust/README.md)：`Agent`、`Cancellation`、`CodingService` | Rust 1.77+，通过仓库内 path dependency 集成；闭包回调、生命周期约束和 Drop 释放，默认链接轻量静态桥接库 |
+| Objective-C | [libai-objc](libai-objc/README.md)：`LAIAgent`、`LAICancellation`、`LAICodingService` | Foundation/ARC、block 回调、NSDictionary/NSError 与 Clang module `LibAI`；供 macOS/iOS 集成，Swift 可通过模块导入 |
+
+### 绑定提供哪些功能
+
+| 能力 | 通用 Agent SDK（默认轻量构建） | 完整桌面构建 |
+| --- | --- | --- |
+| 模型接入 | 应用提供模型回调，可接入自己的 HTTP 客户端或模型 SDK | 另提供内置 Provider Agent，复用 OpenAI compatible/Chat/Responses、Anthropic Messages、Gemini、Ollama 适配；智谱 GLM 使用匹配的官方接口与协议 |
+| 工具与事件 | 动态注册工具、JSON 参数 schema、工具结果反馈、流式文本、授权回调和事件钩子 | 保留上述能力，并可调用工作区、项目和固定命令沙箱服务 |
+| 会话与运行控制 | 多轮会话、会话快照、reset、独立取消令牌、截止时间、模型/工具/上下文/输出预算、有限错误重试和 token 统计 | 保留上述能力，并提供项目、会话、运行审计和持久化操作 |
+| 文件与修订 | 由宿主注册自己的文件工具 | `CodingService` 提供目录浏览、读取、搜索、大纲、SHA-256、文件/目录操作、补丁预览、审核变更事务与恢复 |
+| 项目、配置与存储 | 由宿主组织业务数据 | 项目创建与脚手架、计划/任务状态、工具链发现、编译输出解析；Provider 配置与凭据加密、测试与模型调用；会话/运行记录和策略管理 |
+| 编译与执行 | 通用 Agent 不会自动编译项目 | 固定命令沙箱提供计划预览、确认执行、取消、历史和退出码/输出；宿主负责组合草稿、触发验证并判断完成 |
+
+完整能力通过各语言的 `CodingService` / C `libai_coding_*` 暴露，使用一致的 JSON 操作协议。应先查询 `available` 与 `capabilities`；默认轻量构建和当前移动端包不启用完整编码后端。全部操作、参数及调用示例见 [跨语言 CodingService 协议](libai/docs/CODING_SERVICE.md)，会话快照、取消和内置 Provider 的对应 API 见 [Agent 能力对照表](libai/docs/CODING_SERVICE.md#agent-接口能力补齐)。
+
+通用 Agent 的 `completed` 表示模型与工具循环结束，不保证代码已经编译或通过测试。APP 必须根据实际执行证据判断任务完成。例如 Rust APP 在临时目录合并待确认修改并编译，失败后反馈给模型，最多三轮修复；工具缺失或无法验证时明确报告未验证，正式目录仍由用户审核后写入。
+
+### 构建、清理与第三方部署
+
+各绑定及 Android/iOS 目录都提供 `build.sh`、`clean.sh`。脚本可从任意工作目录调用；可用 `--help` 查看参数，清理只针对该脚本生成的构建产物。以下命令在仓库根目录执行：
+
+```sh
+./libai-c++/build.sh                         # 默认静态 C++ 库
+./libai-c++/build.sh -DBUILD_SHARED_LIBS=ON  # 显式选择动态 C++ 库
+./libai-java/build.sh                       # JAR + JNI；需完整 JDK/JAVA_HOME
+./libai-python/build.sh                     # wheel + C ABI 动态库
+./libai-rust/build.sh                       # 默认离线 release 构建
+./libai-objc/build.sh                       # Foundation/ARC；需 Apple SDK
+./libai-c/build.sh                          # 可供其他语言调用的 C ABI
+./libai-java/clean.sh                       # 其他绑定在各自目录使用同名脚本
+```
+
+启用完整桌面能力时，C++ 使用 `-DLIBAI_CPP_FULL=ON`；C、Java、Python 的原生库和 Objective-C 使用 `-DLIBAI_CODING_FULL=ON`，并按绑定说明配置 ACL/OpenSSL。Rust 使用环境变量 `LIBAI_CODING_FULL=ON`、`ACL_PATH`、`OPENSSL_ROOT_DIR`。完整静态包需要消费应用链接相应依赖；完整动态包需部署原生库及其运行时依赖。C++ ABI、JNI/JVM 架构和平台库必须匹配。
+
+### Android 与 iOS
+
+| 平台 | 入口与产物 | 支持范围与边界 |
+| --- | --- | --- |
+| Android | [Android](Android/README.md)：`./Android/build.sh`，Java/JNI AAR | minSdk 21，默认 arm64-v8a/x86_64，可配置其他 ABI；提供 portable Agent，平台网络、文件、权限和后台线程由 APP 管理 |
+| iOS | [iOS](iOS/README.md)：`./iOS/build.sh`，静态 `LibAI.xcframework` | 最低 iOS 13.0，真机 arm64、模拟器 arm64/x86_64；Objective-C 接口和 Swift 模块导入，网络与设备工具由 APP 提供 |
+
+移动端当前不包含依赖桌面 ACL 的完整 CodingService 后端。已有交叉编译和打包验证，真机/模拟器运行测试的范围见各平台 README；不要将打包成功等同于设备运行验证。
+
+### 使用绑定的独立 APP
+
+| APP | 绑定 | 实现与入口 |
+| --- | --- | --- |
+| [coolder](coolder/README.md) | `libai-c++` | C++ HTTP 宿主与编程工作台，通过 C++ 封装复用核心能力 |
+| [coolder-java](coolder-java/README.md) | `libai-java` | Java 自行实现 HTTP、账户、项目、会话、任务及审核业务；`./coolder-java/build.sh` / `run.sh` / `clean.sh` |
+| [coolder-rust](coolder-rust/README.md) | `libai-rust` | Rust 自行实现对应宿主业务，包含完成前编译验证与检查点继续；`./coolder-rust/build.sh` / `run.sh` / `clean.sh` |
+
+Java/Rust APP 不转发原 C++ APP 的路由，不需要同时启动原 APP。网页资源位于各 APP 的 `html/`，与 `src/` 平级；`build/` 是临时编译目录，`dist/` 保存运行产物。并行运行时分别配置端口与数据目录；JSON 持久化结构和跨 APP 使用边界见 [存储说明](coolder/docs/JSON_STORAGE.md)。绑定提供通用 AI 能力，账户鉴权、界面、平台权限与任务验收仍由宿主实现。
+
 ## 第三方应用集成 libai
 
-第三方桌面应用、命令行工具或后台服务可以直接链接 libai，复用模型适配、工作区工具和编程运行时，不必启动 Coolder 的 HTTP 服务或复用其前端。当前集成接口为 C++，聚合头文件为 `<libai/coding.h>`，CMake 目标为 `libai::ai`。
+第三方桌面应用、命令行工具或后台服务可以直接链接 libai，复用模型适配、工作区工具和编程运行时，不必启动 Coolder 的 HTTP 服务或复用其前端。推荐先选择上文的语言绑定；以下 1–4 节保留原始 C++ 核心的底层源码集成示例，聚合头文件为 `<libai/coding.h>`，CMake 目标为 `libai::ai`。
 
 ### 选择集成层次
 
 | 需求 | 接入方式 | 应用需要负责 |
 | --- | --- | --- |
 | 代码问答、解释或自定义业务助手 | `provider_client_t` 与请求/响应类型 | 上下文、业务流程、模型配置、凭据和结果展示 |
-| 自定义工具型 Agent | 模型客户端、工具 schema 与应用自己的调度循环 | 工具参数校验、授权、执行、结果回传、预算与停止条件 |
+| 自定义工具型 Agent | 各语言 `Agent`、模型回调、工具注册与事件钩子 | 模型客户端、工具参数校验、授权、工具实现与线程管理；SDK 管理循环和预算 |
 | 完整编程 Agent | `webcool::ai::coding` 运行时、工作区、存储及审核接口 | 任务初始化、身份与路径授权、ACL/fiber 生命周期、策略、事件展示和审核入口 |
 
 建议先验证库链接，再完成一次模型调用，最后接入工具和持久化。直接调用模型不会自动获得文件修改、验证、恢复或变更审核流程。
@@ -536,9 +626,9 @@ bool ask_model(const webcool::ai::provider_config_t& provider,
 
 ### 自定义工具与其他语言应用
 
-当前 `agent_registry_t` 提供只读定义查询，没有通用的动态工具注册 API。自定义工具可在应用自己的模型循环中声明 schema 并进行受控分发；若要进入内置编程循环，还需扩展工具定义、参数解析、执行分派和策略检查。只添加工具名称不会自动接通执行能力。参见 [Agent 工具定义](libai/agent/agent_registry.h)、[模型协议类型](libai/provider/ai_provider_client.h) 和 [工具执行入口](libai/runtime/ai_agent_tools.cpp)。
+各语言通用 `Agent` 支持动态注册工具、声明 schema 和提供工具回调，SDK 管理模型与工具循环。原始完整编程运行时的 `agent_registry_t` 仍是固定工具定义查询；扩展该运行时还需接通参数解析、执行分派和策略检查。不要将它与绑定 SDK 的动态工具接口混为一谈。参见 [Agent 工具定义](libai/agent/agent_registry.h)、[模型协议类型](libai/provider/ai_provider_client.h) 和 [工具执行入口](libai/runtime/ai_agent_tools.cpp)。
 
-当前仓库没有提供 Python、JavaScript、Java 或稳定 C ABI 的官方绑定。其他语言应用可以自行提供 C++ 服务桥接或封装 C ABI，并明确字符串/缓冲区所有权、错误处理、取消及生命周期。此类封装属于应用侧开发，不应视为现成 SDK 功能。
+当前仓库已提供 C++、C、Java、Python、Rust、Objective-C 绑定，功能和部署方式见上文。尚未提供独立 JavaScript/TypeScript 绑定；此类应用可以通过 C ABI 或自行实现的服务接入，并遵守内存所有权、错误、取消和生命周期约定。
 
 ## 开发验证与文档
 
@@ -580,9 +670,9 @@ Coolder 使用 [MIT License](LICENSE)。ACL、OpenSSL、zlib 和 Monaco Editor �
 
 **Coolder is a locally deployed AI coding agent that you use through a browser.** It brings language models, project context, code tools, build verification, and change review into one workspace. Describe a task in natural language to explore code, implement features, fix problems, and maintain real projects.
 
-Coolder reads and searches source files, proposes changes across multiple files, and attempts builds and repairs in an isolated draft. You review the changes before applying them to the project. The application uses **C++17, an ACL coroutine HTTP server, and a native web frontend**, with its core coding capabilities provided by **libai**, a reusable static library.
+Coolder reads and searches source files, proposes changes across multiple files, and attempts builds and repairs in an isolated draft. You review the changes before applying them to the project. The application uses **C++17, an ACL coroutine HTTP server, and a native web frontend**, using the **libai-c++** facade over **libai**. The repository also provides C, Java, Python, Rust, and Objective-C bindings, plus Android/iOS packaging.
 
-**On this page:** [Screenshots](#screenshots) · [Architecture](#architecture) · [Reasoning](#agent-reasoning-mechanism) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Task workflow](#task-workflow) · [Troubleshooting](#troubleshooting) · [Integration](#integrating-libai-into-third-party-applications) · [Development](#development-checks-and-documentation)
+**On this page:** [Screenshots](#screenshots) · [Architecture](#architecture) · [Reasoning](#agent-reasoning-mechanism) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Task workflow](#task-workflow) · [Troubleshooting](#troubleshooting) · [Language bindings](#language-bindings-and-platform-support) · [Integration](#integrating-libai-into-third-party-applications) · [Development](#development-checks-and-documentation)
 
 ## Key Features
 
@@ -594,9 +684,11 @@ Coolder reads and searches source files, proposes changes across multiple files,
 - **Accounts and policies**: Administrators manage models, users, language tools, concurrency quotas, and execution limits. Each account has its own workspace.
 - **Browser workspace**: Includes Monaco, project browsing, conversations, task progress, and diff review. The frontend builds without npm, and editor assets are served locally.
 
+- **Language SDKs and mobile packaging**: Shared Agent capabilities and optional desktop coding services for C++, C, Java, Python, Rust, and Objective-C; Android AAR, iOS XCFramework, and independent Java/Rust example APPs.
+
 ## Screenshots
 
-These screenshots show a separate Coolder demo instance running on macOS, using the English interface, a demo account, and the `hello-coolder` project. The task prompt has not been submitted to a model; the code edits and diff demonstrate manual editing.
+The four workspace screenshots below show a separate Coolder demo instance running on macOS, using the English interface, a demo account, and the `hello-coolder` project. Its task prompt has not been submitted to a model; edits and diffs demonstrate manual editing. The Snake game examples that follow were developed using coolder-rust with Zhipu AI and using coolder, respectively.
 
 ### Project Workspace
 
@@ -621,6 +713,18 @@ Inspect added and removed lines before returning to the editor or confirming a s
 Administrators manage users, agent policies, and model providers in one console. This view shows agent availability and role permissions.
 
 ![Coolder administration console showing agent settings and role permissions](docs/screenshots/agent-settings-en.jpg)
+
+### Real Example: Multiplayer Snake with coolder-rust and Zhipu AI
+
+This online multiplayer game was developed using the **coolder-rust APP with a Zhipu AI language model**. The user-provided runtime screenshot shows the browser game board, room/player information, score, leaderboard, food-count slider, and speed selection.
+
+![Online multiplayer Snake developed with coolder-rust and Zhipu AI](docs/screenshots/coolder-rust-zhipu-multiplayer-snake.png)
+
+### Real Example: Snake Developed with coolder
+
+This Snake game was developed using the **coolder APP**. The user-provided runtime screenshot shows room information, the game board, slow/medium/fast speed controls, a food-count slider, and a player leaderboard.
+
+![Snake game developed with the coolder APP](docs/screenshots/coolder-snake-game.png)
 
 ## Architecture
 
@@ -968,7 +1072,17 @@ coolder/
 │   ├── sandbox/               # Sandbox helper entry point
 │   ├── tests/                 # HTTP, account, and frontend regression tests
 │   └── tools/                 # Frontend bundling tools
-├── libai/                     # Reusable AI coding static library
+├── coolder-java/              # Independent APP using Java/JNI
+├── coolder-rust/              # Independent APP using Rust
+├── libai-c++/                 # Independent public C++ types; static by default
+├── libai-c/                   # C ABI and native language bridge
+├── libai-java/                # Java/JNI Agent and CodingService
+├── libai-python/              # Python ctypes Agent and CodingService
+├── libai-rust/                # Rust Agent and CodingService
+├── libai-objc/                # Foundation/ARC Objective-C API
+├── Android/                   # Java/JNI AAR packaging
+├── iOS/                       # Objective-C/Swift XCFramework packaging
+├── libai/                     # Portable Agent and full desktop coding core
 │   ├── agent/, runtime/       # Agent protocols, scheduling, and execution loop
 │   ├── provider/, context/    # Model integration and context management
 │   ├── project/, workspace/   # Projects, tools, and change management
@@ -978,22 +1092,88 @@ coolder/
 └── third-party/               # ACL, OpenSSL, zlib, and build scripts
 ```
 
-libai exposes the aggregate header `<libai/coding.h>` and the recommended CMake target `libai::ai`. It can be built, installed, and integrated independently. The host is responsible for ACL/fiber initialization, thread lifecycles, authentication, and workspace authorization. Execution tools also require deployment of the sandbox helper.
+Third-party C++ APPs should use `<libai_cpp/agent.h>` / `<libai_cpp/coding.h>` and link `libai::cpp`, with independent public types. Other languages use their bindings. Raw `<libai/coding.h>` / `libai::ai` remain available for low-level source integration; full desktop hosts must manage ACL/fiber, authentication, path authorization, and the sandbox helper.
 
 The library retains namespaces such as `webcool::ai`, internal `.webcool_*` storage formats, and the helper name `webcool-sandbox-helper` for compatibility. Coolder builds and runs independently without building the webcool application.
 
 CMake bundles frontend source scripts into `coolder/html/coolder.js`. Edit the original scripts rather than the generated file. See the [libai guide](libai/README.md) for integration details.
 
+## Language Bindings and Platform Support
+
+libai provides a portable Agent SDK and an optional full desktop coding service. C++, C, Java, Python, Rust, and Objective-C share the same model/tool loop, with language-specific types, callbacks, and resource ownership. Third-party applications do not need to run the Coolder server.
+
+### Interfaces and Artifacts
+
+| Language | Directory and API | Integration |
+| --- | --- | --- |
+| C++ | [libai-c++](libai-c++/README.md): `libai::cpp::Agent`, `NativeProviderModel`, `CodingService` | Independent public types and Pimpl; public headers do not include raw libai headers. Link `libai::cpp`. Static by default; select a shared library with `-DBUILD_SHARED_LIBS=ON` |
+| C | [libai-c](libai-c/README.md): `libai.h`, `libai_agent_*`, `libai_coding_*` | C ABI handles, model/tool callbacks, and explicit memory release; link `libai::c`. Also supplies the native bridge used by Python/Rust |
+| Java | [libai-java](libai-java/README.md): `io.coolder.libai.Agent`, `CodingService` | Java 8+, `libai-java.jar` and JNI library, JSON requests, `AutoCloseable`, and independent cancellation tokens |
+| Python | [libai-python](libai-python/README.md): `Agent`, `Cancellation`, `CodingService` | Python 3.9+, ctypes and dictionary requests/results; wheel plus separately deployed C ABI library selected with `LIBAI_LIBRARY` |
+| Rust | [libai-rust](libai-rust/README.md): `Agent`, `Cancellation`, `CodingService` | Rust 1.77+, repository path dependency, closure callbacks, lifetime checks, and Drop; portable static bridge by default |
+| Objective-C | [libai-objc](libai-objc/README.md): `LAIAgent`, `LAICancellation`, `LAICodingService` | Foundation/ARC, blocks, NSDictionary/NSError, and module `LibAI`; macOS/iOS integration and Swift module import |
+
+### Available Capabilities
+
+| Capability | Portable Agent SDK (default) | Full desktop build |
+| --- | --- | --- |
+| Models | Application-supplied model callbacks and HTTP/model SDK clients | Built-in Provider Agents for OpenAI compatible/Chat/Responses, Anthropic Messages, Gemini, and Ollama; GLM uses the matching official endpoint/protocol |
+| Tools and events | Dynamic tool registration, JSON schemas, tool-result feedback, streaming text, authorization callbacks, and event hooks | The same capabilities plus workspace, project, and fixed-command sandbox operations |
+| Sessions and control | Multiple turns, transcript snapshots, reset, independent cancellation, deadlines, model/tool/context/output budgets, bounded retries, and token counters | The same capabilities plus project/session/run audit and persistence operations |
+| Files and revisions | Application-owned file tools | `CodingService` directory listing, reading, search, outlines, SHA-256, file/directory operations, patch previews, reviewed change transactions, and recovery |
+| Projects and configuration | Application-owned business data | Creation/scaffolding, plans/task status, toolchain discovery, compiler-output parsing, encrypted Provider settings, connection tests/completions, session/run records, and runtime policies |
+| Compilation and execution | The portable Agent does not compile automatically | Fixed sandbox plans, confirmed execution, cancellation, history, exit codes, and output; the host assembles drafts and enforces completion checks |
+
+Full capabilities use the same JSON operation protocol through each language's `CodingService` or the C `libai_coding_*` API. Check `available` and `capabilities` first: portable builds and current mobile packages do not enable the full backend. See the [operation reference and examples](libai/docs/CODING_SERVICE.md) and [Agent API correspondence](libai/docs/CODING_SERVICE.md#agent-接口能力补齐).
+
+Agent `completed` means the model/tool loop ended; it does not certify compilation or tests. Hosts must enforce completion using execution evidence. The Rust APP compiles pending revisions in a temporary project copy, feeds failures back to the model for up to three repair rounds, and reports unavailable validation explicitly. Formal files are still written only after review.
+
+### Build, Clean, and Deploy
+
+Every binding and Android/iOS directory has `build.sh` and `clean.sh`. They resolve paths relative to their own directory; use `--help` for options. Cleanup targets their generated build outputs. From the repository root:
+
+```sh
+./libai-c++/build.sh                         # Static C++ library by default
+./libai-c++/build.sh -DBUILD_SHARED_LIBS=ON  # Opt into a shared C++ library
+./libai-java/build.sh                       # JAR + JNI; full JDK/JAVA_HOME required
+./libai-python/build.sh                     # Wheel + C ABI library
+./libai-rust/build.sh                       # Offline release build by default
+./libai-objc/build.sh                       # Foundation/ARC; Apple SDK required
+./libai-c/build.sh                          # C ABI for external applications
+./libai-java/clean.sh                       # Each binding has its own clean.sh
+```
+
+For full desktop facilities, use `-DLIBAI_CPP_FULL=ON` for C++ and `-DLIBAI_CODING_FULL=ON` for C, Java, Python's native library, and Objective-C, with the ACL/OpenSSL paths specified by each binding. Rust uses `LIBAI_CODING_FULL=ON`, `ACL_PATH`, and `OPENSSL_ROOT_DIR`. Full static consumers must link the dependencies; shared deployments must include the native libraries and runtime dependencies. Compiler ABI, JVM/native architecture, and platform libraries must match.
+
+### Android and iOS
+
+| Platform | Build entry and artifact | Support |
+| --- | --- | --- |
+| Android | [Android](Android/README.md): `./Android/build.sh`, Java/JNI AAR | minSdk 21; arm64-v8a/x86_64 by default, other ABIs configurable. Portable Agent; the APP owns networking, files, permissions, and background threads |
+| iOS | [iOS](iOS/README.md): `./iOS/build.sh`, static `LibAI.xcframework` | iOS 13.0 minimum; device arm64 and simulator arm64/x86_64. Objective-C API and Swift module import; the APP supplies network/device tools |
+
+Current mobile packages omit the full desktop ACL coding backend. Cross-compilation and packaging have been validated; see the platform READMEs for device/simulator runtime test coverage.
+
+### Independent Applications Using the Bindings
+
+| APP | Binding | Implementation and scripts |
+| --- | --- | --- |
+| [coolder](coolder/README.md) | `libai-c++` | C++ HTTP host and coding workspace using the C++ facade |
+| [coolder-java](coolder-java/README.md) | `libai-java` | Java-owned HTTP, accounts, projects, sessions, jobs, and reviews; `build.sh`, `run.sh`, and `clean.sh` in its directory |
+| [coolder-rust](coolder-rust/README.md) | `libai-rust` | Rust-owned host services, compilation gating, and checkpoint continuation; the same three scripts in its directory |
+
+Java/Rust do not proxy the C++ APP and run independently. Each APP has `html/` beside `src/`, temporary build files in `build/`, and deployment artifacts in `dist/`. Use separate ports and data directories for concurrent instances. See [JSON storage compatibility](coolder/docs/JSON_STORAGE.md). Bindings supply generic AI operations; authentication, UI, platform permissions, and task acceptance belong to the host.
+
 ## Integrating libai into Third-Party Applications
 
-Desktop applications, CLI tools, and backend services can link libai directly to reuse model adapters, workspace tools, and the coding runtime without starting Coolder's HTTP server or using its frontend. The current integration interface is C++, with `<libai/coding.h>` as the aggregate header and `libai::ai` as the CMake target.
+Desktop applications, CLI tools, and backend services can link libai directly to reuse model adapters, workspace tools, and the coding runtime without starting Coolder's HTTP server or using its frontend. Start with the language bindings above. Sections 1–4 below retain the low-level C++ core source-integration examples using `<libai/coding.h>` and `libai::ai`.
 
 ### Choose an Integration Level
 
 | Need | Integration | Application responsibilities |
 | --- | --- | --- |
 | Code Q&A, explanations, or a custom business assistant | `provider_client_t` and request/response types | Context, workflow, model configuration, credentials, and presentation |
-| An agent with custom tools | Model client, tool schemas, and an application-owned loop | Argument validation, authorization, dispatch, result replay, budgets, and stopping conditions |
+| An agent with custom tools | Language-specific `Agent`, model callbacks, tool registration, and hooks | Model clients, argument validation, authorization, tool implementations, and threading; the SDK manages the loop and budgets |
 | A complete coding agent | `webcool::ai::coding` runtime, workspace, storage, and review interfaces | Task initialization, identity and path authorization, ACL/fiber lifecycle, policy, events, and review UI |
 
 Start with linking, then make a model request, and finally integrate tools and persistence. Calling a model directly does not automatically provide file changes, validation, recovery, or revision review.
@@ -1110,9 +1290,9 @@ Building or running projects also requires `webcool-sandbox-helper` alongside th
 
 ### Custom Tools and Applications in Other Languages
 
-The current `agent_registry_t` exposes read-only definition queries, not a general dynamic tool-registration API. Applications can declare tool schemas and dispatch tools in their own controlled model loop. Integrating tools into the built-in coding loop also requires extending definitions, argument parsing, execution dispatch, and policy checks; adding a tool name alone does not make it executable. See [agent tool definitions](libai/agent/agent_registry.h), [model protocol types](libai/provider/ai_provider_client.h), and [tool execution](libai/runtime/ai_agent_tools.cpp).
+The portable Agent bindings support dynamic tool registration, schemas, and callbacks; the SDK manages the loop. The raw complete coding runtime still has a fixed `agent_registry_t` catalog, and extending that runtime requires parameter parsing, execution dispatch, and policy checks. These are different integration layers. See [agent tool definitions](libai/agent/agent_registry.h), [model protocol types](libai/provider/ai_provider_client.h), and [tool execution](libai/runtime/ai_agent_tools.cpp).
 
-The repository currently provides no official Python, JavaScript, Java, or stable C ABI bindings. Applications in other languages can implement a C++ service bridge or a C ABI wrapper with explicit string/buffer ownership, error handling, cancellation, and lifecycle contracts. Such wrappers are application development work, not existing SDK features.
+The repository provides C++, C, Java, Python, Rust, and Objective-C bindings as described above. There is currently no separate JavaScript/TypeScript binding; applications can integrate through the C ABI or an application-owned service while preserving memory ownership, errors, cancellation, and lifecycle contracts.
 
 ## Development Checks and Documentation
 
@@ -1145,3 +1325,24 @@ The following supporting documents are currently in Chinese:
 ## License
 
 Coolder is distributed under the [MIT License](LICENSE). Third-party components, including ACL, OpenSSL, zlib, and Monaco Editor, are subject to their respective licenses.
+
+### 管理员恢复 / Administrator recovery
+
+停止 APP 后，如果 `data/auth/accounts.v1` 中的管理员记录已删除，重新启动
+`coolder`、`coolder-rust` 或 `coolder-java` 会重新开放管理员创建入口。
+请只删除管理员对应的 JSON 记录，保持 JSON 有效，并保留普通用户及其他数据文件。
+新密码至少需要 6 个字符；已有管理员时不能重复创建。
+
+APP 会在 `auth/administrator-identity.v1` 中保存管理员身份 ID，重建时复用该 ID，
+以保留项目、会话、偏好及共享权限的关联。没有此文件时尝试从
+`accounts.v1.legacy` 获取原 ID；两者都没有时会创建新身份，无法保证原身份的数据关联。
+请保留该身份文件；它不保存密码。此恢复流程要求能够修改服务器数据目录，
+不提供在线删除管理员或绕过现有管理员登录的功能。
+
+After stopping the APP, removing its administrator record from the valid JSON
+`data/auth/accounts.v1` and restarting reopens administrator setup in all three
+APPs. Keep ordinary users and other data intact. The new password must contain at
+least six characters. Existing administrators prevent repeated setup. The private
+`auth/administrator-identity.v1` file preserves the administrator ID for recovery;
+the legacy account backup is a fallback. Keep that identity file to retain data
+associations. If neither source exists, recovery creates a new identity.
