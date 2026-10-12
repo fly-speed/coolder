@@ -188,6 +188,10 @@ bool complete(provider_store_t &store, acl::json_node &a, acl::json_node &out,
 		}
 	}
 	model.set_images(images);
+	const auto effort = text(a, "reasoning_effort");
+	if (!effort.empty() && effort != "low" && effort != "high" && effort != "max")
+		throw std::invalid_argument("invalid reasoning effort");
+	model.set_reasoning_effort(effort);
 	const auto result = model.complete(request, libai::stream_sink_t());
 	out.add_text("text", result.text.c_str())
 	    .add_text("reasoning", result.reasoning.c_str())

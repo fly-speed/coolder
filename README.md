@@ -24,7 +24,7 @@ Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订
 
 ## 运行截图
 
-下面四张工作台截图来自 macOS 上独立启动的 Coolder 演示实例，使用中文界面、演示账户和 `hello-coolder` 项目。演示任务尚未提交给模型，代码编辑与差异为手动操作示例；随后展示的是使用 coolder-rust 配合智谱 AI，以及使用 coolder 开发的贪吃蛇游戏案例。
+下面四张工作台截图来自 macOS 上独立启动的 Coolder 演示实例，使用中文界面、演示账户和 `hello-coolder` 项目。演示任务尚未提交给模型，代码编辑与差异为手动操作示例；随后展示的是使用 coolder-rust 配合智谱 AI，以及使用 coolder、coolder-java 开发的贪吃蛇游戏案例。
 
 ### 项目工作台
 
@@ -61,6 +61,12 @@ Coolder 围绕项目执行任务：读取与搜索源码、生成多文件修订
 该贪吃蛇小游戏由 **coolder APP 开发**。以下为用户提供的游戏运行截图，展示房间信息、贪吃蛇游戏区域、慢/中/快三档速度、食物数量调节和玩家排行榜。
 
 ![使用 coolder APP 开发的贪吃蛇小游戏](docs/screenshots/coolder-snake-game.png)
+
+### 实际案例：coolder-java 开发的贪吃蛇小游戏
+
+该贪吃蛇小游戏由 **coolder-java APP 开发**。以下为用户提供的游戏运行截图，展示房间与在线人数、游戏区域、三档速度、食物数量滑杆、排行榜和房间动态。
+
+![使用 coolder-java APP 开发的贪吃蛇小游戏](docs/screenshots/coolder-java-snake-game.png)
 
 ## 架构设计
 
@@ -169,6 +175,8 @@ flowchart TD
 
 ### 验证驱动修复与完成判断
 
+以下描述 C++ APP 使用的完整编程运行时；Java/Rust 宿主的验证范围见后文“三个 APP 的选择与当前差异”。
+
 运行时主动对保存后的修订进行构建检查，并把报告送回下一轮模型请求。模型返回最终结果时，还会检查当前修订的验证状态；最终文字中的“完成”本身不构成成功证据。
 
 当前最终结果处理在满足预算和错误类型等条件时，允许编译失败最多额外进行 3 次最终验证修复，其他验证失败最多额外进行 1 次；这些次数只针对最终结果阶段，不是整个任务的总修改次数。验证环境不可用等情况会区别处理。
@@ -239,6 +247,8 @@ flowchart TD
 
 管理员可以配置多个模型服务的协议、Base URL、模型 ID 和 API Key，启用模型并测试连接。API Key 由 libai 加密保存，列表接口不回传密钥。使用 Ollama 等本地服务时仍需配置相应端点和模型，Coolder 本身不内置模型权重或推理服务。
 
+三个 APP 均提供智谱 GLM 配置入口。管理控制台先填写 API Base URL，再选择协议；已识别的智谱官方端点会自动选择兼容协议并禁用不适用的选项。常规 GLM Chat 前缀为 `https://open.bigmodel.cn/api/paas/v4/`，不要误配成 Responses 的 `/v1` 路径；其他服务或自定义网关应按其实际端点配置。
+
 首次启动创建管理员，普通用户由管理员创建。管理员可启停账户、重置密码，并设置智能体总开关、角色权限、每用户并行任务数、语言工具、超时和资源限制。账户停用及策略变更会影响后续请求和新任务，已开始任务继续使用启动时的策略快照。
 
 ## 应用场景
@@ -298,9 +308,30 @@ cmake --build coolder/build --parallel 4
 
 Windows 原生 VS 2022 工程位于 `coolder/coolder.sln`，依赖 `third-party/acl` 和 `third-party/zlib-1.2.11`。OpenSSL 可通过 `third-party/build-openssl.bat` 构建 x64 Release 版本。平台依赖与详细步骤见 [第三方依赖说明](third-party/README.md) 和 [应用说明](coolder/README.md)。
 
+### 启动 Java / Rust APP
+
+以下命令从仓库根目录运行，两个 APP 无需同时启动 C++ APP：
+
+```sh
+./coolder-java/build.sh
+./coolder-java/run.sh --port 18096 --data /absolute/coolder-java-data
+
+./coolder-rust/build.sh
+./coolder-rust/run.sh --port 18097 --data /absolute/coolder-rust-data
+```
+
+Java 需要完整 JDK（`java`、`javac`、JNI 头文件），可设置 `JAVA_HOME`；Rust 需要 Rust/Cargo。两个 APP 的原生后端均需 C/C++、CMake 和 ACL/OpenSSL 依赖，不能只安装 Java/Rust 编译器。构建参数与平台准备分别见 [Java APP](coolder-java/README.md) 和 [Rust APP](coolder-rust/README.md)。
+
+浏览器分别访问 **http://127.0.0.1:18096** 与 **http://127.0.0.1:18097**。
+`run.sh` 先切换到对应 APP 根目录，因此默认数据目录分别是
+`coolder-java/var-java/` 与 `coolder-rust/var-rust/`，相对 `--data` 参数也相对于该 APP 根目录解析。切换启动方式时建议使用绝对数据路径，避免看不到原有账户或项目。
+
+`src/` 和 `html/` 保存源码与网页资源，`build/` 仅用于临时编译，`dist/` 保存发布产物。
+`./coolder-java/clean.sh` 与 `./coolder-rust/clean.sh` 清理 `build/` 中的生成输出，保留 `dist/` 运行包和运行数据；需重建时按各 APP 说明操作。更新源码并构建后，需要重启原进程才能使用新代码。
+
 ### 3. 完成首次配置
 
-1. 在初始化页面创建管理员账户。
+1. 在初始化页面创建管理员账户，密码至少 6 个字符；短密码会提示。没有预置的管理员密码，修改最小长度不会更改已有密码。
 2. 打开“管理控制台 → 大模型厂商”，配置协议、端点、模型和 API Key。
 3. 勾选“启用此模型”和“允许向此模型发送项目代码”，保存并测试连接。
 4. 在“智能体设置”中检查可用工具链、权限、任务额度和超时。
@@ -381,9 +412,26 @@ Linux 上若使用启用了 io_uring 的 ACL 静态库，还需要对应的 libu
 | 能生成源码但无法构建 | 确认相应工具链已安装、策略允许执行，并查看验证报告；必要时检查 helper 是否与主程序同目录 |
 | 修改前端脚本后页面没有变化 | 重新运行 `cmake --build coolder/build` 生成合并脚本，再刷新页面；不要直接修改 `coolder.js` |
 | 切换语言后编辑器菜单仍是原语言 | 刷新页面以重新加载 Monaco；未保存编辑请先完成保存 |
+| 模型返回 HTTP 404 | 检查模型 ID、API Base URL 与协议是否匹配；尤其区分 GLM Chat 和 Responses 端点 |
+| 模型请求长时间等待或超时 | 查看模型交互中的具体错误与请求预算，先缩小任务范围；重启升级后的 APP 才能使用新的运行策略 |
+| 重启后项目不见了 | 核对实际数据目录和登录账户；Java/Rust 的 `run.sh` 从 APP 根目录解析相对 `--data` |
+| 批量接受提示 `stale draft` | 刷新并重新审核最新草稿；Java 会合并同一路径的旧提案，但真实版本变化和外部编辑仍须处理 |
+
+### 登录与管理员重建
+
+三个 APP 的密码下限均为 6 个字符，已有账户不会自动改成新密码。无法登录时先核对实际 `--data` 路径、账户启用状态和密码，避免误用另一个数据目录。
+
+如需通过数据文件恢复管理员：
+
+1. 先启动一次新版 APP，生成 `auth/administrator-identity.v1`，然后停止 APP。
+2. 备份数据目录，在 `auth/accounts.v1` 中只删除管理员对应的 JSON 记录，保持 JSON 有效，保留普通用户。
+3. 使用同一数据目录重启，登录页面会重新开放管理员创建；设置新用户名和至少 6 个字符的新密码。
+
+已有管理员时不能重复创建，普通用户的用户名也不能覆盖。保留 `administrator-identity.v1` 可复用原管理员 ID，维持项目、会话、偏好及共享权限关联；没有该文件时尝试读取 `accounts.v1.legacy`，两者都没有则创建新身份，无法保证原身份的数据关联。身份文件不保存密码。此流程需要服务器数据目录的文件访问权，不是在线密码重置接口。
 
 ## 数据、权限与当前边界
 
+- **JSON 兼容范围**：结构化持久化数据使用 JSON，`.v1`/`.v2` 仍是版本文件名。Java/Rust 共享 `auth/app-state.v1` 聚合状态；C++ 项目/会话历史仍采用 libai 独立记录，没有自动映射到聚合状态。共享目录只能依次使用，不能让不同 APP 同时写入；备份须包含主密钥与加密配置。见 [JSON 存储说明](coolder/docs/JSON_STORAGE.md)。
 - **本地访问**：服务固定绑定 `127.0.0.1`，校验对应端口的 Host/Origin，目前不提供其他电脑直接访问的部署入口。多账户可通过不同浏览器或浏览器配置文件使用。
 - **用户隔离**：账户拥有独立工作区；管理员管理账户和全局策略，但不会自动获得普通用户项目的浏览入口。
 - **登录与密钥**：登录使用 HttpOnly、SameSite=Strict Cookie；密码采用加盐 PBKDF2-HMAC-SHA256 保存；模型密钥加密存储。
@@ -499,6 +547,20 @@ libai 同时提供通用 Agent SDK 和可选的桌面完整编码服务。C++、
 | [coolder-rust](coolder-rust/README.md) | `libai-rust` | Rust 自行实现对应宿主业务，包含完成前编译验证与检查点继续；`./coolder-rust/build.sh` / `run.sh` / `clean.sh` |
 
 Java/Rust APP 不转发原 C++ APP 的路由，不需要同时启动原 APP。网页资源位于各 APP 的 `html/`，与 `src/` 平级；`build/` 是临时编译目录，`dist/` 保存运行产物。并行运行时分别配置端口与数据目录；JSON 持久化结构和跨 APP 使用边界见 [存储说明](coolder/docs/JSON_STORAGE.md)。绑定提供通用 AI 能力，账户鉴权、界面、平台权限与任务验收仍由宿主实现。
+
+### 三个 APP 的选择与当前差异
+
+三个 APP 可独立启动，共用 libai 的 AI 能力，各自实现宿主业务。下面的差异应在选型和验收时考虑：
+
+| APP | 宿主与绑定 | 默认端口 | 任务验证与近期能力 |
+| --- | --- | --- | --- |
+| `coolder` | C++ / `libai-c++` | 18095 | 完整编程运行时，草稿验证、诊断反馈与修复、人工审核 |
+| `coolder-rust` | Rust / `libai-rust` | 18097 | 完成前在临时目录合并草稿并执行受控编译/语法检查，编译失败最多反馈三轮；支持检查点继续 |
+| `coolder-java` | Java / `libai-java` | 18096 | 增量文件提案、读取当前任务待确认草稿、同路径草稿合并与批量接受、持久化请求进度；支持检查点继续 |
+
+**Java 版目前没有与 Rust 相同的自动完成前编译验证门槛。** 它的 `completed` 表示模型和工具循环结束，仍须验证生成代码的构建、测试和实际行为。Rust 的编译/语法检查通过同样不等于业务测试全部通过；三个 APP 的正式文件写入都需要人工审核。
+
+Java 标准模式的单次模型输出上限为 16,384 tokens，大项目模式为 32,768 tokens，并受管理员总输出预算约束；快速模式采用管理员配置。GLM-5.3 系列请求使用 `reasoning_effort=low`。较大的输出额度不保证任务更快完成，复杂项目建议按可验证的功能逐步实现。
 
 ## 第三方应用集成 libai
 
@@ -649,6 +711,19 @@ node coolder/tests/run_progress_test.js
 
 这些 HTTP 集成测试使用临时目录与本地模拟模型，不需要真实 API Key。测试命令及覆盖范围说明不代表当前检出版本已在所有平台完成验证。
 
+近期跨语言与宿主回归脚本可直接从仓库根目录运行（先构建对应 APP）：
+
+```sh
+python3 coolder/tests/password_minimum_test.py coolder/build/coolder coolder-java/dist/bin/coolder-java coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/admin_recovery_test.py coolder/build/coolder coolder-java/dist/bin/coolder-java coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/json_storage_test.py --cpp coolder/build/coolder --java coolder-java/dist/bin/coolder-java --rust coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/java_incremental_run_test.py coolder-java/dist/bin/coolder-java
+python3 coolder/tests/java_draft_review_test.py coolder-java/dist/bin/coolder-java
+python3 coolder/tests/rust_completion_validation_test.py coolder-rust/dist/bin/coolder-rust
+```
+
+这些脚本覆盖密码校验、管理员恢复、跨 APP JSON 迁移、Java 增量草稿与批量审核、Rust 完成前验证。模拟模型测试不消耗真实模型额度；实际编译验证仍要求安装对应工具链。
+
 - [构建与贡献规范](BUILD.md)：依赖构建、C++ 格式、函数与文件规模、接口注释检查。
 - [应用使用与部署说明](coolder/README.md)：账户、API、编辑器、附件、Windows 构建和安装细节。
 - [libai 独立库说明](libai/README.md)：模块边界、SDK 构建、安装与集成。
@@ -688,7 +763,7 @@ Coolder reads and searches source files, proposes changes across multiple files,
 
 ## Screenshots
 
-The four workspace screenshots below show a separate Coolder demo instance running on macOS, using the English interface, a demo account, and the `hello-coolder` project. Its task prompt has not been submitted to a model; edits and diffs demonstrate manual editing. The Snake game examples that follow were developed using coolder-rust with Zhipu AI and using coolder, respectively.
+The four workspace screenshots below show a separate Coolder demo instance running on macOS, using the English interface, a demo account, and the `hello-coolder` project. Its task prompt has not been submitted to a model; edits and diffs demonstrate manual editing. The Snake game examples that follow were developed using coolder-rust with Zhipu AI and using coolder and coolder-java.
 
 ### Project Workspace
 
@@ -725,6 +800,12 @@ This online multiplayer game was developed using the **coolder-rust APP with a Z
 This Snake game was developed using the **coolder APP**. The user-provided runtime screenshot shows room information, the game board, slow/medium/fast speed controls, a food-count slider, and a player leaderboard.
 
 ![Snake game developed with the coolder APP](docs/screenshots/coolder-snake-game.png)
+
+### Real-world example: Snake developed with coolder-java
+
+This Snake game was **developed using the coolder-java APP**. The user-provided running screenshot shows room and online player information, the game board, three speed settings, a food-count slider, the leaderboard, and room activity.
+
+![Snake game developed with the coolder-java APP](docs/screenshots/coolder-java-snake-game.png)
 
 ## Architecture
 
@@ -833,6 +914,8 @@ If a model exhausts its output budget without producing an answer or tool call, 
 
 ### Validation-Driven Repair and Completion
 
+This section describes the complete coding runtime used by the C++ APP. See “Choosing an APP and Understanding Current Differences” for Java/Rust host validation scope.
+
 The runtime proactively checks builds after revisions are saved and feeds reports into subsequent model requests. When the model returns a final result, the runtime also checks validation for the current revision. A textual claim of completion is not itself evidence of success.
 
 Under the applicable budget and error conditions, final-result handling currently permits up to 3 additional final-validation repair attempts for compiler failures and 1 for other validation failures. These limits apply to the final-result stage, not to the total number of edits in a task. Unavailable validation environments and other special cases are handled separately.
@@ -903,6 +986,8 @@ Each submission supports up to 8 attachments, with an 8 MiB per-file limit, a 16
 
 Administrators configure the protocol, Base URL, model ID, and API key for multiple model services, enable models, and test connections. libai encrypts stored API keys, and list endpoints do not return them. Local services such as Ollama still require a configured endpoint and model; Coolder does not bundle model weights or an inference server.
 
+All three APPs provide a Zhipu GLM preset. Enter the API Base URL before selecting a protocol; recognized official Zhipu endpoints select a compatible protocol and disable incompatible options. The ordinary GLM Chat prefix is `https://open.bigmodel.cn/api/paas/v4/`; do not substitute a Responses `/v1` path. Configure custom gateways according to their actual endpoint.
+
 The first launch creates an administrator account. Administrators create regular users, enable or disable accounts, reset passwords, and configure agent availability, role permissions, concurrent tasks per user, language tools, timeouts, and resource limits. Account disabling and policy changes affect subsequent requests and new tasks. Existing tasks continue with the policy snapshot captured at startup.
 
 ## Use Cases
@@ -962,9 +1047,30 @@ cmake --build coolder/build --parallel 4
 
 The native Visual Studio 2022 solution is `coolder/coolder.sln`, with dependencies on `third-party/acl` and `third-party/zlib-1.2.11`. Use `third-party/build-openssl.bat` to build OpenSSL for x64 Release. See the [dependency guide](third-party/README.md) and [application guide](coolder/README.md) for platform requirements and detailed instructions.
 
+### Run the Java / Rust APPs
+
+From the repository root; neither APP requires the C++ APP to be running:
+
+```sh
+./coolder-java/build.sh
+./coolder-java/run.sh --port 18096 --data /absolute/coolder-java-data
+
+./coolder-rust/build.sh
+./coolder-rust/run.sh --port 18097 --data /absolute/coolder-rust-data
+```
+
+Java requires a full JDK (`java`, `javac`, JNI headers); `JAVA_HOME` can select it. Rust requires Rust/Cargo. Both native backends also require a C/C++ toolchain, CMake, and ACL/OpenSSL dependencies. See the [Java APP](coolder-java/README.md) and [Rust APP](coolder-rust/README.md) for build options and platform setup.
+
+Open **http://127.0.0.1:18096** for Java or **http://127.0.0.1:18097** for Rust.
+Each `run.sh` switches to its APP root. Default data therefore resides in
+`coolder-java/var-java/` or `coolder-rust/var-rust/`; relative `--data` arguments resolve against that APP root too. Use absolute data paths when changing launch methods to retain access to existing accounts and projects.
+
+`src/` and `html/` hold source and frontend assets; `build/` is temporary, while `dist/` holds release artifacts.
+The APPs' `clean.sh` scripts clean generated outputs under `build/`, retaining `dist/` release packages and runtime data. Follow each APP's instructions when rebuilding. Restart the existing process after building updated code.
+
 ### 3. Configure the Application
 
-1. Create an administrator account on the initialization page.
+1. Create an administrator account on the initialization page with at least six password characters. Short passwords are flagged. There is no preset administrator password; changing the minimum does not change existing passwords.
 2. Open the model provider settings in the administration console and configure the protocol, endpoint, model, and API key.
 3. Enable the model and allow project code to be sent to it, then save and test the connection.
 4. Review available toolchains, permissions, task quotas, and timeouts in the agent settings.
@@ -1045,9 +1151,26 @@ For code exploration, explicitly request analysis without file changes. For a de
 | Code generation works but builds do not | Check the installed toolchain, execution policy, and validation report; verify that the helper is alongside the executable when needed |
 | Frontend source edits are not visible | Run `cmake --build coolder/build` to regenerate the bundled script and refresh the page; do not edit `coolder.js` directly |
 | Editor menus remain in the previous language | Refresh the page to reload Monaco; save pending edits first |
+| Provider returns HTTP 404 | Check the model ID, API Base URL, and protocol together, especially GLM Chat versus Responses endpoints |
+| Model request waits for a long time or times out | Inspect the interaction error and budgets; narrow the task scope. Restart an updated APP to use new execution policies |
+| Projects disappear after restart | Verify the data directory and account; Java/Rust `run.sh` resolves relative `--data` paths from the APP root |
+| Bulk acceptance reports `stale draft` | Refresh and review the latest draft. Java coalesces older proposals for a path, but real version changes and external edits still need resolution |
+
+### Login and Administrator Recovery
+
+All three APPs require at least six password characters. Existing credentials remain unchanged. Check the actual `--data` directory, account status, and password before recovering an account.
+
+To recover an administrator through the data files:
+
+1. Start the updated APP once to create `auth/administrator-identity.v1`, then stop it.
+2. Back up the data directory. Remove only the administrator record from `auth/accounts.v1`, retaining valid JSON and ordinary users.
+3. Restart with the same data directory. The login page reopens administrator setup; choose a username and a new password of at least six characters.
+
+An existing administrator blocks repeated setup, and ordinary usernames cannot be overwritten. Keep `administrator-identity.v1` to reuse the original administrator ID and retain project, session, preference, and sharing associations. `accounts.v1.legacy` is the fallback; without either source, recovery creates a new identity and cannot guarantee old associations. The identity file contains no password. Recovery requires filesystem access to server data; it is not an online password-reset API.
 
 ## Data, Permissions, and Current Limitations
 
+- **JSON compatibility**: Structured persistence uses JSON; `.v1`/`.v2` filenames retain version meaning. Java/Rust share aggregate `auth/app-state.v1` data. C++ project/session history uses separate libai records and is not automatically mapped into that aggregate. Use shared directories sequentially, never with simultaneous APP writers. Back up master keys and encrypted configuration too. See [JSON storage](coolder/docs/JSON_STORAGE.md).
 - **Local access**: The service binds to `127.0.0.1` and validates Host/Origin for the configured port. Direct access from other computers is not currently provided. Different browsers or browser profiles can be used for multiple accounts.
 - **User isolation**: Accounts have separate workspaces. Administrators manage accounts and global policies but do not automatically receive an interface for browsing regular users' projects.
 - **Authentication and secrets**: Login uses HttpOnly, SameSite=Strict cookies. Passwords use salted PBKDF2-HMAC-SHA256, and model API keys are encrypted at rest.
@@ -1163,6 +1286,20 @@ Current mobile packages omit the full desktop ACL coding backend. Cross-compilat
 | [coolder-rust](coolder-rust/README.md) | `libai-rust` | Rust-owned host services, compilation gating, and checkpoint continuation; the same three scripts in its directory |
 
 Java/Rust do not proxy the C++ APP and run independently. Each APP has `html/` beside `src/`, temporary build files in `build/`, and deployment artifacts in `dist/`. Use separate ports and data directories for concurrent instances. See [JSON storage compatibility](coolder/docs/JSON_STORAGE.md). Bindings supply generic AI operations; authentication, UI, platform permissions, and task acceptance belong to the host.
+
+### Choosing an APP and Understanding Current Differences
+
+Each APP runs independently, reuses libai AI capabilities, and implements its own host business logic.
+
+| APP | Host / binding | Default port | Validation and recent capabilities |
+| --- | --- | --- | --- |
+| `coolder` | C++ / `libai-c++` | 18095 | Complete coding runtime, draft validation, diagnostic feedback and repair, human review |
+| `coolder-rust` | Rust / `libai-rust` | 18097 | Compiles or syntax-checks a temporary draft overlay before completion; up to three compiler-feedback repair rounds; checkpoint continuation |
+| `coolder-java` | Java / `libai-java` | 18096 | Incremental proposals, pending-draft reads within the current run, latest-draft coalescing and bulk acceptance, durable request progress, checkpoint continuation |
+
+**Java currently does not have Rust's automatic pre-completion compilation gate.** Its `completed` status means the model/tool loop ended; builds, tests, and behavior still need verification. Rust compilation or syntax-check success also does not establish that all business tests passed. Formal writes require human review in all three APPs.
+
+Java caps each standard-mode model response at 16,384 tokens and large-mode responses at 32,768, subject to the administrator's total output budget. Quick mode uses the configured budget. GLM-5.3 requests use `reasoning_effort=low`. Larger output budgets do not guarantee faster completion; split complex projects into verifiable increments.
 
 ## Integrating libai into Third-Party Applications
 
@@ -1313,6 +1450,19 @@ node coolder/tests/run_progress_test.js
 
 The HTTP integration tests use temporary directories and local mock models without real API keys. These commands and coverage descriptions do not imply that the current checkout has been validated on every platform.
 
+Recent cross-language and host regression scripts can be run from the repository root after building the corresponding APPs:
+
+```sh
+python3 coolder/tests/password_minimum_test.py coolder/build/coolder coolder-java/dist/bin/coolder-java coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/admin_recovery_test.py coolder/build/coolder coolder-java/dist/bin/coolder-java coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/json_storage_test.py --cpp coolder/build/coolder --java coolder-java/dist/bin/coolder-java --rust coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/java_incremental_run_test.py coolder-java/dist/bin/coolder-java
+python3 coolder/tests/java_draft_review_test.py coolder-java/dist/bin/coolder-java
+python3 coolder/tests/rust_completion_validation_test.py coolder-rust/dist/bin/coolder-rust
+```
+
+Coverage includes password checks, administrator recovery, cross-APP JSON migration, Java incremental drafts and bulk review, and Rust completion validation. Mock-model tests consume no real provider quota; actual compilation checks still require the relevant language tools.
+
 The following supporting documents are currently in Chinese:
 
 - [Build and contribution conventions](BUILD.md): Dependency builds, C++ formatting, function and file size limits, and interface comment checks.
@@ -1325,24 +1475,3 @@ The following supporting documents are currently in Chinese:
 ## License
 
 Coolder is distributed under the [MIT License](LICENSE). Third-party components, including ACL, OpenSSL, zlib, and Monaco Editor, are subject to their respective licenses.
-
-### 管理员恢复 / Administrator recovery
-
-停止 APP 后，如果 `data/auth/accounts.v1` 中的管理员记录已删除，重新启动
-`coolder`、`coolder-rust` 或 `coolder-java` 会重新开放管理员创建入口。
-请只删除管理员对应的 JSON 记录，保持 JSON 有效，并保留普通用户及其他数据文件。
-新密码至少需要 6 个字符；已有管理员时不能重复创建。
-
-APP 会在 `auth/administrator-identity.v1` 中保存管理员身份 ID，重建时复用该 ID，
-以保留项目、会话、偏好及共享权限的关联。没有此文件时尝试从
-`accounts.v1.legacy` 获取原 ID；两者都没有时会创建新身份，无法保证原身份的数据关联。
-请保留该身份文件；它不保存密码。此恢复流程要求能够修改服务器数据目录，
-不提供在线删除管理员或绕过现有管理员登录的功能。
-
-After stopping the APP, removing its administrator record from the valid JSON
-`data/auth/accounts.v1` and restarting reopens administrator setup in all three
-APPs. Keep ordinary users and other data intact. The new password must contain at
-least six characters. Existing administrators prevent repeated setup. The private
-`auth/administrator-identity.v1` file preserves the administrator ID for recovery;
-the legacy account backup is a fallback. Keep that identity file to retain data
-associations. If neither source exists, recovery creates a new identity.

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>多人贪吃蛇</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#111; color:#eee; display:flex; justify-content:center; }
+  .panel { background:#1c1c24; padding:16px; border-radius:10px; margin:10px; }
+  input, button, select { padding:6px 10px; border-radius:6px; border:1px solid #444; background:#2a2a35; color:#eee; }
+  button { cursor:pointer; }
+  #board { background:#0a0a12; border:2px solid #333; display:block; }
+  .row { margin:8px 0; display:flex; align-items:center; gap:8px; }
+  #scoreboard div { margin:2px 0; }
+  .dead { opacity:.5; text-decoration: line-through; }
+  h3 { margin:6px 0; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div id="lobby">
+    <h3>加入房间</h3>
+    <div class="row">房间: <input id="roomInput" placeholder="room1" value="room1">
+      昵称: <input id="nameInput" placeholder="你的昵称"></div>
+    <div class="row"><button id="joinBtn">加入</button></div>
+    <h3>现有房间</h3><div id="roomList"></div>
+  </div>
+  <div id="game" style="display:none">
+    <div class="row">
+      房间: <span id="roomLabel"></span>
+      我的得分: <span id="myScore">0</span>
+      状态: <span id="status"></span>
+    </div>
+    <canvas id="board" width="800" height="600"></canvas>
+    <div class="row">
+      速度:
+      <select id="speedSel">
+        <option value="slow">慢</option>
+        <option value="mid" selected>中</option>
+        <option value="fast">快</option>
+      </select>
+      食物数量: <input type="range" id="foodSlider" min="0" max="50" value="5">
+      <span id="foodCount">5</span>
+    </div>
+    <div class="row"><button id="pauseBtn">暂停/继续 (空格)</button></div>
+    <div id="scoreboard"></div>
+    <div>方向键控制移动；空格：暂停/继续；死亡后按空格重新开始。</div>
+  </div>
+</div>
+<script>
+const CELL = 20;
+let myId = Math.random().toString(36).slice(2, 10);
+let room = null, paused = false, lastState = null;
+
+async function post(url, data) {
+  await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+}
+
+function fmtRooms(list) {
+  const el = document.getElementById('roomList');
+  el.innerHTML = list.length ? '' : '（暂无）';
+  for (const r of list) {
+    const a = document.createElement('a');
+    a.textContent = r.id + '（' + r.players + '人）';
+    a.style.cursor = 'pointer';
+    a.style.color = '#7abaff';
+    a.onclick = () => { document.getElementById('roomInput').value = r.id; };
+    el.appendChild(a);
+  }
+}
+fetch('/api/rooms').then(r=>r.json()).then(fmtRooms);
+
+async function join() {
+  room = document.getElementById('roomInput').value.trim() || 'room1';
+  const name = document.getElementById('nameInput').value.trim();
+  await post('/api/join', {room, id: myId, name});
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  document.getElementById('roomLabel').textContent = room;
+  startStream();
+}
+
+function startStream() {
+  const es = new EventSource('/api/stream?room=' + encodeURIComponent(room));
+  es.onmessage = e => { lastState = JSON.parse(e.data); render(lastState); };
+}
+
+function render(s) {
+  const ctx = document.getElementById('board').getContext('2d');
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, 800, 600);
+  // 食物
+  ctx.fillStyle = '#e53935';
+  for (const f of s.food) { ctx.beginPath(); ctx.arc(f.X*CELL+CELL/2, f.Y*CELL+CELL/2, CELL/3, 0, 7); ctx.fill(); }
+  // 蛇
+  for (const p of s.players) {
+    ctx.fillStyle = p.color;
+    for (const b of p.body) ctx.fillRect(b.X*CELL+1, b.Y*CELL+1, CELL-2, CELL-2);
+    if (p.id === myId) { // 自己加亮头部
+      ctx.fillStyle = '#fff';
+      const h = p.body[0];
+      ctx.fillRect(h.X*CELL+4, h.Y*CELL+4, CELL-8, CELL-8);
+    }
+  }
+  // 记分板
+  const sb = document.getElementById('scoreboard');
+  sb.innerHTML = '';
+  for (const p of s.players) {
+    const d = document.createElement('div');
+    d.textContent = `${p.name}: ${p.score}${p.alive ? '' : ' （死亡，按空格重开）'}`;
+    d.style.color = p.color;
+    if (!p.alive) d.className = 'dead';
+    sb.appendChild(d);
+  }
+  const me = s.players.find(p => p.id === myId);
+  document.getElementById('myScore').textContent = me ? me.score : 0;
+  paused = s.paused;
+  document.getElementById('foodCount').textContent = s.foodCount;
+  document.getElementById('foodSlider').value = s.foodCount;
+  const st = document.getElementById('status');
+  if (me && !me.alive) st.textContent = '已死亡！按空格重新开始';
+  else if (s.paused) st.textContent = '已暂停';
+  else st.textContent = '进行中';
+}
+
+document.addEventListener('keydown', e => {
+  if (!room) {
+    if (e.code === 'Enter') join();
+    return;
+  }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    const me = lastState && lastState.players.find(p => p.id === myId);
+    if (me && !me.alive) { post('/api/restart', {room, id: myId}); return; }
+    post('/api/pause', {room, id: myId, paused: !paused});
+    return;
+  }
+  const dirs = {ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0]};
+  if (dirs[e.key]) { e.preventDefault(); const [dx,dy] = dirs[e.key]; post('/api/dir', {room, id: myId, dx, dy}); }
+});
+
+document.getElementById('joinBtn').onclick = join;
+document.getElementById('pauseBtn').onclick = () => post('/api/pause', {room, id: myId, paused: !paused});
+document.getElementById('foodSlider').oninput = e => {
+  document.getElementById('foodCount').textContent = e.target.value;
+  post('/api/food', {room, count: +e.target.value});
+};
+document.getElementById('speedSel').onchange = e => post('/api/speed', {room, speed: e.target.value});
+</script>
+</body>
+</html>

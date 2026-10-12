@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🐍 多人贪吃蛇 · 多房间</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- 大厅 -->
+<div id="lobby" class="lobby">
+  <div class="card">
+    <h1>🐍 多人贪吃蛇</h1>
+    <p class="sub">多房间 · 多人在线 · 撞墙即死 · 空格暂停/复活</p>
+
+    <label for="nameInput">昵称</label>
+    <input id="nameInput" maxlength="12" placeholder="你的昵称" autocomplete="off">
+
+    <label for="roomInput">房间</label>
+    <input id="roomInput" maxlength="20" list="roomList" placeholder="输入或选择房间名，例如：房间1" autocomplete="off">
+    <datalist id="roomList"></datalist>
+
+    <button id="joinBtn" class="primary">加入游戏</button>
+    <div id="roomChips" class="chips"></div>
+
+    <p class="hint">
+      方向键 / WASD 控制方向 · 空格：暂停 / 继续，死亡后按空格重新开始<br>
+      手机：在棋盘上滑动改变方向，点按棋盘 = 空格
+    </p>
+  </div>
+</div>
+
+<!-- 游戏 -->
+<div id="game" class="game hidden">
+  <header>
+    <div class="badge" id="roomBadge">🏠</div>
+    <div class="badge" id="onlineBadge">在线 1 人</div>
+    <div class="spacer"></div>
+    <button id="leaveBtn">← 退出房间</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="speed-group">
+      <span class="tool-label">速度</span>
+      <button class="speed-btn" data-speed="slow">慢速</button>
+      <button class="speed-btn" data-speed="normal">中速</button>
+      <button class="speed-btn" data-speed="fast">快速</button>
+    </div>
+    <div class="food-group">
+      <span class="tool-label">🍎 食物数量：<b id="foodCount">10</b></span>
+      <input id="foodSlider" type="range" min="1" max="50" step="1" value="10">
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="stage">
+      <canvas id="board" width="720" height="480"></canvas>
+      <div id="overlay" class="overlay hidden">
+        <div class="overlay-text" id="overlayText"></div>
+        <button id="overlayBtn" class="primary hidden">重新开始（空格）</button>
+      </div>
+      <div id="connOverlay" class="overlay hidden">
+        <div class="overlay-text" id="connText">连接已断开</div>
+        <button id="backBtn" class="primary">返回大厅</button>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <h3>排行榜</h3>
+      <ul id="scoreList"></ul>
+      <h3>房间动态</h3>
+      <ul id="eventLog"></ul>
+    </aside>
+  </div>
+
+  <p class="hint center">
+    空格：暂停 / 继续 · 死亡后按空格重新开始 · 拖动滑杆实时增减全房间食物数量
+  </p>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
