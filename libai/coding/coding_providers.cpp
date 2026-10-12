@@ -126,7 +126,7 @@ bool complete(provider_store_t &store, acl::json_node &a, acl::json_node &out,
 		request.instructions = "You are a helpful assistant.";
 	const auto timeout = number(a, "timeout_ms", 30000),
 	           tokens = number(a, "max_output_tokens", 4096);
-	if (timeout <= 0 || timeout > 300000 || tokens <= 0 || tokens > 1000000)
+	if (timeout <= 0 || timeout > 7200000 || tokens <= 0 || tokens > 1000000)
 		throw std::invalid_argument("invalid model budgets");
 	request.deadline = std::chrono::steady_clock::now() +
 	    std::chrono::milliseconds(timeout);
@@ -248,6 +248,20 @@ bool providers(const std::string &root, const std::string &op,
 		p.allow_file_content = boolean(a, "allow_file_content", false);
 		p.is_default = boolean(a, "is_default", false);
 		p.clear_api_key = boolean(a, "clear_api_key", false);
+		p.responses_store = boolean(a, "responses_store", p.responses_store);
+		p.responses_background = boolean(a, "responses_background", p.responses_background);
+		p.responses_compact = boolean(a, "responses_compact", p.responses_compact);
+		p.responses_strict_tools = boolean(a, "responses_strict_tools", p.responses_strict_tools);
+		p.qwen_session_cache = boolean(a, "qwen_session_cache", p.qwen_session_cache);
+		if (a["responses_min_reasoning_effort"]) p.responses_min_reasoning_effort = text(a, "responses_min_reasoning_effort");
+		if (a["responses_reasoning_summary"]) p.responses_reasoning_summary = text(a, "responses_reasoning_summary");
+		if (a["responses_text_verbosity"]) p.responses_text_verbosity = text(a, "responses_text_verbosity");
+		if (a["responses_service_tier"]) p.responses_service_tier = text(a, "responses_service_tier");
+		if (a["responses_cache_ttl"]) p.responses_cache_ttl = text(a, "responses_cache_ttl");
+		if (a["openai_organization"]) p.openai_organization = text(a, "openai_organization");
+		if (a["openai_project"]) p.openai_project = text(a, "openai_project");
+		if (!provider_store_t::validate_input(p, false, error))
+			return false;
 		if (!store.save(p, saved, error))
 			return false;
 		record(out, saved);

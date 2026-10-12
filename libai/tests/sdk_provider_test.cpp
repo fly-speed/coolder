@@ -37,6 +37,24 @@ int main()
 		assert(provider_detail::responses_compact_url(provider) == prefix + "/responses/compact");
 	}
 
+	// Protocol completion must not depend on HTTP EOF or gateway keep-alive.
+	for (const std::string protocol : { "openai_chat", "openai_responses",
+	         "anthropic_messages", "ollama" }) {
+		provider_config_t provider;
+		provider.protocol = protocol;
+		provider_detail::stream_diagnostics_t diagnostics;
+		completion_result_t result;
+		std::vector<provider_detail::streamed_tool_call_t> calls;
+		std::string delta, reasoning, error;
+		const std::string line = protocol == "ollama" ? R"({"done":true})" :
+		    protocol == "anthropic_messages" ? R"(data: {"type":"message_stop"})" :
+		    protocol == "openai_responses" ? R"(data: {"type":"response.completed"})" :
+		    "data: [DONE]";
+		assert(provider_detail::parse_stream_line(provider, line, result,
+		    calls, delta, reasoning, diagnostics, error));
+		assert(diagnostics.completed);
+	}
+
 	libai::model_request_t source;
 	source.instructions = "application instructions";
 	libai::tool_spec_t spec;

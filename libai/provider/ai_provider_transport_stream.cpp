@@ -74,7 +74,9 @@ public:
 		    ", received_bytes=" +
 		    std::to_string(state->progress.received_bytes) +
 		    ", tool_argument_bytes=" +
-		    std::to_string(state->progress.tool_argument_bytes) + ")";
+		    std::to_string(state->progress.tool_argument_bytes) +
+		    ", last_effective_ms=" + std::to_string(state->progress.last_effective_ms) +
+		    ", last_data_ms=" + std::to_string(state->progress.last_data_ms) + ")";
 		return true;
 	}
 };
@@ -600,9 +602,14 @@ bool stream_exchange_t::read_stream_body(acl::http_request &request)
 			pending_line.erase(0, newline + 1);
 			if (!line.empty() && line[line.size() - 1] == '\r')
 				line.resize(line.size() - 1);
-			if (process_stream_line(line))
-				continue;
-			return false;
+			if (!process_stream_line(line))
+				return false;
+			if (diagnostics.completed) {
+				// Ignore anything after the protocol terminator. A successful
+				// but unconsumed HTTP body is closed, never returned to the pool.
+				pending_line.clear();
+				return true;
+			}
 		}
 		if (diagnostics.event_count > 0 && buffered_json_candidate) {
 			// A parsed event proves this is a stream, so keeping a duplicate full

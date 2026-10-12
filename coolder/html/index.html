@@ -1319,6 +1319,7 @@
             <label for="provider-vendor"><span data-i18n="常见厂商预设">常见厂商预设</span></label>
             <select id="provider-vendor">
               <option value="custom">自定义厂商</option>
+              <option value="zhipu">智谱 GLM</option>
               <option value="deepseek">DeepSeek</option>
               <option value="kimi">Kimi</option>
               <option value="qwen">千问</option>
@@ -1331,28 +1332,15 @@
               >
             </p>
             <input name="id" type="hidden" />
-            <div class="grid">
-              <label
-                ><span data-i18n="名称">名称</span
-                ><input
-                  name="name"
-                  required
-                  placeholder="我的编程模型"
-                  data-i18n-placeholder="我的编程模型"
-                />
-              </label>
-              <label
-                ><span data-i18n="协议">协议</span
-                ><select name="protocol">
-                  <option value="openai_compatible">OpenAI compatible</option>
-                  <option value="openai_responses">OpenAI Responses</option>
-                  <option value="openai_chat">OpenAI Chat</option>
-                  <option value="anthropic_messages">Anthropic Messages</option>
-                  <option value="gemini_native">Gemini</option>
-                  <option value="ollama">Ollama</option>
-                </select>
-              </label>
-            </div>
+            <label
+              ><span data-i18n="名称">名称</span
+              ><input
+                name="name"
+                required
+                placeholder="我的编程模型"
+                data-i18n-placeholder="我的编程模型"
+              />
+            </label>
             <label
               >API Base URL<input
                 name="base_url"
@@ -1360,6 +1348,17 @@
                 required
                 placeholder="https://your-provider.example/v1"
               />
+            </label>
+            <label
+              ><span data-i18n="协议">协议</span
+              ><select name="protocol">
+                <option value="openai_compatible">OpenAI compatible</option>
+                <option value="openai_responses">OpenAI Responses</option>
+                <option value="openai_chat">OpenAI Chat</option>
+                <option value="anthropic_messages">Anthropic Messages</option>
+                <option value="gemini_native">Gemini</option>
+                <option value="ollama">Ollama</option>
+              </select>
             </label>
             <label id="provider-model-options" hidden
               ><span data-i18n="常用模型">常用模型</span>

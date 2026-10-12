@@ -606,6 +606,15 @@ bool provider_store_t::validate_input(
 	}
 	const std::string lower_model = lower_ascii(input.model);
 	const std::string lower_url = lower_ascii(input.base_url);
+	const size_t path_start = lower_url.find('/', lower_url.find("://") + 3);
+	std::string api_path = path_start == std::string::npos ? "" : lower_url.substr(path_start);
+	while (!api_path.empty() && api_path.back() == '/')
+		api_path.pop_back();
+	if (hostname == "open.bigmodel.cn" && input.protocol == "openai_responses" &&
+	    (api_path == "/api/paas/v4" || api_path == "/api/coding/paas/v4")) {
+		err = "Zhipu /api/paas/v4 and /api/coding/paas/v4 require OpenAI compatible or OpenAI Chat, not OpenAI Responses";
+		return ai_error("provider.store", "validate-zhipu-protocol", err);
+	}
 	const char *maas_suffix = ".maas.aliyuncs.com";
 	const size_t maas_suffix_size = strlen(maas_suffix);
 	const bool maas_host = hostname.size() > maas_suffix_size &&

@@ -436,8 +436,12 @@ bool parse_stream_line(const provider_config_t &provider,
 		// SSE also contains `event:`, retry and comment lines.
 		return true;
 	}
-	if (line.empty() || line == "[DONE]")
+	if (line.empty())
 		return true;
+	if (line == "[DONE]") {
+		diagnostics.completed = true;
+		return true;
+	}
 	acl::json json(line.c_str());
 	if (!json.finish()) {
 		err = "AI provider returned an invalid streaming event";
@@ -514,6 +518,12 @@ bool parse_stream_line(const provider_config_t &provider,
 		        reasoning_delta, diagnostics, json))
 			return false;
 	}
+	if (wire_event_type == "response.completed" ||
+	    (provider.protocol == "anthropic_messages" &&
+	        wire_event_type == "message_stop") ||
+	    (provider.protocol == "ollama" && json["done"] != NULL &&
+	        json["done"]->get_bool() != NULL && *json["done"]->get_bool()))
+		diagnostics.completed = true;
 	if (reasoning_delta.empty())
 		return true;
 	diagnostics.reasoning_bytes += reasoning_delta.size();
@@ -588,7 +598,7 @@ bool provider_client_t::parse_stream_response(const provider_config_t &provider,
 				return false;
 			}
 		}
-		if (end == std::string::npos)
+		if (diagnostics.completed || end == std::string::npos)
 			break;
 		begin = end + 1;
 	}

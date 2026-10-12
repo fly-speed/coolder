@@ -217,6 +217,35 @@ bool completion_call_t::request_with_retries()
 {
 	requested = submit_request();
 
+	// A stalled partial tool stream has not executed any tool. Replay exactly
+	// once, discarding all partial arguments, while preserving the caller's
+	// cancellation/deadline. Never replay text already delivered to the sink,
+	// completed tool calls, total-budget expiry, or malformed/limited output.
+	if (!requested && observer != NULL && !observer->cancel_requested() &&
+	    result.text.empty() && result.tool_calls.empty() &&
+	    !result.native_tool_call &&
+	    (err.find("AI provider effective_output_stalled") == 0 ||
+	        err.find("AI provider connection_idle_timeout") == 0)) {
+		const completion_result_t stalled = result;
+		ai_log_error("provider.client", "stalled-stream-retry",
+		    err + "; discarding partial tool arguments and retrying once");
+		if (!wait_for_transport_retry(0, observer, err)) {
+			result.error_category = provider_error_cancelled;
+			return false;
+		}
+		result = completion_result_t();
+		result.effective_max_output_tokens = effective_max_output_tokens;
+		transport_retried = true;
+		requested = submit_request();
+		// Only account for usage actually reported by the failed attempt.
+		result.latency_ms += stalled.latency_ms;
+		result.input_tokens += stalled.input_tokens;
+		result.output_tokens += stalled.output_tokens;
+		result.cached_input_tokens += stalled.cached_input_tokens;
+		result.reasoning_tokens += stalled.reasoning_tokens;
+		result.cache_usage_available = result.cache_usage_available || stalled.cache_usage_available;
+	}
+
 	// Tool-based coding runs can consume several requests in quick succession.
 	// A provider's RPM/concurrency 429 is temporary and normally includes an exact
 	// Retry-After value. Retry it inside the same model turn so the durable agent

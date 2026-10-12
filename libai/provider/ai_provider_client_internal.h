@@ -58,6 +58,8 @@ struct parsed_url_t {
 
 // Bounded counters and metadata explaining a streamed response.
 struct stream_diagnostics_t {
+	// A protocol terminal event ends generation even if HTTP remains open.
+	bool completed = false;
 	// Number of events observed for this operation.
 	size_t event_count = 0;
 	// Bytes of reasoning received so far.

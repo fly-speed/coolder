@@ -975,6 +975,17 @@ function renderRunProgress(s) {
   view.root.classList.toggle('finished', s.status !== 'running');
 }
 
+function requestedToolNames(value) {
+  if (typeof value === 'string') return value.trim();
+  const calls = Array.isArray(value) ? value : [value];
+  return calls.map(call => {
+    if (typeof call === 'string') return call.trim();
+    if (!call || typeof call !== 'object') return '';
+    const name = call.name || call.function?.name;
+    return typeof name === 'string' ? name.trim() : '';
+  }).filter(Boolean).join(', ');
+}
+
 function renderModelInteractions(s) {
   if (!state.run || typeof s.model_interactions_json !== 'string') return;
   let events;
@@ -1019,7 +1030,8 @@ function renderModelInteractions(s) {
         .filter(value => typeof value === 'string' && value.trim());
       for (const part of [...new Set(text)]) row.append(node('p', assistantDisplayText(part)));
       if (event.reply_overview_truncated) row.append(node('small', () => t('内容较长，仅显示概览')));
-      if (event.requested_tools) row.append(node('p', () => t('请求工具') + ': ' + event.requested_tools));
+      const tools = requestedToolNames(event.requested_tools);
+      if (tools) row.append(node('p', () => t('请求工具') + ': ' + tools));
       if (event.error) row.append(node('p', event.error, 'error'));
       row.append(node('small', () => usageText(event)));
     }
@@ -1453,9 +1465,15 @@ $('project-form').onsubmit = task(async () => {
   if (p) await selectProject(p);
 });
 
-// Coding presets copied from webcool/html/js/ai-settings.js.
+// Coding provider presets; model IDs can also be entered manually.
 // Image-generation providers are not coding-agent providers.
 const providerPresets = {
+  zhipu: {
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4/',
+    protocol: 'openai_compatible',
+    models: ['glm-5.3-flash', 'glm-5.3', 'glm-5.2']
+  },
   deepseek: {
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com',
@@ -1477,6 +1495,7 @@ const providerPresets = {
 function providerVendor(provider) {
   try {
     const host = new URL(provider?.base_url).hostname;
+    if (host === 'open.bigmodel.cn') return 'zhipu';
     if (host === 'api.deepseek.com') return 'deepseek';
     if (['api.moonshot.cn', 'api.moonshot.ai', 'api.kimi.com'].includes(host)) return 'kimi';
     if (
@@ -1488,6 +1507,32 @@ function providerVendor(provider) {
     /* Unsaved/custom URLs need no preset. */
   }
   return 'custom';
+}
+
+// Restrict only documented official endpoints; custom gateways may support any protocol.
+function providerProtocols(baseUrl) {
+  try {
+    const url = new URL(baseUrl.trim());
+    if (!['https:', 'http:'].includes(url.protocol) || url.hostname !== 'open.bigmodel.cn')
+      return null;
+    const path = url.pathname.replace(/\/+$/, '');
+    if (['/api/paas/v4', '/api/coding/paas/v4'].includes(path))
+      return ['openai_compatible', 'openai_chat'];
+    if (path === '/api/v1') return ['openai_responses'];
+    if (path === '/api/anthropic') return ['anthropic_messages'];
+  } catch {
+    // Keep the menu editable while a URL is incomplete.
+  }
+  return null;
+}
+
+function syncProviderProtocol() {
+  const form = $('provider-form');
+  const allowed = providerProtocols(form.elements.base_url.value);
+  const select = form.elements.protocol;
+  for (const option of select.options)
+    option.disabled = !!allowed && !allowed.includes(option.value);
+  if (allowed && !allowed.includes(select.value)) select.value = allowed[0];
 }
 
 function syncProviderModels() {
@@ -1526,6 +1571,7 @@ $('provider-vendor').onchange = function () {
     form.elements.protocol.value = presetProtocol(preset, preset.models[0]);
   }
   syncProviderModels();
+  syncProviderProtocol();
   renderProviderList();
 };
 $('provider-model-preset').onchange = function () {
@@ -1539,8 +1585,16 @@ $('provider-model-preset').onchange = function () {
   } else {
     form.elements.model.focus();
   }
+  syncProviderProtocol();
 };
 $('provider-form').elements.model.addEventListener('input', syncProviderModels);
+for (const event of ['input', 'change'])
+  $('provider-form').elements.base_url.addEventListener(event, () => {
+    const form = $('provider-form');
+    $('provider-vendor').value = providerVendor({ base_url: form.elements.base_url.value });
+    syncProviderModels();
+    syncProviderProtocol();
+  });
 
 function renderProviderList() {
   const selected = $('provider-form').elements.id.value;
@@ -1577,6 +1631,7 @@ function selectProvider(id = '') {
     form.elements[name].checked = !!p?.[name];
   $('provider-vendor').value = providerVendor(p);
   syncProviderModels();
+  syncProviderProtocol();
   renderProviderList();
 }
 
@@ -1586,6 +1641,7 @@ $('new-provider').onclick = () => {
 };
 
 $('provider-form').onsubmit = task(async () => {
+  syncProviderProtocol();
   const form = $('provider-form');
   const data = Object.fromEntries(new FormData(form));
   data.enabled = form.elements.enabled.checked;
