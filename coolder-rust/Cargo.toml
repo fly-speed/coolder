@@ -1,0 +1,17 @@
+[package]
+name = "coolder-rust"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+build = "build.rs"
+description = "Standalone browser coding application using libai-rust"
+
+[dependencies]
+libai = { package = "coolder-libai", path = "../libai-rust" }
+
+serde_json = "1"
+sha2 = "0.10"
+pbkdf2 = "0.12"
+base64 = "0.22"
+getrandom = "0.2"
