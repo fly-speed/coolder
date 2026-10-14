@@ -1112,20 +1112,6 @@ function renderRun(s) {
         .filter((text, i, all) => text && all.indexOf(text) === i).join('\n\n') || t('正在处理任务…')
     )
   );
-  if (s.validation) {
-    const report = node('div', undefined, 'validation-report');
-    const labels = { passed: '编译或语法检查通过', failed: '编译或语法检查失败',
-      unverified: '编译未验证', not_required: '本次没有待验证的修改' };
-    report.append(node('strong', labels[s.validation.status] || '编译未验证'));
-    if (s.validation.reason) report.append(node('p', s.validation.reason));
-    for (const command of s.validation.commands || []) {
-      const details = node('details');
-      details.append(node('summary', `${command.command_id} · exit=${command.exit_code ?? 'unknown'}`));
-      details.append(node('pre', [command.stdout, command.stderr, command.error].filter(Boolean).join('\n')));
-      report.append(details);
-    }
-    live.append(report);
-  }
   live.append(renderTaskContract(s));
   if (!active) live.append(usageFooter(s));
   $('tools').replaceChildren();
