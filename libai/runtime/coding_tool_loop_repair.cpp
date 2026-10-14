@@ -378,7 +378,8 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		    "workspace.validate", executed_tool_calls);
 		completion_validation = validate_staged_draft(
 		    runtime_task->user_root, project_path, runtime_task->id,
-		    changes, sandbox_limits, validation_trace, NULL, !focused);
+		    changes, sandbox_limits, validation_trace, NULL, !focused,
+		    turn.effect_key);
 		traces.push_back(validation_trace);
 		complete_runtime_tool(
 		    runtime_task, validation_trace, executed_tool_calls);

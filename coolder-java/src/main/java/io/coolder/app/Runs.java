@@ -8,8 +8,16 @@ import java.util.concurrent.*;
 
 /** Java-owned asynchronous agent jobs, replay, drafts and review state. */
 final class Runs {
+  static final String INSTRUCTIONS = "You are a coding agent implementing the requested project in the current project root. "
+      + "Work incrementally: inspect existing files, then propose complete files using workspace_propose. "
+      + "Paths are relative to this project; do not add another project directory. "
+      + "Use actual function calls, never print tool calls or all source code as chat text. "
+      + "Proposals require human review before formal writes. workspace_read can read pending drafts. "
+      + "Keep reasoning concise and implement a small working slice before adding more features. "
+      + "Finish only after proposing the requested implementation; honestly report any remaining work.";
   final Projects projects;
   final CodingService providers;
+  final String helper;
   final ConcurrentHashMap<String, Job> jobs = new ConcurrentHashMap<>();
   final ExecutorService executor = Executors.newFixedThreadPool(16);
   static final String[] TOOLS = {
@@ -24,7 +32,8 @@ final class Runs {
     "project_plan",
     "project_tasks",
     "toolchain_commands",
-    "project_diagnostics"
+    "project_diagnostics",
+    "project_validation_result"
   };
 
   static final class Job {
@@ -39,8 +48,9 @@ final class Runs {
     }
   }
 
-  Runs(Projects p) throws Exception {
+  Runs(Projects p, String helper) throws Exception {
     projects = p;
+    this.helper = helper;
     providers = new CodingService(p.auth.workspace.toString());
     for (Object list : Json.map(p.state.get("runs")).values())
       for (Object item : Json.list(list)) {
@@ -78,6 +88,38 @@ final class Runs {
     }
   }
 
+  Map<String,Object> recovery(Map<String,Object> actor,String id) throws Exception {
+    synchronized(projects) {
+      Map<String,Object> run=projects.get(projects.records("runs",actor),id);
+      if(!id.equals(Json.text(run,"id"))) throw new App.Error(404,"record not found");
+      String scope=Json.text(run,"execution_scope");
+      if(!Json.flag(run,"durable_execution",false)) throw new App.Error(409,"run has no SDK execution journal");
+      for(Job job:jobs.values())
+        if(Json.text(job.record,"execution_scope").equals(scope))
+          throw new App.Error(409,"execution is active; wait until it stops");
+      if(Json.text(run,"status").equals("running")) throw new App.Error(409,"execution is active; wait until it stops");
+      Map<String,Object> context=Json.map(run.get("execution_context"));
+      Object version=context.get("version");
+      if(!(version instanceof Long || version instanceof Integer) || ((Number)version).longValue()!=1 || !scope.equals(Json.text(context,"scope"))
+          || !(context.get("input") instanceof String) || !(context.get("instructions") instanceof String)
+          || !Objects.equals(context.get("path"),run.get("path")))
+        throw new App.Error(409,"frozen execution identity cannot be verified");
+      Path root=projects.auth.data.resolve("auth/executions").resolve(Json.text(actor,"id"));
+      Map<String,Object> result;
+      try(FileExecutionStore store=FileExecutionStore.plaintext(root.toAbsolutePath().toString())) {
+        Execution.Snapshot snapshot=store.open(scope);
+        try {
+          if(snapshot.stateJson.isEmpty()) throw new App.Error(409,"execution checkpoint missing");
+          result=Json.map(Json.parse(Governance.call("executions.inspect",Json.encode(Json.obj(
+              "scope",scope,"revision",snapshot.revision,"state_json",snapshot.stateJson,
+              "input",context.get("input"),"instructions",context.get("instructions"))))));
+        } finally {store.close(scope);}
+      } catch(Exception failure) {throw new App.Error(409,"execution journal unavailable: "+failure.getMessage());}
+      if(!Json.flag(result,"ok",false)) throw new App.Error(409,Json.text(result,"error"));
+      result.put("run_id",id);return result;
+    }
+  }
+
   Map<String, Object> record(Map<String, Object> a, String id) {
     synchronized (projects) {
       Map<String, Object> r = projects.get(projects.records("runs", a), id);
@@ -96,17 +138,33 @@ final class Runs {
         if (Json.text(session, "id").equals(Json.text(r, "session_id"))
             && Json.text(session, "last_run_id").equals(id)) current = true;
       }
-      r.put("recovery_available", stopped && valid && current);
+      boolean uncertain = ToolReceipts.uncertain(r) || !Json.text(r,"storage_error").isEmpty();
+      r.put("recovery_available", stopped && valid && current && !uncertain);
+      r.put("recovery_blocked_reason",uncertain ? "unconfirmed host tool effect or storage outcome" : "");
+      refreshContract(a, r);
       return r;
     }
   }
 
   Object start(Map<String, Object> a, Map<String, Object> b, Map<String, Object> policy)
       throws Exception {
+    Map<String,Object> frozen = null, resumeState = null;
+    boolean durable = FileExecutionStore.available();
     if (Json.flag(b, "resume_from_progress", false)) {
       Map<String, Object> session =
           projects.get(projects.records("sessions", a), Json.text(b, "session_id"));
       Map<String, Object> previous = record(a, Json.text(session, "last_run_id"));
+      resumeState = ExecutionContext.copy(previous);
+      durable = Json.flag(previous,"durable_execution",false);
+      if (durable && !FileExecutionStore.available())
+        throw new App.Error(409,"durable execution store unavailable on this platform");
+      if (ToolReceipts.uncertain(previous) || !Json.text(previous,"storage_error").isEmpty())
+        throw new App.Error(409,"unconfirmed host tool effect or storage outcome");
+      if (previous.containsKey("execution_context")) {
+        if (!(previous.get("execution_context") instanceof Map))
+          throw new App.Error(409,"invalid frozen execution context");
+        frozen = ExecutionContext.copy(Json.map(previous.get("execution_context")));
+      }
       if (!previous.containsKey("checkpoint"))
         throw new App.Error(400, "restart checkpoint unavailable");
       Map<String, Object> request = new LinkedHashMap<>(Json.map(previous.get("checkpoint")));
@@ -133,12 +191,22 @@ final class Runs {
             .count();
     if (count >= Json.number(policy, "max_active_runs_per_user", 3))
       throw new App.Error(429, "run limit");
+    Map<String,Object> identity = ExecutionContext.providerIdentity(selected);
+    if (frozen != null) {
+      ExecutionContext.validate(frozen,b,identity,INSTRUCTIONS);
+      if (durable) {
+        String scope = Json.text(frozen,"scope");
+        for (Job active : jobs.values())
+          if (Json.text(active.record,"execution_scope").equals(scope))
+            throw new App.Error(409,"execution scope still active");
+      }
+    }
     String draft = Json.text(b, "attachment_draft");
     List<Object> attachments =
         b.containsKey("attachments") ? Json.list(b.get("attachments")) : new ArrayList<>();
     List<Object> images = new ArrayList<>();
     StringBuilder prompt = new StringBuilder(Json.text(b, "prompt"));
-    if (!draft.isEmpty()) {
+    if (frozen == null && !draft.isEmpty()) {
       if (!draft.matches("\\.webcool_agent/attachments/[a-f0-9]{64}"))
         throw new App.Error(400, "invalid draft");
       for (Object v : attachments) {
@@ -175,14 +243,27 @@ final class Runs {
     Map<String, Object> args = new LinkedHashMap<>(b);
     args.put("_images", images);
     args.put("_model", Json.text(selected, "model"));
-    args.put("_policy", new LinkedHashMap<>(policy));
+    args.put("_model_profile", Json.text(selected, "model_profile_json"));
+    args.put("_policy", ExecutionContext.policy(policy,policy));
     List<Object> history = new ArrayList<>();
     if (!Json.text(b, "session_id").isEmpty()) {
       Map<String, Object> session =
           projects.get(projects.records("sessions", a), Json.text(b, "session_id"));
       if (session.containsKey("transcript")) history = Json.list(session.get("transcript"));
     }
-    args.put("_history", history);
+    args.put("_history", Json.parse(Json.encode(history)));
+    if (frozen != null) {
+      prompt.setLength(0);
+      prompt.append(Json.text(frozen,"input"));
+      args.clear();
+      args.putAll(ExecutionContext.copy(Json.map(frozen.get("args"))));
+      args.put("session_id",b.get("session_id"));
+      args.put("remember_session",true);
+      args.put("_policy",ExecutionContext.policy(Json.map(args.get("_policy")),policy));
+    }
+    Map<String,Object> originalSession = Json.text(args,"session_id").isEmpty() ? null
+        : projects.get(projects.records("sessions",a),Json.text(args,"session_id"));
+    Map<String,Object> originalSessionSnapshot = originalSession == null ? null : ExecutionContext.copy(originalSession);
     if (Json.flag(b, "remember_session", false) && Json.text(args, "session_id").isEmpty()) {
       String sid = Store.id();
       Map<String, Object> session =
@@ -249,11 +330,22 @@ final class Runs {
             "[]",
             "started_at",
             System.currentTimeMillis() / 1000L);
+    if (durable && resumeState != null) {
+      for (String key : Arrays.asList("changes","superseded_changes","tool_calls","validation","validation_attempts"))
+        if (resumeState.containsKey(key)) r.put(key,resumeState.get(key));
+    }
+    r.put("durable_execution",durable);
+    String scope = frozen == null ? id : Json.text(frozen,"scope");
+    Map<String,Object> context = frozen == null
+        ? Json.obj("version",1L,"scope",scope,"instructions",INSTRUCTIONS,"path",path,
+            "provider_identity",identity,"input",prompt.toString(),
+            "args",ExecutionContext.select(args,ExecutionContext.INPUT_KEYS))
+        : ExecutionContext.copy(frozen);
+    Json.map(context.get("args")).put("_policy",ExecutionContext.copy(Json.map(args.get("_policy"))));
+    r.put("execution_context",context);
+    r.put("execution_scope",scope);
     if (Json.flag(b, "resume_after_restart", false)) {
-      Map<String, Object> checkpoint = new LinkedHashMap<>(b);
-      checkpoint.remove("attachments");
-      checkpoint.remove("attachment_draft");
-      checkpoint.remove("resume_from_progress");
+      Map<String, Object> checkpoint = ExecutionContext.select(b,ExecutionContext.CHECKPOINT_KEYS);
       r.put("checkpoint", checkpoint);
     }
     if (!Json.text(args, "session_id").isEmpty()) {
@@ -265,7 +357,19 @@ final class Runs {
     Job j = new Job(r, new LinkedHashMap<>(a));
     jobs.put(id, j);
     projects.records("runs", a).add(r);
-    projects.save();
+    try { projects.save(); }
+    catch (Exception e) {
+      jobs.remove(id);
+      j.cancellation.close();
+      projects.records("runs",a).remove(r);
+      if (originalSession != null) {
+        originalSession.clear(); originalSession.putAll(originalSessionSnapshot);
+      } else if (!Json.text(args,"session_id").isEmpty()) {
+        String sid = Json.text(args,"session_id");
+        projects.records("sessions",a).removeIf(value -> Json.text(Json.map(value),"id").equals(sid));
+      }
+      throw e; // No worker/model started. Disk may hold either complete snapshot.
+    }
     String input = prompt.toString();
     executor.submit(() -> execute(j, projectRoot, input, args));
     return Json.obj("ok", true, "run_id", id, "status", "running");
@@ -275,7 +379,8 @@ final class Runs {
     Map<String, Object> r = job.record;
     List<Object> events = new ArrayList<>();
     long began = System.currentTimeMillis();
-    try (Agent agent =
+    try (FileExecutionStore execution = RunExecution.store(projects,job);
+        Agent agent =
         new Agent(
             (request, invocation) -> {
               while (job.paused && !job.cancellation.cancelled())
@@ -287,7 +392,11 @@ final class Runs {
                 }
               Map<String, Object> q = Json.map(Json.parse(request));
               q.put("id", r.get("provider_id"));
-              q.put("timeout_ms", Json.number(Json.map(args.get("_policy")), "provider_request_timeout_seconds", 900) * 1000);
+              long requestTimeout=Json.number(Json.map(args.get("_policy")), "provider_request_timeout_seconds", 900)*1000;
+              long remaining=invocation.remainingMs();
+              if(invocation.stopped()||remaining==0){Agent.Response stopped=new Agent.Response("");stopped.error="任务时限或取消阻止模型请求";return stopped;}
+              if(remaining>0)requestTimeout=Math.min(requestTimeout,remaining);
+              q.put("timeout_ms",requestTimeout);
               q.put("images", args.get("_images"));
               String model = Json.text(args, "_model").toLowerCase(Locale.ROOT);
               if (model.startsWith("glm-5.3")) q.put("reasoning_effort", "low");
@@ -376,24 +485,45 @@ final class Runs {
                   r.put("cache_usage_available", true);
                 r.put("model_interactions_json", Json.encode(events));
               }
+              if (out.error.isEmpty() && out.calls.isEmpty()) {
+                Validation.Gate gate = Validation.gate(projects,job,root);
+                if (!gate.error.isEmpty()) out.error=gate.error;
+                else if (gate.report==null) {
+                  out.calls.add(new Agent.ToolCall("compiler-feedback-"+Store.id(),"project_validation_result","{}"));
+                  out.text="";
+                } else synchronized(projects) { r.put("validation",gate.report); }
+              }
               return out;
             },
-            "You are a coding agent implementing the requested project in the current project root. "
-                + "Work incrementally: inspect existing files, then propose complete files using workspace_propose. "
-                + "Paths are relative to this project; do not add another project directory. "
-                + "Use actual function calls, never print tool calls or all source code as chat text. "
-                + "Proposals require human review before formal writes. workspace_read can read pending drafts. "
-                + "Keep reasoning concise and implement a small working slice before adding more features. "
-                + "Finish only after proposing the requested implementation; honestly report any remaining work.")) {
+            INSTRUCTIONS)) {
+      if (execution != null) {
+        RunExecution.reconcile(projects,job,execution,input,INSTRUCTIONS);
+        if(RunExecution.migrateDeadline(projects,job,execution,input,INSTRUCTIONS)) {
+          synchronized(projects){job.terminalStatus="deadline_exceeded";r.put("error","原任务总时限已耗尽，请新建任务；旧检查点保留。");}
+          return;
+        }
+        agent.setExecutionStore(Json.text(r,"execution_scope"),execution);
+      }
+      String profile = Json.text(args, "_model_profile");
+      agent.configureModel(profile.isEmpty() ? "{\"version\":1}" : profile);
       for (String name : TOOLS)
         agent.addTool(
             name,
             toolDescription(name),
             toolSchema(name),
             false,
+            "6-durable-validation-receipts",
+            Arrays.asList("workspace_list","workspace_read","workspace_search").contains(name),
             (call, invocation) -> {
               try {
                 Map<String, Object> b = Json.map(Json.parse(call.arguments));
+                if (call.name.equals("project_validation_result"))
+                  return new Agent.ToolResult(Json.encode(Validation.tool(projects,job,root,helper,call,invocation)));
+                if (call.name.startsWith("workspace_propose")) {
+                  Object output = ToolReceipts.proposal(projects,job,call,invocation,
+                      () -> tool(job,root,call.name,b));
+                  return new Agent.ToolResult(Json.encode(output));
+                }
                 Object result = tool(job, root, call.name, b);
                 synchronized (projects) {
                   Json.list(r.get("tool_calls"))
@@ -411,6 +541,8 @@ final class Runs {
                 return new Agent.ToolResult(Json.encode(result));
               } catch (Exception e) {
                 synchronized (projects) {
+                  if (!Json.text(r,"storage_error").isEmpty())
+                    return new Agent.ToolResult("tool storage outcome uncertain; execution stopped",true);
                   Json.list(r.get("tool_calls")).add(Json.obj("name", call.name,
                       "arguments", call.arguments, "ok", false, "error", e.toString()));
                   saveProgress();
@@ -456,6 +588,7 @@ final class Runs {
       synchronized (projects) {
         job.terminalStatus = job.cancellation.cancelled() ? "cancelled" : Json.text(out, "status");
         if (job.terminalStatus.equals("success")) job.terminalStatus = "completed";
+        if (job.terminalStatus.equals("recovery_required")) r.put("execution_recovery_required",true);
         r.put("text", out.get("text"));
         r.put("error", job.terminalStatus.equals("deadline_exceeded")
             ? "任务执行达到总时限，请查看交互记录并继续任务。" : out.get("error"));
@@ -463,11 +596,16 @@ final class Runs {
     } catch (Exception e) {
       synchronized (projects) {
         job.terminalStatus = job.cancellation.cancelled() ? "cancelled" : "failed";
+        if (Json.flag(r,"durable_execution",false)) r.put("execution_recovery_required",true);
         r.put("error", e.toString());
       }
     } finally {
       synchronized (projects) {
         try {
+          if (!Json.text(r,"storage_error").isEmpty()) {
+            job.terminalStatus = "failed";
+            r.put("error","任务存储失败，执行已停止，不能确认本次写入："+Json.text(r,"storage_error"));
+          }
           r.put("status", job.terminalStatus);
           r.put("finished_at", System.currentTimeMillis() / 1000);
           r.put("elapsed_ms", System.currentTimeMillis() - began);
@@ -531,11 +669,27 @@ final class Runs {
           }
           if (!Json.text(args, "attachment_draft").isEmpty())
             projects.attachments(job.actor, args, true);
+          refreshContract(job.actor, r);
           projects.save();
         } catch (Exception e) {
           System.err.println("persist run: " + e);
         }
+        jobs.remove(Json.text(r,"id"));
+        job.cancellation.close();
       }
+    }
+  }
+
+  void refreshContract(Map<String,Object> actor, Map<String,Object> run) {
+    try {
+      Path root=projects.workspace(actor).resolve(Json.text(run,"path"),false);
+      Map<String,Object> contract=Json.map(Json.parse(
+          new CodingService(root.toString()).call("tasks.describe_run",Json.encode(run))));
+      if (!Json.flag(contract,"ok",false)) throw new IllegalStateException(Json.text(contract,"error"));
+      contract.remove("ok");
+      run.put("task_contract",contract);
+    } catch (Exception e) {
+      run.put("task_contract",Json.obj("version",1,"accepted",false,"error",e.toString()));
     }
   }
 
@@ -556,11 +710,14 @@ final class Runs {
       case "workspace_propose_mkdir": return "Propose creating a directory at path.";
       case "workspace_propose_delete": return "Propose deleting the file at path.";
       case "workspace_propose_move": return "Propose moving path to target_path, both relative to project root.";
+      case "project_validation_result": return "Compile pending proposals in an isolated project copy. Inspect the report and repair failures before finishing.";
       default: return "Inspect project information using " + name + ".";
     }
   }
 
   static String toolSchema(String name) {
+    if (name.equals("project_validation_result"))
+      return "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}";
     Map<String,Object> properties = Json.obj("path", Json.obj("type","string"));
     List<Object> required = new ArrayList<>();
     if (name.startsWith("workspace_") && !name.equals("workspace_list")) required.add("path");
@@ -576,8 +733,9 @@ final class Runs {
       properties.put("target_path", Json.obj("type","string"));
       required.add("target_path");
     }
-    return Json.encode(Json.obj("type","object","properties",properties,
-        "required",required,"additionalProperties",true));
+    Map<String,Object> schema=Json.obj("type","object","properties",properties,"additionalProperties",true);
+    if (!required.isEmpty()) schema.put("required",required);
+    return Json.encode(schema);
   }
 
   Object tool(Job job, Path root, String name, Map<String, Object> b) throws Exception {
@@ -677,6 +835,8 @@ final class Runs {
       if (j != null) j.paused = Json.flag(b, "paused", true);
       r.put("paused", Json.flag(b, "paused", true));
     } else if (op.startsWith("result/")) {
+      if (ToolReceipts.uncertain(r) || !Json.text(r,"storage_error").isEmpty())
+        throw new App.Error(409,"unconfirmed host tool effect or storage outcome; review disabled");
       List<Object> cs = Json.list(r.get("changes"));
       List<Object> reviews =
           b.containsKey("reviews") ? Json.list(b.get("reviews")) : new ArrayList<>();
@@ -727,9 +887,12 @@ final class Runs {
           Files.write(f, Json.text(c, "content").getBytes(StandardCharsets.UTF_8));
         }
         c.put("review_status", "accepted");
+        c.put("accepted_by", a.get("id"));
+        c.put("review_reference", Store.id());
       }
     } else if (op.equals("reasoning/save")) r.put("reasoning", Json.text(b, "reasoning"));
     else throw new App.Error(404, "unknown run operation");
+    refreshContract(a, r);
     projects.save();
     return Json.obj("ok", true, "run_id", id, "status", r.get("status"));
   }

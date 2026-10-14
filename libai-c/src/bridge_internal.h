@@ -19,6 +19,8 @@ struct libai_tool_result {
 };
 /* A borrowed execution boundary; foreign wrappers must expire it on return. */
 struct libai_invocation {
+	/* Key copied from the tool admission checkpoint; empty for model callbacks. */
+	std::string idempotency_key;
 	/* Cancellation shared by model transport and tool callbacks. */
 	std::shared_ptr<libai::cancellation_t> cancellation;
 	/* Deadline inherited from the synchronous run. */
@@ -28,6 +30,9 @@ struct libai_invocation {
 };
 /* A native agent with one serialized session and cancellation independent of its lock. */
 struct libai_agent {
+	/* Idle-configured durable store and host-owned task scope. */
+	std::shared_ptr<libai::execution_store_t> execution_store;
+	std::string execution_scope;
 	/* Guard configuration and the transcript against simultaneous runs. */
 	std::mutex mutex;
 	/* Atomic shared_ptr operations protect concurrent cancellation snapshots. */
@@ -60,3 +65,14 @@ struct libai_cancellation {
 char *bridge_owned(const std::string &text);
 /* Serialize an ordered transcript independently of model request metadata. */
 std::string bridge_messages_json(const std::vector<libai::message_t> &messages);
+
+/* Store response owned by the native stack during a synchronous callback. */
+struct libai_execution_result {
+    std::string revision, state_json, error;
+    bool failed=false;
+};
+
+/* Serialize a copied snapshot for file store consumers. */
+std::string bridge_execution_snapshot_json(const libai::execution_snapshot_t &);
+/* Shared synchronous adapter; the caller retains callback/user through use. */
+std::shared_ptr<libai::execution_store_t> bridge_execution_store(libai_execution_fn, void *);

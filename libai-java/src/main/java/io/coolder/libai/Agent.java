@@ -11,11 +11,16 @@ public final class Agent implements AutoCloseable {
 
     /** Independently owned thread-safe stop token. Retained runs survive close(). */
     public static final class Cancellation implements AutoCloseable {
-        private long handle = nativeTokenCreate();
+        private long handle;
+        public Cancellation() { this(nativeTokenCreate()); }
+        private Cancellation(long pointer) {
+            if (pointer == 0) throw new IllegalStateException("cancellation allocation failed");
+            handle = pointer;
+        }
         public synchronized void cancel() { check(); nativeTokenCancel(handle); }
         public synchronized boolean cancelled() { check(); return nativeTokenCancelled(handle); }
         private void check() { if (handle == 0) throw new IllegalStateException("cancellation closed"); }
-        private synchronized long retain() { check(); return nativeTokenRetain(handle); }
+        synchronized long retain() { check(); return nativeTokenRetain(handle); }
         @Override public synchronized void close() {
             if (handle != 0) { nativeTokenDestroy(handle); handle = 0; }
         }
@@ -35,9 +40,23 @@ public final class Agent implements AutoCloseable {
         private final Thread thread = Thread.currentThread();
         private Invocation(long handle) { this.handle = handle; }
         private void check() { if (handle == 0 || thread != Thread.currentThread()) throw new IllegalStateException("invocation expired or wrong thread"); }
+        public String idempotencyKey() { check(); return nativeIdempotencyKey(handle); }
         public boolean stopped() { check(); return nativeStopped(handle); }
+        /** -1 unlimited, 0 expired. Never map 0 to an unlimited child timeout. */
+        public long remainingMs() { check(); return nativeRemainingMs(handle); }
+        /** Independent owner of the shared stop state; close after use. */
+        public Cancellation retainCancellation() {
+            check(); long pointer = nativeInvocationToken(handle);
+            if (pointer == 0) throw new IllegalStateException("invocation has no cancellation token or retain failed");
+            try { return new Cancellation(pointer); }
+            catch (RuntimeException | Error failure) { nativeTokenDestroy(pointer); throw failure; }
+        }
         public boolean emit(String text) { check(); return nativeEmit(handle, checked(text)); }
     }
+
+    static Invocation invocation(long pointer) { return new Invocation(pointer); }
+    static void expire(Invocation invocation) { invocation.handle = 0; }
+    static void releaseToken(long pointer) { nativeTokenDestroy(pointer); }
 
     /** Complete JSON arguments are retained as text, with no JSON library dependency. */
     public static final class ToolCall {
@@ -83,6 +102,7 @@ public final class Agent implements AutoCloseable {
     private long handle;
     private boolean busy;
     private Hooks hooks;
+    private Execution.Store executionStore;
 
     public Agent(Model model) { this(model, ""); }
     public Agent(Model model, String instructions) {
@@ -108,14 +128,59 @@ public final class Agent implements AutoCloseable {
         if (text == null || text.indexOf('\0') >= 0) throw new IllegalArgumentException("text contains NUL or is null");
         return text;
     }
+    /** Configure host-declared capabilities before running the agent. */
+    public synchronized Agent configureModel(String profileJson) {
+        idle(); nativeConfigureModel(handle, checked(profileJson)); return this;
+    }
+    /** Host-validate final JSON; empty schema disables validation. Feedback range 0..8. */
+    public synchronized Agent configureOutput(String schemaJson, long repairs) {
+        idle();
+        if (repairs < 0 || repairs > 8) throw new IllegalArgumentException("repairs must be from 0 to 8");
+        nativeConfigureOutput(handle, checked(schemaJson), repairs); return this;
+    }
+    private native void nativeConfigureOutput(long pointer, String schemaJson, long repairs);
+    private native void nativeConfigureModel(long pointer, String profileJson);
+    /** Configure a stable durable task; null disables persistence. Store is retained. */
+    public synchronized Agent setExecutionStore(String scope, Execution.Store store) {
+        idle(); nativeSetExecutionStore(handle, checked(scope), store != null);
+        executionStore = store; return this;
+    }
     public synchronized Agent addTool(String name, String description, String schema,
                                      boolean requiresApproval, Tool handler) {
+        return addTool(name, description, schema, requiresApproval, "1", handler);
+    }
+    /** Change executionRevision when handler semantics change. Pending recovery checks it. */
+    public synchronized Agent addTool(String name, String description, String schema,
+                                     boolean requiresApproval, String executionRevision, Tool handler) {
+        return addTool(name, description, schema, requiresApproval, executionRevision, false, handler);
+    }
+    /** Trusted host assertion: permit unconfirmed retries only without external side effects. */
+    public synchronized Agent addTool(String name, String description, String schema,
+            boolean requiresApproval, String executionRevision, boolean sideEffectFree, Tool handler) {
         idle();
         if (handler == null) throw new IllegalArgumentException("handler is null");
-        nativeAddTool(handle, checked(name), checked(description), checked(schema), requiresApproval);
+        nativeAddToolGoverned(handle, checked(name), checked(description), checked(schema), requiresApproval, checked(executionRevision), sideEffectFree);
         tools.put(name, handler);
         return this;
     }
+    /** Bind discovered MCP capabilities while idle using explicit host Schema/revision. */
+    public synchronized Agent addMcpTool(McpClient client, String remoteName, String localName, String policyJson) {
+        idle();
+        if (client == null) throw new IllegalArgumentException("MCP client is null");
+        long connection = client.begin();
+        try { nativeAddMcpTool(handle, connection, checked(remoteName), checked(localName), checked(policyJson)); }
+        finally { client.end(); }
+        return this;
+    }
+    private native void nativeAddMcpTool(long pointer, long client, String remote, String local, String policy);
+    /** Host-owned scope/filter/revision; Agent retains the native retriever. */
+    public synchronized Agent addRetrievalTool(Rag retriever,String name,Rag.Binding binding) {
+        idle();if(retriever==null||binding==null)throw new IllegalArgumentException("null retriever/binding");
+        String policy=binding.json();long component=retriever.beginRetriever();
+        try{nativeAddRetrievalTool(handle,component,checked(name),policy);}finally{retriever.end();}
+        return this;
+    }
+    private native void nativeAddRetrievalTool(long pointer,long retriever,String name,String binding);
     public String run(String text) { return run(text, new Options(), new Hooks()); }
     /** Returns status/text/error and usage as JSON; sessions persist between calls. */
     public String run(String text, Options options, Hooks hooks) {
@@ -146,7 +211,7 @@ public final class Agent implements AutoCloseable {
     public synchronized void reset() { idle(); nativeReset(handle); }
     @Override public synchronized void close() {
         if (handle == 0) return;
-        idle(); nativeDestroy(handle); handle = 0; tools.clear();
+        idle(); nativeDestroy(handle); handle = 0; tools.clear(); executionStore = null;
     }
 
     // JNI calls these methods on the run thread. Callback handles never escape.
@@ -178,15 +243,19 @@ public final class Agent implements AutoCloseable {
     private native long nativeCreate(String instructions, String config, String apiKey);
     private native String nativeMessages(long pointer);
     private static native long nativeTokenCreate();
+    private static native long nativeRemainingMs(long pointer);
+    private static native long nativeInvocationToken(long pointer);
     private static native long nativeTokenRetain(long pointer);
     private static native void nativeTokenDestroy(long pointer);
     private static native void nativeTokenCancel(long pointer);
     private static native boolean nativeTokenCancelled(long pointer);
     private native void nativeDestroy(long pointer);
-    private native void nativeAddTool(long pointer, String name, String description, String schema, boolean approval);
+    private native void nativeAddToolGoverned(long pointer, String name, String description, String schema, boolean approval, String revision, boolean sideEffectFree);
     private native String nativeRun(long pointer, String text, long[] options, boolean stream, boolean authorize, boolean events, long cancellation);
     private native void nativeCancel(long pointer);
     private native void nativeReset(long pointer);
+    private native void nativeSetExecutionStore(long pointer, String scope, boolean enabled);
+    private static native String nativeIdempotencyKey(long invocation);
     private static native boolean nativeStopped(long invocation);
     private static native boolean nativeEmit(long invocation, String delta);
 }

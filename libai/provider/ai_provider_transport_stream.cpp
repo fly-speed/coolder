@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "model_profile_payload.h"
 #include "ai_provider_client_internal.h"
 #include "fiber/fiber_base.h"
 #include "../agent/ai_admin_policy.h"
@@ -818,6 +819,7 @@ bool post_json_stream(const provider_config_t &provider,
     std::string &err,
     const std::shared_ptr<provider_transport_session_t> &session)
 {
+	if (!model_profile_payload(provider,payload,err)) {status=0;return false;}
 	stream_exchange_t exchange(provider, api_key, url, payload, result,
 	    observer, status, latency_ms, err, session);
 	return exchange.run();

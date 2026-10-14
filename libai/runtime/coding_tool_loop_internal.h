@@ -10,6 +10,7 @@ namespace agent_detail
 
 // Shared only by the coding-loop implementation files.
 struct coding_turn_t {
+    std::string effect_key;
 	// Index of the current tool-loop iteration.
 	size_t call{};
 	// Number of tool calls left in the current invocation's budget.
@@ -98,7 +99,7 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
     const std::string &project_path, const std::string &original_prompt,
     const std::string &transcript, const std::string &reasoning,
     const std::string &last_error, size_t completed_tool_calls,
-    std::string &err);
+    std::string &err, const std::string &complete_effect="");
 
 // Build a bounded checkpoint transcript retaining task and tool evidence.
 std::string compact_coding_transcript(const std::string &original_prompt,

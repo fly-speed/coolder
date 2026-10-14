@@ -13,6 +13,7 @@ namespace
 {
 void record(acl::json_node &out, const provider_config_t &p)
 {
+	out.add_text("model_profile_json", p.model_profile_json.c_str());
 	out.add_text("id", p.id.c_str())
 	    .add_text("name", p.name.c_str())
 	    .add_text("protocol", p.protocol.c_str())
@@ -121,6 +122,7 @@ bool complete(provider_store_t &store, acl::json_node &a, acl::json_node &out,
 	if (!store.reveal_api_key(*selected, key, error))
 		return false;
 	libai::model_request_t request;
+	request.profile = libai::parse_model_profile(selected->model_profile_json);
 	request.instructions = text(a, "instructions");
 	if (request.instructions.empty())
 		request.instructions = "You are a helpful assistant.";
@@ -247,6 +249,10 @@ bool providers(const std::string &root, const std::string &op,
 		p.protocol = text(a, "protocol");
 		p.base_url = text(a, "base_url");
 		p.model = text(a, "model");
+		if (a["model_profile_json"]) {
+			if (!a["model_profile_json"]->is_string()) throw std::invalid_argument("model_profile_json must be a string");
+			p.model_profile_json=text(a,"model_profile_json");
+		}
 		p.api_key = text(a, "api_key");
 		p.enabled = boolean(a, "enabled", true);
 		p.allow_file_content = boolean(a, "allow_file_content", false);

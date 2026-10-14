@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../sdk/model_profile.h"
 #include "../common/record_json.h"
 #include "ai_provider_store_internal.h"
 namespace webcool
@@ -225,7 +226,7 @@ bool load_unlocked(const std::string &user_root,
 		// controls were appended so existing installations remain readable without
 		// an eager migration or a second provider database.
 		if (fields.size() != 10 && fields.size() != 19 &&
-		    fields.size() != 21 && fields.size() != 22) {
+		    fields.size() != 21 && fields.size() != 22 && fields.size() != 23) {
 			err = "invalid AI provider record";
 			return false;
 		}
@@ -267,8 +268,14 @@ bool load_unlocked(const std::string &user_root,
 			err = "invalid OpenAI routing header encoding";
 			return false;
 		}
-		if (fields.size() == 22)
+		if (fields.size() >= 22)
 			item.qwen_session_cache = fields[21] == "1";
+		if (fields.size() == 23) {
+			std::string profile;
+			if (!hex_decode(fields[22], profile)) {err="invalid model profile encoding";return false;}
+			try {item.model_profile_json=libai::parse_model_profile(profile).json;}
+			catch (const std::exception &) {err="invalid stored model profile";return false;}
+		}
 		item.output_limit_cache_directory = agent_dir(user_root);
 		providers.push_back(item);
 	}
@@ -409,7 +416,8 @@ bool save_unlocked(const std::string &user_root,
 		    << hex_encode(item.responses_cache_ttl) << '\t'
 		    << hex_encode(item.openai_organization) << '\t'
 		    << hex_encode(item.openai_project) << '\t'
-		    << (item.qwen_session_cache ? "1" : "0") << '\n';
+		    << (item.qwen_session_cache ? "1" : "0") << '\t'
+		    << hex_encode(item.model_profile_json) << '\n';
 	}
 	out.close();
 	if (!out.good()) {

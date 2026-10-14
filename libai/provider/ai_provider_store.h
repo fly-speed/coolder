@@ -10,6 +10,8 @@ namespace ai
 
 // User provider settings with credential metadata and protocol controls.
 struct provider_config_t {
+	// Validated host capability profile, persisted without credentials.
+	std::string model_profile_json = "{\"version\":1}";
 	// Trusted store-owned path; never accepted from HTTP provider settings.
 	std::string output_limit_cache_directory;
 	// Per-run override; deliberately not persisted in provider settings.
@@ -80,6 +82,8 @@ struct provider_config_t {
 // Browser input used for validation and encryption. api_key exists only during
 // the current save/test operation and must never be logged.
 struct provider_input_t {
+	// Empty preserves existing capabilities; explicit version 1 resets defaults.
+	std::string model_profile_json;
 	// Identifier used to look up this record.
 	std::string id;
 	// Name used to identify this item in its containing collection.

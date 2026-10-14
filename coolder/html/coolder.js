@@ -1047,6 +1047,42 @@ function renderModelInteractions(s) {
   view.root.hidden = !events.length;
 }
 
+function taskContractStages(snapshot) {
+  let contract = snapshot.task_contract;
+  if (!contract && snapshot.acceptance_contract_json) {
+    try { contract = JSON.parse(snapshot.acceptance_contract_json); } catch (_) {}
+  }
+  if (!contract || contract.version !== 1 || contract.error || contract.ok === false) contract = null;
+  const state = (name, positive) => {
+    const value = contract && contract[name] && contract[name].state;
+    if (value === positive) return name === 'review' ? '已接受' : name === 'generation' ? '已生成' : '通过';
+    if (value === 'failed') return '失败';
+    if (value === 'rejected') return '已拒绝';
+    if (value === 'not_required') return '无需验证';
+    return name === 'review' ? '待确认' : '未验证';
+  };
+  const ended = contract ? contract.loop_finished === true
+    : Boolean(snapshot.status && snapshot.status !== 'running');
+  return [
+    ['运行循环', ended ? '已结束' : '进行中'],
+    ['生成成果', state('generation', 'completed')],
+    ['构建检查', state('build', 'passed')],
+    ['测试检查', state('tests', 'passed')],
+    ['人工审核', state('review', 'accepted')]
+  ];
+}
+
+function renderTaskContract(snapshot) {
+  const card = node('section', undefined, 'task-contract-summary');
+  card.setAttribute('aria-label', t('任务验收状态'));
+  card.append(node('strong', () => t('任务验收状态')));
+  const list = node('ul');
+  for (const [label, value] of taskContractStages(snapshot))
+    list.append(node('li', () => t(label) + '：' + t(value)));
+  card.append(list, node('small', () => t('循环结束不代表构建、测试或人工审核已通过。')));
+  return card;
+}
+
 function renderRun(s) {
   const messages = $('messages');
   const follow = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 64;
@@ -1074,6 +1110,7 @@ function renderRun(s) {
         .filter((text, i, all) => text && all.indexOf(text) === i).join('\n\n') || t('正在处理任务…')
     )
   );
+  live.append(renderTaskContract(s));
   if (!active) live.append(usageFooter(s));
   $('tools').replaceChildren();
   for (const t of Array.isArray(s.tool_calls) ? s.tool_calls : [])
@@ -1620,11 +1657,51 @@ function renderProviderList() {
   }
 }
 
+function providerCapabilityProfile(raw) {
+  const profile = raw ? JSON.parse(raw) : {version: 1};
+  if (!profile || Array.isArray(profile) || profile.version !== 1)
+    throw new Error(t('模型能力配置无效'));
+  for (const key of ['tool_calling', 'multiple_tool_calls'])
+    if (profile[key] !== undefined && typeof profile[key] !== 'boolean')
+      throw new Error(t('模型能力配置无效'));
+  for (const key of ['max_output_tokens', 'max_context_bytes'])
+    if (profile[key] !== undefined && (!Number.isSafeInteger(profile[key]) || profile[key] < 1 || profile[key] > 1073741824))
+      throw new Error(t('模型能力上限必须是 1 到 1073741824 的整数'));
+  return profile;
+}
+
+function loadProviderCapabilities(form, provider) {
+  const profile = providerCapabilityProfile(provider?.model_profile_json);
+  form.modelCapabilityProfile = profile;
+  form.elements.cap_tool_calling.checked = profile.tool_calling !== false;
+  form.elements.cap_multiple_tool_calls.checked = profile.multiple_tool_calls !== false;
+  form.elements.cap_multiple_tool_calls.disabled = !form.elements.cap_tool_calling.checked;
+  form.elements.cap_output_tokens.value = profile.max_output_tokens ?? '';
+  form.elements.cap_context_bytes.value = profile.max_context_bytes ?? '';
+}
+
+function saveProviderCapabilities(form) {
+  // Preserve host annotations and fields outside these four controls.
+  const profile = {...(form.modelCapabilityProfile || {version: 1})};
+  profile.tool_calling = form.elements.cap_tool_calling.checked;
+  profile.multiple_tool_calls = form.elements.cap_multiple_tool_calls.checked;
+  for (const [control, key] of [['cap_output_tokens', 'max_output_tokens'], ['cap_context_bytes', 'max_context_bytes']]) {
+    const raw = form.elements[control].value.trim();
+    if (!raw) delete profile[key];
+    else {
+      if (!/^\d+$/.test(raw)) throw new Error(t('模型能力上限必须是 1 到 1073741824 的整数'));
+      profile[key] = Number(raw);
+    }
+  }
+  return JSON.stringify(providerCapabilityProfile(JSON.stringify(profile)));
+}
+
 function selectProvider(id = '') {
   const form = $('provider-form');
   const p = state.providers.find(p => p.id === id);
   for (const name of ['id', 'name', 'protocol', 'base_url', 'model'])
     form.elements[name].value = p?.[name] || (name === 'protocol' ? 'openai_compatible' : '');
+  loadProviderCapabilities(form, p);
   form.elements.api_key.value = '';
   form.elements.enabled.checked = p ? p.enabled : true;
   for (const name of ['allow_file_content', 'is_default'])
@@ -1640,6 +1717,11 @@ $('new-provider').onclick = () => {
   $('provider-form').elements.name.focus();
 };
 
+$('provider-form').elements.cap_tool_calling.onchange = () => {
+  const form = $('provider-form');
+  form.elements.cap_multiple_tool_calls.disabled = !form.elements.cap_tool_calling.checked;
+};
+
 $('provider-form').onsubmit = task(async () => {
   syncProviderProtocol();
   const form = $('provider-form');
@@ -1647,6 +1729,8 @@ $('provider-form').onsubmit = task(async () => {
   data.enabled = form.elements.enabled.checked;
   data.allow_file_content = form.elements.allow_file_content.checked;
   data.is_default = form.elements.is_default.checked;
+  data.model_profile_json = saveProviderCapabilities(form);
+  for (const name of ['cap_tool_calling', 'cap_multiple_tool_calls', 'cap_output_tokens', 'cap_context_bytes']) delete data[name];
   // Match webcool's Responses compatibility flags for Qwen and stateless vendors.
   if (data.protocol === 'openai_responses') {
     const stateless = /^(deepseek|kimi)/i.test(data.model);

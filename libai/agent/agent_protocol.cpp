@@ -2,8 +2,10 @@
 #include "../common/json_value.h"
 #include "agent_protocol.h"
 #include "../context/requirement_progress.h"
+#include "../sdk/json_schema.h"
 
 #include <cctype>
+#include <cstring>
 
 namespace webcool
 {
@@ -70,7 +72,60 @@ void truncate_utf8_bytes(std::string &value, size_t maximum_bytes)
 	value.resize(keep);
 }
 
+bool final_contains_nul(const libai::governance_detail::json::Value &value)
+{
+    if(value.IsString())return std::strlen(value.GetString())!=value.GetStringLength();
+    if(value.IsArray())for(const auto &item:value.GetArray())if(final_contains_nul(item))return true;
+    if(value.IsObject())for(const auto &item:value.GetObject())if(final_contains_nul(item.value))return true;
+    return false;
+}
+
 } // namespace
+
+std::string validate_agent_final_message(const std::string &raw)
+{
+    const auto candidate=unwrap_json_fence(raw);
+    acl::json hint(candidate.c_str());
+    if(!hint.finish() || node_text(hint["type"])!="final")return "";
+    static const std::string schema=R"({
+      "type":"object","required":["type","text"],"additionalProperties":false,
+      "properties":{
+        "type":{"enum":["final"]},"text":{"type":"string","minLength":1},
+        "completion_summary":{"type":"string"},"memory_summary":{"type":"string"},
+        "session_title":{"type":"string"},
+        "requirement_progress":{"type":"array","maxItems":12,"items":{
+          "type":"object","required":["requirement"],"additionalProperties":false,
+          "properties":{"requirement":{"type":"string"},"status":{"enum":["implemented","partial","not_implemented","unknown"]},
+            "evidence":{"type":"string"},"remaining":{"type":"string"}}}},
+        "changes":{"type":"array","maxItems":20,"items":{
+          "type":"object","required":["path"],"additionalProperties":false,
+          "properties":{"operation":{"enum":["write","delete","move","mkdir","replace_empty_file_with_directory"]},
+            "path":{"type":"string","minLength":1,"maxLength":2048},
+            "target_path":{"type":"string","maxLength":2048},"content":{"type":"string","maxLength":262144},
+            "reason":{"type":"string","maxLength":1000}},
+          "anyOf":[
+            {"properties":{"operation":{"enum":["write"]}},"required":["content"]},
+            {"properties":{"operation":{"enum":["delete","mkdir","replace_empty_file_with_directory"]}},"required":["operation"]},
+            {"properties":{"operation":{"enum":["move"]},"target_path":{"minLength":1}},"required":["operation","target_path"]}
+          ]}}
+      }
+    })";
+    try {
+        const auto result=libai::validate_json_schema(schema,candidate);
+        if(!result.valid)return "final message rejected: "+result.code+" "+result.keyword+" "+result.instance_pointer;
+        libai::governance_detail::json::Document document;
+        libai::governance_detail::parse_json(candidate,document);
+        if(final_contains_nul(document))return "NUL in final protocol field";
+        if(document.HasMember("changes"))for(const auto &change:document["changes"].GetArray()) {
+            for(const auto &field:change.GetObject()) {
+                const std::string name(field.name.GetString(),field.name.GetStringLength());
+                const size_t limit=name=="content"?262144:name=="reason"?1000:2048;
+                if(field.value.GetStringLength()>limit)return "final proposal field exceeds byte limit";
+            }
+        }
+        return "";
+    }catch(const std::exception &){return "invalid final protocol JSON";}
+}
 
 bool parse_agent_protocol_message(
     const std::string &raw, agent_protocol_message_t &message)
@@ -82,6 +137,7 @@ bool parse_agent_protocol_message(
 		return false;
 	const std::string type = node_text(json["type"]);
 	if (type == "final") {
+		if(!validate_agent_final_message(candidate).empty())return false;
 		message.final_message = true;
 		message.final_text = node_text(json["text"]);
 		message.memory_summary = node_text(json["memory_summary"]);
@@ -127,6 +183,7 @@ bool parse_agent_protocol_message(
 	    !(type == "patch_set" &&
 	        node_text(json["name"]) == "workspace.patch_set"))
 		return false;
+	message.raw_tool_json = candidate;
 	message.tool.name = node_text(json["name"]);
 	acl::json_node *arguments = json["arguments"];
 	message.tool.path = node_text(object_child(arguments, "path"));

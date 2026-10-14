@@ -1,10 +1,17 @@
 #pragma once
 #include "types.h"
+#include "governance.h"
 
 namespace libai
 {
 namespace cpp
 {
+class McpClient;
+struct McpBinding;
+class Retriever;
+struct RagBinding;
+// Last returned run's schema validation; independent of artifact acceptance.
+struct OutputValidation { bool output_validated=false; std::size_t output_repairs=0; };
 // Owning C++ facade with a private native runtime and persistent session.
 // Concurrent runs/configuration are rejected; cancel may be called concurrently.
 class LIBAI_CPP_API Agent {
@@ -25,8 +32,21 @@ public:
 	Agent(Agent &&) = delete;
 	// Prevent moving live native state between application objects.
 	Agent &operator=(Agent &&) = delete;
+	// Configure versioned JSON capabilities while idle; never exposes native types.
+	Agent &configure_model(const std::string &profile_json);
+    // Host-validate final JSON; bounded correction never executes additional tools.
+    Agent &configure_output(const std::string &schema, std::size_t repairs = 1);
+    // Idle snapshot; preserves the existing RunResult value ABI.
+    OutputValidation output_validation() const;
+    // Only on this Agent's on_event callback thread; returns an owning snapshot.
+    EventExecution event_execution() const;
 	// Register one uniquely named application capability while idle.
 	Agent &add_tool(const ToolSpec &spec, ToolHandler handler);
+    // Bind retrieval using host-owned scope/filter/revision and normal tool governance.
+    Agent &add_retrieval_tool(std::shared_ptr<Retriever>,const std::string &name,const RagBinding &);
+	// Bind a discovered MCP tool using explicit host policy, while idle.
+	Agent &add_mcp_tool(std::shared_ptr<McpClient> client,const std::string &remote_name,
+	    const std::string &local_name,const McpBinding &policy);
 	// Run one bounded turn, retaining the owned transcript for later turns.
 	RunResult run(
 	    const std::string &input, const RunOptions &options = RunOptions());

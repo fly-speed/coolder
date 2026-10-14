@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "coding_runtime.h"
+#include "../storage/run_timing.h"
 namespace action
 {
 namespace agent_detail
@@ -42,6 +43,11 @@ void add_run_record_json(
 	item.add_text("path", record.project_path.c_str());
 	item.add_number("started_at", record.started_at);
 	item.add_number("finished_at", record.finished_at);
+	const auto timing = webcool::ai::run_timing(record.started_at, record.finished_at, record.status);
+	item.add_number("elapsed_ms", timing.elapsed_ms);
+	item.add_bool("elapsed_available", timing.available);
+	item.add_number("elapsed_resolution_ms", 1000);
+	item.add_text("elapsed_source", "unix_seconds");
 	item.add_number("input_tokens", record.input_tokens);
 	item.add_number("cached_input_tokens", record.cached_input_tokens);
 	item.add_number("output_tokens", record.output_tokens);
@@ -114,6 +120,10 @@ void add_runtime_result_json(acl::json_node &root,
 	root.add_bool("resumed_after_restart", task->resumed_after_restart);
 	root.add_bool("resumed_from_progress", task->resumed_from_progress);
 	root.add_bool("recovery_available", task->recovery_available);
+	if(task->status=="cancelled" && !task->error.empty()) {
+		root.add_text("recovery_note",task->error.c_str());
+		root.add_bool("checkpoint_read_unavailable",!task->recovery_available && !task->progress_file.empty());
+	}
 	root.add_bool("browser_debug_confirmation_required",
 	    task->browser_debug_confirmation_required);
 	root.add_number("browser_debug_retry_count",

@@ -63,3 +63,7 @@ exec "${JAVA:-${JAVA_HOME:+$JAVA_HOME/bin/}java}" -Djava.library.path="$app_dir/
 LAUNCH
 chmod +x "$dist_dir/bin/coolder-java"
 printf 'Build cache: %s\nRun: %s/bin/coolder-java\n' "$output" "$dist_dir"
+
+# Carry private Schema validator notices with the distributed native runtime.
+mkdir -p "$dist_dir/licenses/rapidjson"
+cp "$source_dir/../libai/sdk/vendor/rapidjson/LICENSE.txt" "$source_dir/../libai/sdk/vendor/rapidjson/SOURCE.md" "$dist_dir/licenses/rapidjson/"

@@ -34,7 +34,7 @@ mkdir -p -- "$output/classes"
 "$javac_bin" -encoding UTF-8 -source 8 -target 8 -d "$output/classes" \
     "$script_dir/src/main/java/io/coolder/libai/"*.java
 # ZIP is the JAR container format; this also works with JDKs lacking the jar utility.
-"${PYTHON:-python3}" - "$output" "$script_dir/../LICENSE" <<'PACKAGE'
+"${PYTHON:-python3}" - "$output" "$script_dir/../LICENSE" "$script_dir/../libai/sdk/vendor/rapidjson" <<'PACKAGE'
 from pathlib import Path
 import sys
 import zipfile
@@ -42,6 +42,8 @@ output = Path(sys.argv[1])
 with zipfile.ZipFile(output / 'install/libai-java.jar', 'w', zipfile.ZIP_DEFLATED) as jar:
     jar.writestr('META-INF/MANIFEST.MF', 'Manifest-Version: 1.0\r\n\r\n')
     jar.write(sys.argv[2], 'META-INF/LICENSE')
+    for notice in ('LICENSE.txt', 'SOURCE.md'):
+        jar.write(Path(sys.argv[3]) / notice, 'META-INF/licenses/rapidjson/' + notice)
     for path in sorted((output / 'classes/io').rglob('*.class')):
         jar.write(path, path.relative_to(output / 'classes').as_posix())
 PACKAGE

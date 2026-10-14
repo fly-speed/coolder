@@ -1,4 +1,4 @@
-//! Build the same portable C ABI; no crates or network downloads are required.
+//! Build the portable C ABI locally; the optional RAG codec uses cached Cargo dependencies.
 use std::{env, path::PathBuf, process::Command};
 
 fn execute(command: &mut Command) {

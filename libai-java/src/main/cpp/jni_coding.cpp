@@ -2,6 +2,19 @@
 #include <memory>
 #include <stdexcept>
 extern "C" {
+JNIEXPORT jstring JNICALL Java_io_coolder_libai_Governance_nativeCall(
+    JNIEnv *env,jclass,jstring operation,jstring arguments)
+{
+    try {
+        const auto op=jni_utf8(env,operation),args=jni_utf8(env,arguments);
+        std::unique_ptr<char,decltype(&libai_string_free)> reply(
+            libai_governance_call(op.c_str(),args.c_str()),libai_string_free);
+        if (!reply) {jni_throw(env,libai_last_error());return nullptr;}
+        return jni_string(env,reply.get());
+    } catch (const std::exception &e) {jni_throw(env,e.what());}
+    return nullptr;
+}
+
 JNIEXPORT jboolean JNICALL Java_io_coolder_libai_CodingService_nativeAvailable(
     JNIEnv *, jclass)
 {

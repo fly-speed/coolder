@@ -4,6 +4,9 @@
 #include "../common/json_value.h"
 #include "../workspace/agent_change_limits.h"
 #include "agent_progress_store.h"
+#include "durable_record_writer.h"
+#include "../sdk/json_guard.h"
+#include "../sdk/file_execution_store.h"
 #include "../workspace/agent_workspace.h"
 #include "../common/ai_error_log.h"
 #include "../common/webcool_mutex.h"
@@ -18,6 +21,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <set>
 #include <sys/stat.h>
 
 namespace webcool
@@ -116,9 +120,63 @@ bool json_boolean(acl::json_node *node)
 
 bool safe_progress(const agent_progress_t &progress)
 {
+    if(!progress.execution_revision.empty()) {
+        if(progress.execution_revision.size()!=64)return false;
+        for(char c:progress.execution_revision)if(record_codec::hex_value(c)<0)return false;
+    }
+    if(progress.tool_effects.size()>256)return false;
+    bool running=false;
+    for(size_t i=0;i<progress.tool_effects.size();++i) {
+        const auto &effect=progress.tool_effects[i];
+        const auto dot=effect.key.find('.');
+        auto digest=[](const std::string &value){if(value.size()!=64)return false;for(char c:value)if(record_codec::hex_value(c)<0)return false;return true;};
+        if(dot!=32 || !identifiers::valid_id(effect.key.substr(0,dot)) || effect.key.substr(dot+1)!=std::to_string(i) ||
+            effect.name.empty() || effect.name.size()>128 || effect.name.find('\0')!=std::string::npos || !digest(effect.arguments_sha256) ||
+            effect.completed_before>progress.completed_tool_calls || running)return false;
+        if(effect.tool_call_count>256 || effect.native_call_ids.size()>effect.tool_call_count ||
+            effect.response_id.size()>512 || effect.response_id.find('\0')!=std::string::npos)return false;
+        std::set<std::string> ids;
+        for(const auto &id:effect.native_call_ids)
+            if(id.empty() || id.size()>512 || id.find('\0')!=std::string::npos || !ids.insert(id).second)return false;
+        if(!effect.native_call_ids.empty() && effect.native_call_ids.size()!=effect.tool_call_count)return false;
+        if(!effect.response_id.empty() && effect.native_call_ids.empty())return false;
+        if(effect.state=="running") {
+            running=true;
+            if(i+1!=progress.tool_effects.size() || !effect.reference.empty() || effect.completed_after!=0)return false;
+        } else if(effect.state=="done") {
+            if(!digest(effect.output_sha256) || effect.reference!="progress:"+effect.key ||
+                effect.completed_after<effect.completed_before || effect.completed_after>progress.completed_tool_calls)return false;
+        } else if(effect.state=="confirmed_none" || effect.state=="confirmed_applied") {
+            if(!digest(effect.output_sha256) || effect.reference.empty() || effect.reference.size()>2048 ||
+                effect.reference.find('\0')!=std::string::npos || effect.tool_call_count==0 ||
+                effect.completed_after<effect.completed_before+effect.tool_call_count ||
+                effect.completed_after>progress.completed_tool_calls)return false;
+        } else return false;
+    }
 	if (!progress.source_run_id.empty() &&
 	    !valid_session_id(progress.source_run_id))
 		return false;
+	const auto &receipt=progress.validation_receipt;
+	if(!receipt.effect_key.empty()) {
+		if(receipt.execution_revision.empty() || receipt.execution_revision!=progress.execution_revision ||
+		    receipt.source_sha256.size()!=64 || receipt.proposal_sha256.size()!=64 || receipt.report_json.size()>512*1024)return false;
+		for(const auto *hash:{&receipt.source_sha256,&receipt.proposal_sha256})for(char c:*hash)if(record_codec::hex_value(c)<0)return false;
+		const agent_tool_effect_t *owner=nullptr;
+		for(const auto &effect:progress.tool_effects)if(effect.key==receipt.effect_key)owner=&effect;
+		if(!owner || (owner->state!="done"&&owner->state!="confirmed_applied") ||
+		    owner->output_sha256!=agent_workspace_t::content_sha256(receipt.report_json))return false;
+		if(owner->name!="coding.final_validation" && owner->name!="coding.recovery_validation" &&
+		    owner->name!="coding.budget_validation" && owner->name!="coding.admission_validation")return false;
+		try {
+			namespace json=libai::governance_detail::json;
+			json::Document report;libai::governance_detail::parse_json_bounded(receipt.report_json,report,512*1024);
+			if(!report.IsObject() || !report.HasMember("ok") || !report["ok"].IsBool() || !report["ok"].GetBool())return false;
+			for(const auto &pair:std::vector<std::pair<std::string,std::string>>{{"source_baseline_sha256",receipt.source_sha256},{"proposal_sha256",receipt.proposal_sha256}}) {
+				if(!report.HasMember(pair.first.c_str()) || !report[pair.first.c_str()].IsString() ||
+				    std::string(report[pair.first.c_str()].GetString(),report[pair.first.c_str()].GetStringLength())!=pair.second)return false;
+			}
+		}catch(const std::exception &){return false;}
+	} else if(!receipt.execution_revision.empty() || !receipt.source_sha256.empty() || !receipt.proposal_sha256.empty() || !receipt.report_json.empty())return false;
 	if (!(!progress.provider_id.empty() &&
 	        progress.provider_id.size() <= 64 &&
 	        progress.provider_model.size() <= 200 &&
@@ -181,7 +239,27 @@ std::string serialize(const agent_progress_t &progress)
 	acl::json json;
 	acl::json_node &root = json.create_node();
 	root.add_number("version", 5);
+	root.add_text("execution_revision",progress.execution_revision.c_str());
+	auto &validation=json.create_node();root.add_child("validation_receipt",validation);
+	validation.add_text("effect_key",progress.validation_receipt.effect_key.c_str())
+	    .add_text("execution_revision",progress.validation_receipt.execution_revision.c_str())
+	    .add_text("source_sha256",progress.validation_receipt.source_sha256.c_str())
+	    .add_text("proposal_sha256",progress.validation_receipt.proposal_sha256.c_str())
+	    .add_text("report_json",progress.validation_receipt.report_json.c_str());
 	root.add_text("source_run_id", progress.source_run_id.c_str());
+    auto &effects=json.create_array();root.add_child("tool_effects",effects);
+    for(const auto &effect:progress.tool_effects) {
+        auto &item=effects.add_child(false,true);
+        item.add_text("key",effect.key.c_str());item.add_text("name",effect.name.c_str());
+        item.add_text("arguments_sha256",effect.arguments_sha256.c_str());item.add_text("state",effect.state.c_str());
+        item.add_text("output_sha256",effect.output_sha256.c_str());item.add_text("reference",effect.reference.c_str());
+        item.add_number("completed_before",static_cast<long long>(effect.completed_before));
+        item.add_number("completed_after",static_cast<long long>(effect.completed_after));
+        item.add_number("tool_call_count",static_cast<long long>(effect.tool_call_count));
+        item.add_text("response_id",effect.response_id.c_str());
+        auto &ids=json.create_array();item.add_child("native_call_ids",ids);
+        for(const auto &id:effect.native_call_ids)ids.add_child(json.create_array_text(id.c_str()));
+    }
 	root.add_text("provider_id", progress.provider_id.c_str());
 	root.add_text("provider_model", progress.provider_model.c_str());
 	root.add_text("project_path", progress.project_path.c_str());
@@ -233,6 +311,57 @@ std::string serialize(const agent_progress_t &progress)
 	return std::string(value.c_str(), value.size());
 }
 
+#ifndef _WIN32
+// Caller serializes local access; mutators additionally hold the record lease.
+bool read_checkpoint_bytes(const std::string &directory, const std::string &name,
+    std::string &content, bool &found, std::string &err)
+{
+    found=false;content.clear();
+	storage_detail::record_fd_t dir(::open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
+	if (dir.fd < 0) {
+		if (errno == ENOENT) return true;
+		err = "cannot open coding-agent progress directory"; return false;
+	}
+	struct stat metadata;
+	if (::fstat(dir.fd, &metadata) || !S_ISDIR(metadata.st_mode) ||
+	    metadata.st_uid != ::geteuid() || (metadata.st_mode & 0777) != 0700) {
+		err = "coding-agent progress directory is not private"; return false;
+	}
+	storage_detail::record_fd_t file(::openat(dir.fd, name.c_str(),
+	    O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK));
+	if (file.fd < 0) {
+		if (errno == ENOENT) return true;
+		err = "cannot open coding-agent progress checkpoint"; return false;
+	}
+	if (::fstat(file.fd, &metadata) || !S_ISREG(metadata.st_mode) ||
+	    metadata.st_uid != ::geteuid() || (metadata.st_mode & 0777) != 0600 || metadata.st_nlink != 1) {
+		err = "coding-agent progress checkpoint is not private"; return false;
+	}
+	char buffer[16384];
+	while (content.size() <= kMaxProgressFileBytes) {
+		const auto count = ::read(file.fd, buffer, sizeof(buffer));
+		if (count < 0) {
+			if (errno == EINTR) continue;
+			err = "cannot read coding-agent progress checkpoint"; return false;
+		}
+		if (!count) break;
+		content.append(buffer, static_cast<size_t>(count));
+	}
+
+    if(content.size()>kMaxProgressFileBytes){err="coding-agent progress checkpoint is too large";return false;}
+    found=true;return true;
+}
+std::unique_ptr<libai::file_execution_store_t> progress_record_lease(
+    const std::string &directory,const std::string &session_id)
+{
+    std::unique_ptr<libai::file_execution_store_t> lease(new libai::file_execution_store_t(
+        directory,libai::execution_file_codec_t::plaintext()));
+    if(!lease->open("coding_progress_"+(session_id.empty()?std::string("single"):session_id)).state_json.empty())
+        throw std::runtime_error("unexpected progress record lease state");
+    return lease;
+}
+#endif
+
 } // namespace
 
 agent_progress_store_t::agent_progress_store_t(const std::string &user_root,
@@ -252,6 +381,24 @@ std::string agent_progress_store_t::relative_path() const
 bool agent_progress_store_t::save(
     const agent_progress_t &progress, std::string &err) const
 {
+    std::string revision;
+    return save_impl(progress,nullptr,revision,err);
+}
+bool agent_progress_store_t::save_if_revision(const agent_progress_t &progress,
+    const std::string &expected_revision,std::string &revision,std::string &err) const
+{
+    revision.clear();
+    if(expected_revision.size()!=64){err="invalid checkpoint revision";return false;}
+    for(char c:expected_revision)if(record_codec::hex_value(c)<0){err="invalid checkpoint revision";return false;}
+    return save_impl(progress,&expected_revision,revision,err);
+}
+bool agent_progress_store_t::save_impl(const agent_progress_t &progress,
+    const std::string *expected_revision,std::string &revision,std::string &err) const
+{
+    revision.clear();
+#ifdef _WIN32
+    if(expected_revision){err="checkpoint compare-and-save requires POSIX";return false;}
+#endif
 	if (!safe_progress(progress) ||
 	    progress.project_path != project_path_ ||
 	    progress.session_id != session_id_) {
@@ -267,15 +414,34 @@ bool agent_progress_store_t::save(
 	if (!ensure_progress_directory(project, directory, err)) {
 		return ai_error("agent.progress", "prepare-directory", err);
 	}
+#ifdef _WIN32
 	const std::string target =
 	    join_path(directory, progress_name(session_id_));
 	const std::string temporary = target + ".tmp";
+#endif
 	const std::string content = serialize(progress);
 	if (content.size() > kMaxProgressFileBytes) {
 		err =
 		    "serialized coding-agent progress exceeds the recovery file limit";
 		return ai_error("agent.progress", "validate-file-size", err);
 	}
+#ifndef _WIN32
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=progress_record_lease(directory,session_id_);}
+    catch(const std::exception &error){err=std::string("progress record lease unavailable: ")+error.what();return false;}
+    if(expected_revision){
+        std::string current;bool found=false;
+        if(!read_checkpoint_bytes(directory,progress_name(session_id_),current,found,err))return false;
+        if(!found || agent_workspace_t::content_sha256(current)!=*expected_revision){
+            err="checkpoint revision conflict";return false;
+        }
+    }
+	if (storage_detail::write_private_record(directory, progress_name(session_id_), content, err)) {
+        revision=agent_workspace_t::content_sha256(content);
+		return true;
+    }
+	return ai_error("agent.progress", "durable-save", err);
+#else
 	std::ofstream out(temporary.c_str(),
 	    std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.good()) {
@@ -289,25 +455,27 @@ bool agent_progress_store_t::save(
 		err = "cannot flush coding-agent progress checkpoint";
 		return ai_error("agent.progress", "flush", err);
 	}
-#ifndef _WIN32
-	if (chmod(temporary.c_str(), 0600) != 0) {
-		::remove(temporary.c_str());
-		err = "cannot protect coding-agent progress checkpoint";
-		return ai_error("agent.progress", "protect", err);
-	}
-#endif
 	if (replace_file(temporary, target))
 		return true;
 	::remove(temporary.c_str());
 	err = std::string("cannot install coding-agent progress checkpoint: ") +
 	    strerror(errno);
 	return ai_error("agent.progress", "install", err);
+#endif
 }
 
 bool agent_progress_store_t::load(
     agent_progress_t &progress, bool &found, std::string &err) const
 {
+	std::string revision;
+	return load_snapshot(progress, found, revision, err);
+}
+
+bool agent_progress_store_t::load_snapshot(agent_progress_t &progress,
+    bool &found, std::string &revision, std::string &err) const
+{
 	found = false;
+	revision.clear();
 	if (!valid_session_id(session_id_)) {
 		err = "invalid coding-agent progress session id";
 		return ai_error("agent.progress", "validate-load", err);
@@ -321,6 +489,11 @@ bool agent_progress_store_t::load(
 	std::string content;
 	{
 		std::lock_guard<webcool::mutex> guard(g_progress_mutex);
+#ifndef _WIN32
+        bool input_found=false;
+        if(!read_checkpoint_bytes(join_path(project,".webcool_agent"),progress_name(session_id_),content,input_found,err))return false;
+        if(!input_found)return true;
+#else
 		std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
 		if (!in.good())
 			return true;
@@ -332,6 +505,7 @@ bool agent_progress_store_t::load(
 			content.append(
 			    buffer, static_cast<size_t>(in.gcount()));
 		}
+#endif
 		if (content.size() > kMaxProgressFileBytes) {
 			err = "coding-agent progress checkpoint is too large";
 			return ai_error("agent.progress", "read-limit", err);
@@ -348,6 +522,45 @@ bool agent_progress_store_t::load(
 		return ai_error("agent.progress", "parse", err);
 	}
 	agent_progress_t parsed;
+    // Validate the original bytes, including duplicate keys and integer tokens.
+    try {
+        namespace json=libai::governance_detail::json;
+        json::Document document;libai::governance_detail::parse_json_bounded(content,document,kMaxProgressFileBytes);
+        if(!document.IsObject())throw std::invalid_argument("invalid checkpoint object");
+        if(document.HasMember("execution_revision")) {
+            if(!document["execution_revision"].IsString())throw std::invalid_argument("invalid execution revision");
+            parsed.execution_revision.assign(document["execution_revision"].GetString(),document["execution_revision"].GetStringLength());
+        }
+        if(document.HasMember("validation_receipt")) {
+            const auto &receipt=document["validation_receipt"];
+            if(!receipt.IsObject() || receipt.MemberCount()!=5)throw std::invalid_argument("invalid validation receipt");
+            auto text=[&](const char *field){if(!receipt.HasMember(field)||!receipt[field].IsString())throw std::invalid_argument("invalid validation receipt field");return std::string(receipt[field].GetString(),receipt[field].GetStringLength());};
+            parsed.validation_receipt.effect_key=text("effect_key");parsed.validation_receipt.execution_revision=text("execution_revision");
+            parsed.validation_receipt.source_sha256=text("source_sha256");parsed.validation_receipt.proposal_sha256=text("proposal_sha256");parsed.validation_receipt.report_json=text("report_json");
+        }
+        if(document.HasMember("tool_effects")) {
+            const auto &list=document["tool_effects"];
+            if(!list.IsArray() || list.Size()>256)throw std::invalid_argument("invalid tool effect list");
+            for(const auto &item:list.GetArray()) {
+                if(!item.IsObject() || (item.MemberCount()!=8 && item.MemberCount()!=11))throw std::invalid_argument("invalid tool effect record");
+                auto text=[&](const char *key){if(!item.HasMember(key)||!item[key].IsString())throw std::invalid_argument("invalid tool effect string");return std::string(item[key].GetString(),item[key].GetStringLength());};
+                auto count=[&](const char *key){if(!item.HasMember(key)||!item[key].IsUint64()||item[key].GetUint64()>256)throw std::invalid_argument("invalid tool effect counter");return static_cast<size_t>(item[key].GetUint64());};
+                agent_tool_effect_t effect;effect.key=text("key");effect.name=text("name");effect.arguments_sha256=text("arguments_sha256");
+                effect.state=text("state");effect.output_sha256=text("output_sha256");effect.reference=text("reference");
+                effect.completed_before=count("completed_before");effect.completed_after=count("completed_after");
+                if(item.MemberCount()==11) {
+                    effect.tool_call_count=count("tool_call_count");effect.response_id=text("response_id");
+                    if(!item.HasMember("native_call_ids") || !item["native_call_ids"].IsArray() || item["native_call_ids"].Size()>256)
+                        throw std::invalid_argument("invalid native call IDs");
+                    for(const auto &id:item["native_call_ids"].GetArray()) {
+                        if(!id.IsString())throw std::invalid_argument("invalid native call ID");
+                        effect.native_call_ids.emplace_back(id.GetString(),id.GetStringLength());
+                    }
+                }
+                parsed.tool_effects.push_back(effect);
+            }
+        }
+    }catch(const std::exception &error){err=std::string("invalid coding tool effect checkpoint: ")+error.what();return ai_error("agent.progress","parse-effects",err);}
 	parsed.source_run_id = json_text(json["source_run_id"]);
 	parsed.provider_id = json_text(json["provider_id"]);
 	parsed.provider_model = json_text(json["provider_model"]);
@@ -429,6 +642,7 @@ bool agent_progress_store_t::load(
 		return ai_error("agent.progress", "validate-loaded", err);
 	}
 	progress = parsed;
+	revision = agent_workspace_t::content_sha256(content);
 	found = true;
 	return true;
 }
@@ -490,6 +704,7 @@ bool agent_progress_store_t::exists(bool &found, std::string &err) const
 
 bool agent_progress_store_t::remove(std::string &err) const
 {
+	if (!valid_session_id(session_id_)) { err="invalid coding-agent progress session id";return false; }
 	std::string project;
 	if (!resolve_project(user_root_, project_path_, project, err)) {
 		return ai_error(
@@ -498,6 +713,14 @@ bool agent_progress_store_t::remove(std::string &err) const
 	const std::string path = join_path(
 	    join_path(project, ".webcool_agent"), progress_name(session_id_));
 	std::lock_guard<webcool::mutex> guard(g_progress_mutex);
+#ifndef _WIN32
+    const auto directory=join_path(project,".webcool_agent");
+    struct stat metadata;
+    if(::lstat(directory.c_str(),&metadata)!=0 && errno==ENOENT)return true;
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=progress_record_lease(directory,session_id_);}
+    catch(const std::exception &error){err=std::string("progress record lease unavailable: ")+error.what();return false;}
+#endif
 	if (!(::remove(path.c_str()) != 0 && errno != ENOENT))
 		return true;
 	err = std::string("cannot remove coding-agent progress checkpoint: ") +

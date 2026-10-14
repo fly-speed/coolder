@@ -6,7 +6,12 @@
 现有 `<libai/coding.h>` 与 `webcool::ai` 接口继续兼容。
 
 详见 [通用 Agent API、集成示例与边界](docs/AGENT_SDK.md)。
+SDK 与独立 C++ Agent 支持 [最终 JSON Schema 校验与有限修正](docs/STRUCTURED_OUTPUT.md)；
+修正阶段不能重跑工具，结构通过不代表构建、测试或人工验收通过。
 `examples/agent` 是无需网络和密钥的完整工具调用示例。
+[可插拔传输的 MCP 工具客户端](docs/MCP.md) 提供初始化、分页发现和显式宿主策略绑定；
+SDK、独立 C++、C、Java、Python、Rust、Objective-C 已提供拥有连接生命周期的 MCP 接口；
+已提供 POSIX 本地子进程 stdio 传输，内置 Streamable HTTP 传输仍待实现。
 
 仅使用自己的模型后端时，可独立构建无外部依赖的 C++11 SDK：
 
@@ -166,3 +171,14 @@ Mobile packages include the portable runtime; ACL/OpenSSL provider adapters are 
 APP 集成推荐使用同级 `libai-c++` 的编译封装。`coding/` 提供跨语言共享的 JSON 编码服务，
 复用工作区、项目、provider、会话和运行记录；`common/json_values.h` 统一从 APP 提取的 JSON 标量转换。
 详见 [CODING_SERVICE.md](docs/CODING_SERVICE.md)。
+
+[通用DAG工作流](docs/WORKFLOW.md)提供JSON状态、条件分支、显式安全声明的并行
+和合流；状态冲突前置拒绝，失败轮不提交增量，子Agent恢复状态保持传播。
+SDK及独立C++封装已支持图级持久恢复、冻结输入、宿主收据确认和完成结果缓存。
+C ABI、Python、Rust、Java和Objective-C也已提供图句柄/对象、回调及持久恢复入口；
+各语言也已提供下述可插拔RAG；更多平台运行验证仍需继续。
+
+[可插拔RAG SDK](docs/RAG.md)统一文档、UTF-8分块、Embedding、向量存储与全文/混合
+检索接口，提供有界内存cosine适配器及受治理的Agent检索工具。访问范围由宿主
+指定，结果保留来源/版本/引用；不绑定数据库。SDK、独立C++、C、Java、Python、
+Rust和Objective-C均已提供接口；实际Embedding服务及持久向量数据库由宿主适配。

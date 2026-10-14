@@ -4,6 +4,8 @@
 #include "../storage/task_contract_store.h"
 #include "../validation/task_acceptance.h"
 #include "../context/task_delivery_summary.h"
+#include "../sdk/file_execution_store.h"
+#include "../common/file_ops.h"
 namespace action
 {
 namespace agent_detail
@@ -68,13 +70,76 @@ void coding_tool_loop_t::record_acceptance_evidence(const std::string &report)
 }
 bool coding_tool_loop_t::run()
 {
+#if defined(__unix__) || defined(__APPLE__)
+    // Hold a pinned SDK lease across startup, requests, tools and acceptance.
+    // The HTTP admission map cannot exclude another service process.
+    std::shared_ptr<libai::file_execution_store_t> execution_lease;
+    const std::string lease_scope="coding_loop_"+(runtime_task->session_id.empty()?std::string("single"):runtime_task->session_id);
+    if(!runtime_task->text_preview && !runtime_task->assistant_chat) {
+        std::string project;
+        if(!webcool::ai::agent_workspace_t::resolve_project_state_root(runtime_task->user_root,project_path,project,err))return false;
+        const auto directory=webcool::ai::file_ops::join_path(project,".webcool_agent");
+        if(!webcool::ai::file_ops::make_private_directory(directory)) {
+            err="cannot prepare coding execution lease directory";return false;
+        }
+        try {
+            execution_lease.reset(new libai::file_execution_store_t(directory,libai::execution_file_codec_t::plaintext()));
+            const auto snapshot=execution_lease->open(lease_scope);
+            // Reserved namespace: this scope owns only a lock, not a snapshot.
+            if(!snapshot.state_json.empty()) {err="unexpected coding execution lease state";return false;}
+            std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+            if(runtime_task->retain_coding_worker_lease)runtime_task->coding_worker_lease=execution_lease;
+        }catch(const std::exception &error){err=std::string("coding execution lease unavailable: ")+error.what();return false;}
+    }
+#endif
 	if (!prepare_task_contract())
 		return false;
 	const bool completed = run_impl();
-	finish_task_acceptance(completed);
-	return completed;
+	return finish_task_acceptance(completed);
 }
-void coding_tool_loop_t::finish_task_acceptance(bool completed)
+bool coding_tool_loop_t::cleanup_browser_style(
+    const std::function<std::string(const std::string &)> &dispatch)
+{
+	const auto original_error = err;
+	auto fail = [&]() {
+		if (!original_error.empty())
+			err = original_error + " Browser cleanup: " + err;
+		return false;
+	};
+	// Cleanup is an external tool call too; never exceed the persisted ledger
+	// or silently bypass the host's tool budget on a terminal path.
+	if (executed_tool_calls >= effective_tool_call_limit ||
+	    executed_tool_calls >= 256) {
+		err = "browser cleanup requires an available tool budget; host cleanup required";
+		return fail();
+	}
+	coding_turn_t cleanup;
+	cleanup.call = executed_tool_calls;
+	cleanup.provider_tool_call_count = 1;
+	cleanup.message.tool.name = "browser.patch_style";
+	cleanup.message.tool.content = "{\"undo\":\"all\"}";
+	cleanup.message.tool.content_present = true;
+	if (!begin_tool_effect(cleanup))
+		return fail();
+	++executed_tool_calls;
+	try {
+		cleanup.tool_result = dispatch(cleanup.effect_key);
+	} catch (const std::exception &error) {
+		err = std::string("browser cleanup outcome unknown: ") + error.what();
+		return fail();
+	} catch (...) {
+		err = "browser cleanup outcome unknown";
+		return fail();
+	}
+	acl::json result(cleanup.tool_result.c_str());
+	cleanup.trace.ok = result.finish() && json_bool(result["ok"], false);
+	if (settle_tool_effect(cleanup, step_t::proceed) == step_t::failed)
+		return fail();
+	err = original_error;
+	return true;
+}
+
+bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 {
 	refresh_browser_evidence();
 	bool temporary_cleanup_failed = false;
@@ -84,19 +149,20 @@ void coding_tool_loop_t::finish_task_acceptance(bool completed)
 		acl::json undo;
 		auto &options = undo.create_node();
 		options.add_text("undo", "all");
-		const auto result = webcool::ai::browser_debug_tool(
-		    runtime_task->user_root, project_path, runtime_task->id,
-		    "browser.patch_style", "", serialize_json(options));
-		acl::json cleanup(result.c_str());
-		temporary_cleanup_failed =
-		    !cleanup.finish() || !json_bool(cleanup["ok"], false);
+		temporary_cleanup_failed = !cleanup_browser_style([&](const std::string &key) {
+			return webcool::ai::browser_debug_tool(runtime_task->user_root,
+			    project_path, runtime_task->id, "browser.patch_style", "",
+			    serialize_json(options), key);
+		});
+		if (temporary_cleanup_failed)
+			completed = false;
 		append_simple_operation_event(runtime_task,
 		    "browser_temporary_style_cleanup",
 		    temporary_cleanup_failed ? "failed" : "undo_acknowledged",
 		    "", executed_tool_calls);
 	}
 	if (task_contract.empty())
-		return;
+		return completed;
 	const bool current = !acceptance_report.empty() &&
 	    !acceptance_baseline.empty() &&
 	    acceptance_draft ==
@@ -231,6 +297,7 @@ void coding_tool_loop_t::finish_task_acceptance(bool completed)
 	}
 	evidence.add_text("event", "task_acceptance_evaluated");
 	append_runtime_operation_event(runtime_task, evidence);
+	return completed;
 }
 }
 }

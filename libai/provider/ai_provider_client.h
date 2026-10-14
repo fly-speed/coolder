@@ -153,6 +153,8 @@ struct completion_tool_exchange_t {
 
 // Provider-neutral request consumed by the handwritten HTTP protocol adapters.
 struct completion_request_t {
+	// Host-declared permission to emit several tool calls in one response.
+	bool allow_multiple_tool_calls = true;
 	// In-memory, task-scoped transport state; never serialized or checkpointed.
 	std::shared_ptr<provider_transport_session_t> transport_session;
 	// These two fields are sensitive and must never enter system logs. Coding

@@ -1,4 +1,5 @@
 #import "LAIInternal.h"
+#import "LAIMcpInternal.h"
 
 @implementation LAIAgent
 - (instancetype)initWithModel:(LAIModel)model
@@ -83,6 +84,47 @@
 		return lai_error(error, @"Agent is running");
 	return YES;
 }
+- (BOOL)configureOutput:(NSDictionary *)schema repairs:(NSUInteger)repairs error:(NSError **)error
+{
+    @synchronized(self) {
+        if (![self idle:error]) return NO;
+        NSString *wire=@"";
+        if (schema) {
+            NSJSONWritingOptions options=0;
+            if (@available(macOS 10.13, iOS 11.0, *)) options=NSJSONWritingSortedKeys;
+            else return lai_error(error,@"structured output requires deterministic Foundation JSON serialization");
+            NSData *data=[NSJSONSerialization dataWithJSONObject:schema options:options error:error];
+            if (!data) return NO;
+            wire=[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        }
+        return [self configureOutputJSON:wire repairs:repairs error:error];
+    }
+}
+- (BOOL)configureOutputJSON:(NSString *)schemaJSON repairs:(NSUInteger)repairs error:(NSError **)error
+{
+    @synchronized(self) {
+        if (![self idle:error]) return NO;
+        @try {
+            if (libai_agent_configure_output(_native,lai_utf8(schemaJSON ?: @""),repairs))
+                return lai_error(error,[NSString stringWithUTF8String:libai_last_error()]);
+        } @catch(NSException *exception) {return lai_error(error,exception.description);}
+        return YES;
+    }
+}
+- (BOOL)configureModel:(NSDictionary<NSString *, id> *)profile error:(NSError **)error
+{
+	@synchronized(self) {
+		if (![self idle:error]) return NO;
+		NSData *data = [NSJSONSerialization dataWithJSONObject:profile options:0 error:error];
+		if (!data) return NO;
+		NSString *wire = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+		@try {
+			if (libai_agent_configure_model(_native, lai_utf8(wire)))
+				return lai_error(error, [NSString stringWithUTF8String:libai_last_error()]);
+		} @catch (NSException *exception) { return lai_error(error, exception.description); }
+		return YES;
+	}
+}
 - (BOOL)addTool:(NSString *)name
          description:(NSString *)description
               schema:(NSString *)schema
@@ -90,15 +132,67 @@
              handler:(LAITool)handler
                error:(NSError **)error
 {
+    return [self addTool:name description:description schema:schema requiresApproval:approval
+        executionRevision:@"1" handler:handler error:error];
+}
+- (BOOL)addMcpTool:(LAIMcpClient *)client remoteName:(NSString *)remote localName:(NSString *)local policy:(NSDictionary *)policy error:(NSError **)error
+{
+    @synchronized(self) {
+        if (![self idle:error]) return NO;
+        if (!client) return lai_error(error,@"MCP client required");
+        libai_mcp *native=[client begin:error];if(!native)return NO;
+        @try {
+            NSMutableDictionary *converted=[policy mutableCopy];
+            for(NSString *key in @[@"parameters_schema",@"output_schema"]){
+                if([converted[key] isKindOfClass:[NSDictionary class]]){
+                    NSJSONWritingOptions options=0;
+                    if(@available(macOS 10.13,iOS 11.0,*))options=NSJSONWritingSortedKeys;
+                    else return lai_error(error,@"Dictionary MCP Schema requires deterministic JSON encoding");
+                    NSData *data=[NSJSONSerialization dataWithJSONObject:converted[key] options:options error:error];if(!data)return NO;
+                    converted[key]=[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                }
+            }
+            NSData *data=[NSJSONSerialization dataWithJSONObject:converted options:0 error:error];if(!data)return NO;
+            NSString *wire=[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            if(libai_agent_add_mcp_tool(_native,native,lai_utf8(remote),lai_utf8(local),lai_utf8(wire)))
+                return lai_error(error,[NSString stringWithUTF8String:libai_last_error()]);
+            return YES;
+        }@catch(NSException *e){return lai_error(error,e.description);}
+        @finally {[client end];}
+    }
+}
+- (BOOL)setExecutionStore:(id<LAIExecutionStore>)store scope:(NSString *)scope error:(NSError **)error
+{
+    @synchronized(self) {
+        if (![self idle:error]) return NO;
+        @try {
+            if (libai_agent_set_execution_store(_native, lai_utf8(scope), store ? lai_execution : nullptr,
+                (__bridge void *)store)) return lai_error(error, [NSString stringWithUTF8String:libai_last_error()]);
+            _executionStore = store;
+            return YES;
+        } @catch (NSException *failure) { return lai_error(error, failure.description); }
+    }
+}
+- (BOOL)addTool:(NSString *)name description:(NSString *)description schema:(NSString *)schema
+    requiresApproval:(BOOL)approval executionRevision:(NSString *)revision handler:(LAITool)handler
+               error:(NSError **)error
+{
+    return [self addTool:name description:description schema:schema requiresApproval:approval
+        executionRevision:revision sideEffectFree:NO handler:handler error:error];
+}
+- (BOOL)addTool:(NSString *)name description:(NSString *)description schema:(NSString *)schema
+    requiresApproval:(BOOL)approval executionRevision:(NSString *)revision sideEffectFree:(BOOL)sideEffectFree
+             handler:(LAITool)handler error:(NSError **)error
+{
 	@synchronized(self) {
 		if (![self idle:error])
 			return NO;
 		if (!handler)
 			return lai_error(error, @"Handler is required");
 		@try {
-			if (libai_agent_add_tool(_native, lai_utf8(name),
+			if (libai_agent_add_tool_governed(_native, lai_utf8(name),
 			        lai_utf8(description), lai_utf8(schema),
-			        approval, lai_tool, (__bridge void *)self))
+			        approval, lai_utf8(revision), sideEffectFree, lai_tool, (__bridge void *)self))
 				return lai_error(error,
 				    [NSString stringWithUTF8String:
 				                  libai_last_error()]);
@@ -200,6 +294,7 @@
 			    [NSString stringWithUTF8String:libai_last_error()]);
 		_native = NULL;
 		[_tools removeAllObjects];
+		_executionStore = nil;
 		return YES;
 	}
 }

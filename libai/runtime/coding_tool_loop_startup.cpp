@@ -1,6 +1,7 @@
 #include "stdafx.h"
 // Initial context, checkpoint recovery and validation capabilities.
 #include "coding_tool_loop_internal.h"
+#include "../coding/coding_internal.h"
 
 namespace action
 {
@@ -10,6 +11,51 @@ namespace agent_detail
 using coding_loop_detail::validation_repair_context;
 using coding_loop_detail::save_coding_progress;
 using coding_loop_detail::compact_coding_transcript;
+
+bool coding_tool_loop_t::prepare_execution_revision()
+{
+    if(runtime_task->text_preview || runtime_task->assistant_chat)return true;
+    acl::json context,input,policy;auto &root=context.create_node();
+    auto &arguments=input.create_node();auto &settings=policy.create_node();
+    if(!webcool::ai::coding_detail::runtime("runtime.policy.get",arguments,settings,err))return false;
+    root.add_text("implementation","libai-coding-execution-v12-browser-child-receipts")
+        .add_text("policy_json",serialize_json(settings).c_str())
+        .add_text("provider_protocol",provider.protocol.c_str()).add_text("provider_url",provider.base_url.c_str())
+        .add_text("provider_model",provider.model.c_str()).add_bool("allow_file_content",provider.allow_file_content)
+        .add_number("tool_budget",static_cast<long long>(max_tool_calls))
+        .add_number("output_budget",max_output_tokens)
+        .add_number("no_progress_budget",static_cast<long long>(max_no_progress_tool_calls))
+        .add_number("context_budget",static_cast<long long>(tool_context_compaction_bytes))
+        .add_text("thinking_mode",thinking_mode.c_str()).add_text("reasoning_effort",reasoning_effort.c_str());
+    auto &limits=context.create_node();root.add_child("sandbox_limits",limits);
+    limits.add_number("timeout_ms",static_cast<long long>(sandbox_limits.timeout_ms))
+        .add_number("cpu_seconds",static_cast<long long>(sandbox_limits.cpu_seconds))
+        .add_number("memory_bytes",static_cast<long long>(sandbox_limits.memory_bytes))
+        .add_number("process_count",static_cast<long long>(sandbox_limits.process_count))
+        .add_number("open_files",static_cast<long long>(sandbox_limits.open_files))
+        .add_number("file_size_bytes",static_cast<long long>(sandbox_limits.file_size_bytes))
+        .add_number("output_bytes",static_cast<long long>(sandbox_limits.output_bytes));
+    const auto *definition=webcool::ai::agent_registry_t::instance().find("coding");
+    if(!definition){err="coding agent definition unavailable";return false;}
+    root.add_text("agent_version",definition->version.c_str());
+    auto &catalog=context.create_array();root.add_child("tools",catalog);
+    for(const auto &tool:definition->tools){
+        auto &item=catalog.add_child(false,true);
+        item.add_text("name",tool.name.c_str()).add_text("schema",tool.parameters_json.c_str())
+            .add_text("authorization",tool.authorization.c_str()).add_bool("mutating",tool.mutating)
+            .add_bool("model_enabled",tool.model_enabled).add_bool("requires_file_content",tool.requires_file_content);
+        auto &parameters=context.create_array();item.add_child("parameters",parameters);
+        for(const auto &parameter:tool.parameters){auto &entry=parameters.add_child(false,true);
+            entry.add_text("name",parameter.name.c_str()).add_bool("required",parameter.required);}
+    }
+    const auto revision=webcool::ai::agent_workspace_t::content_sha256(serialize_json(root));
+    std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+    if(!runtime_task->coding_execution_revision.empty() && runtime_task->coding_execution_revision!=revision){
+        err="coding execution configuration changed during the run";return false;
+    }
+    runtime_task->coding_execution_revision=revision;
+    return true;
+}
 
 void coding_tool_loop_t::initialize_transcript()
 {
@@ -47,6 +93,14 @@ void coding_tool_loop_t::initialize_transcript()
 bool coding_tool_loop_t::restore_checkpoint_contents(
     const webcool::ai::agent_progress_t &restored, std::string &restore_err)
 {
+    for(const auto &effect:restored.tool_effects)if(effect.state=="running") {
+        err="unconfirmed tool effect requires host reconciliation: "+effect.key;return false;
+    }
+    {
+        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        runtime_task->tool_effects=restored.tool_effects;
+        runtime_task->validation_receipt=restored.validation_receipt;
+    }
 	changes = restored.staged_changes;
 	// Reconcile each immutable generation with its durable review ledger.
 	// A mixed checkpoint can contain accepted, rejected and pending files.
@@ -138,7 +192,8 @@ bool coding_tool_loop_t::restore_checkpoint_contents(
 bool coding_tool_loop_t::restore_checkpoint()
 {
 	changes.clear();
-	if (initial_completed_tool_calls > 0) {
+	if (initial_completed_tool_calls > 0 ||
+	    runtime_task->resumed_from_progress) {
 		webcool::ai::agent_progress_t restored;
 		bool found = false;
 		std::string restore_err;
@@ -149,12 +204,22 @@ bool coding_tool_loop_t::restore_checkpoint()
 			return false;
 		}
 
-		if ((found && restored.provider_id == provider.id &&
-		        (restored.provider_model.empty() ||
-		            restored.provider_model == provider.model) &&
-		        restored.project_path == project_path &&
-		        restored.original_prompt == original_prompt) &&
-		    (!restore_checkpoint_contents(restored, restore_err)))
+		// A zero-tool checkpoint can already own a provider background response.
+		// Do not silently start a new request if that checkpoint changed/disappeared
+		// after admission loaded it, or if its attempt cursor no longer matches.
+		if (!found || restored.provider_id != provider.id ||
+		    (!restored.provider_model.empty() &&
+		        restored.provider_model != provider.model) ||
+		    restored.project_path != project_path ||
+		    restored.original_prompt != original_prompt ||
+		    restored.completed_tool_calls != initial_completed_tool_calls) {
+			err = "coding checkpoint identity or cursor changed during recovery";
+			return false;
+		}
+		if(!restored.execution_revision.empty() && restored.execution_revision!=runtime_task->coding_execution_revision) {
+			err="coding checkpoint execution configuration changed; host inspection required";return false;
+		}
+		if (!restore_checkpoint_contents(restored, restore_err))
 			return false;
 	}
 	if (initial_completed_tool_calls > 0 && changes.empty() &&
@@ -196,15 +261,14 @@ bool coding_tool_loop_t::restore_checkpoint()
 	return true;
 }
 
-void coding_tool_loop_t::validate_recovered_draft()
+bool coding_tool_loop_t::validate_recovered_draft()
 {
 	if (initial_completed_tool_calls > 0 && !changes.empty()) {
 		agent_tool_trace_t recovery_validation_trace;
 		recovery_validation_trace.name = "workspace.validate";
 		recovery_validation_trace.path = project_path;
-		const std::string recovery_validation = validate_staged_draft(
-		    runtime_task->user_root, project_path, runtime_task->id,
-		    changes, sandbox_limits, recovery_validation_trace);
+		std::string recovery_validation;
+		if(!run_automatic_validation("coding.recovery_validation",recovery_validation_trace,recovery_validation))return false;
 		traces.push_back(recovery_validation_trace);
 		const bool validation_passed =
 		    recovery_validation.find("\"validation_passed\":true") !=
@@ -260,9 +324,8 @@ void coding_tool_loop_t::validate_recovered_draft()
 		agent_tool_trace_t recovery_validation_trace;
 		recovery_validation_trace.name = "workspace.validate";
 		recovery_validation_trace.path = project_path;
-		const std::string recovery_validation = validate_staged_draft(
-		    runtime_task->user_root, project_path, runtime_task->id,
-		    changes, sandbox_limits, recovery_validation_trace);
+		std::string recovery_validation;
+		if(!run_automatic_validation("coding.recovery_validation",recovery_validation_trace,recovery_validation))return false;
 		traces.push_back(recovery_validation_trace);
 		const bool still_unavailable =
 		    recovery_validation.find("\"commands_executed\":0") !=
@@ -296,10 +359,12 @@ void coding_tool_loop_t::validate_recovered_draft()
 		transcript = persistent_transcript;
 		provider_history_base = transcript;
 	}
+    return true;
 }
 
 bool coding_tool_loop_t::prepare_model_tools()
 {
+	initial_model_tool_calls=executed_tool_calls;
 	const webcool::ai::agent_definition_t *coding_agent =
 	    webcool::ai::agent_registry_t::instance().find("coding");
 	if (coding_agent == NULL) {
@@ -341,7 +406,7 @@ bool coding_tool_loop_t::prepare_model_tools()
 	}
 	if (save_coding_progress(progress_store, provider, runtime_task,
 	        project_path, original_prompt, persistent_transcript,
-	        accumulated_reasoning, "", initial_completed_tool_calls, err))
+	        accumulated_reasoning, "", executed_tool_calls, err))
 		return true;
 	return false;
 }

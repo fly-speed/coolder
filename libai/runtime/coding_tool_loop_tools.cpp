@@ -90,13 +90,14 @@ void coding_tool_loop_t::refresh_browser_evidence()
 	}
 }
 
-std::string coding_tool_loop_t::probe_browser_experiment()
+std::string coding_tool_loop_t::probe_browser_experiment(const std::string &execution_key)
 {
 	if (browser_experiment_selector.empty() || !provider.allow_file_content)
 		return "";
 	const auto observed = webcool::ai::browser_debug_tool(
 	    runtime_task->user_root, project_path, runtime_task->id,
-	    "browser.inspect", browser_experiment_selector, "");
+	    "browser.inspect", browser_experiment_selector, "",
+	    execution_key.empty() ? "" : execution_key + ".inspect");
 	refresh_browser_evidence();
 	acl::json result(observed.c_str());
 	auto *data = result.finish() ? json_array_node(result["data"]) : NULL;
@@ -113,7 +114,8 @@ std::string coding_tool_loop_t::probe_browser_experiment()
 		return observed;
 	const auto snapshot = webcool::ai::browser_debug_tool(
 	    runtime_task->user_root, project_path, runtime_task->id,
-	    "browser.snapshot", "", "{\"image\":true}");
+	    "browser.snapshot", "", "{\"image\":true}",
+	    execution_key.empty() ? "" : execution_key + ".snapshot");
 	const auto bytes = webcool::ai::browser_debug_take_image(
 	    runtime_task->user_root, project_path, runtime_task->id);
 	if (!bytes.empty()) {
@@ -323,11 +325,8 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 				agent_tool_trace_t validation_trace;
 				validation_trace.name = "workspace.validate";
 				validation_trace.path = project_path;
-				const std::string validation =
-				    validate_staged_draft(
-				        runtime_task->user_root, project_path,
-				        runtime_task->id, changes,
-				        sandbox_limits, validation_trace);
+				std::string validation;
+				if(!run_automatic_validation("coding.admission_validation",validation_trace,validation))return step_t::failed;
 				traces.push_back(validation_trace);
 				record_acceptance_evidence(validation);
 				last_validated_fingerprint =
@@ -342,8 +341,11 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 				last_validation_passed = already_validated;
 				validation_state = describe_validation_state(
 				    validation, already_validated, chinese);
+				if(validation.find("tool_budget_exhausted")!=std::string::npos)
+					validation_state="工具额度已用尽，未启动固定验证";
 			}
-			final_output.text = already_validated ?
+			final_output.text = validation_state=="工具额度已用尽，未启动固定验证" ?
+			    "本轮已达到工具调用额度；现有待审查修订已保存，尚未执行固定验证。" : already_validated ?
 			    validation_state + "。" :
 			    validation_state == "固定验证工具不可用" ?
 			    "本轮已达到工具调用额度；现有待审查修订已完整保存，"
@@ -415,7 +417,8 @@ bool coding_tool_loop_t::prepare_browser_experiment(coding_turn_t &turn)
 	if (!browser_evidence.active_patch().empty()) {
 		const auto restored = webcool::ai::browser_debug_tool(
 		    runtime_task->user_root, project_path, runtime_task->id,
-		    "browser.patch_style", "", "{\"undo\":\"all\"}");
+		    "browser.patch_style", "", "{\"undo\":\"all\"}",
+		    turn.effect_key.empty() ? "" : turn.effect_key + ".undo-previous");
 		acl::json undo(restored.c_str());
 		const bool ok = undo.finish() && json_bool(undo["ok"], false);
 		browser_evidence.observe(
@@ -428,7 +431,7 @@ bool coding_tool_loop_t::prepare_browser_experiment(coding_turn_t &turn)
 			    "Could not restore the previous browser experiment; reconnect the affected tab before continuing.";
 			return false;
 		}
-		probe_browser_experiment();
+		probe_browser_experiment(turn.effect_key.empty() ? "" : turn.effect_key + ".restored");
 	}
 	browser_evidence.describe_experiment(
 	    "selector=" + turn.message.tool.query +
@@ -437,9 +440,64 @@ bool coding_tool_loop_t::prepare_browser_experiment(coding_turn_t &turn)
 	    browser_evidence.experiment_target().empty() ?
 	    turn.message.tool.query :
 	    browser_evidence.experiment_target();
-	probe_browser_experiment();
+	probe_browser_experiment(turn.effect_key.empty() ? "" : turn.effect_key + ".baseline");
 
 	return true;
+}
+
+bool coding_tool_loop_t::begin_tool_effect(coding_turn_t &turn)
+{
+    if(runtime_task->text_preview)return true;
+    if(!prepare_execution_revision())return false;
+    acl::json json;auto &arguments=json.create_node();
+    const auto &tool=turn.message.tool;
+    arguments.add_text("name",tool.name.c_str());arguments.add_text("path",tool.path.c_str());
+    arguments.add_text("query",tool.query.c_str());arguments.add_text("old_text",tool.old_text.c_str());
+    arguments.add_text("target_path",tool.target_path.c_str());arguments.add_text("content",tool.content.c_str());
+    arguments.add_bool("content_present",tool.content_present);
+    webcool::ai::agent_tool_effect_t effect;
+    effect.name=tool.name;
+    effect.arguments_sha256=webcool::ai::agent_workspace_t::content_sha256(serialize_json(arguments));
+    effect.state="running";effect.completed_before=turn.call;
+    effect.tool_call_count=turn.provider_tool_call_count;
+    if(turn.output.native_tool_call && completion_calls_have_ids(turn.output.tool_calls)) {
+        for(const auto &call:turn.output.tool_calls)effect.native_call_ids.push_back(call.id);
+        if(provider.protocol=="openai_responses" && !stateless_responses && provider.responses_store)
+            effect.response_id=turn.output.response_id;
+    }
+    {
+        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        if(runtime_task->tool_effects.size()>=256) {err="tool effect ledger limit reached";return false;}
+        if(!runtime_task->tool_effects.empty()&&runtime_task->tool_effects.back().state=="running") {
+            err="unconfirmed tool effect requires host reconciliation";return false;
+        }
+        effect.key=runtime_task->id+"."+std::to_string(runtime_task->tool_effects.size());
+        runtime_task->tool_effects.push_back(effect);
+    }
+    turn.effect_key=effect.key;
+    // Intent records the pre-dispatch counter, not the handler's future result.
+    return save_coding_progress(progress_store,provider,runtime_task,project_path,original_prompt,
+        persistent_transcript,accumulated_reasoning,"",turn.call,err);
+}
+
+coding_tool_loop_t::step_t coding_tool_loop_t::settle_tool_effect(coding_turn_t &turn,step_t result)
+{
+    if(turn.effect_key.empty() || result==step_t::failed)return result;
+    if(!turn.trace.ok && coding_tool_requires_confirmation(turn.message.tool)) {
+        err="tool returned an unconfirmed external outcome; host reconciliation required: "+turn.effect_key;
+        return step_t::failed;
+    }
+    {
+        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        auto &effect=runtime_task->tool_effects.back();
+        if(effect.key!=turn.effect_key){err="tool effect identity changed";return step_t::failed;}
+        effect.output_sha256=webcool::ai::agent_workspace_t::content_sha256(turn.tool_result);
+    }
+    const auto context=persistent_transcript+"\n<committed_tool_result name=\""+turn.message.tool.name+"\">\n"+turn.tool_result+"\n</committed_tool_result>\n";
+    if(!save_coding_progress(progress_store,provider,runtime_task,project_path,original_prompt,
+        context,accumulated_reasoning,"",executed_tool_calls,err,turn.effect_key))return step_t::failed;
+    persistent_transcript=context;
+    return result;
 }
 
 bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
@@ -523,6 +581,7 @@ bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
 			supplementary_read_calls +=
 			    turn.provider_tool_call_count;
 	}
+    if(!begin_tool_effect(turn))return false;
 	if (!prepare_browser_experiment(turn))
 		return false;
 	turn.tool_result = turn.repair_blocked ?
@@ -531,7 +590,7 @@ bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
 	        project_path, provider.allow_file_content, turn.message.tool,
 	        turn.trace, &changes, runtime_task->id, sandbox_limits, chinese,
 	        &unavailable_validation, &validation_cache,
-	        &saved_proposal_batch, &turn.batch_validation);
+	        &saved_proposal_batch, &turn.batch_validation, turn.effect_key);
 	if (turn.tool_result.find("read_batch content must be a JSON array") !=
 	    std::string::npos) {
 		++read_batch_argument_errors;
@@ -548,8 +607,8 @@ bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
 	}
 	// Close the smaller race in which the user reviews a generation after the
 	// pre-tool snapshot but before proposal validation completes. Rebase and
-	// retry this same deterministic local tool once; no provider request or
-	// additional tool-budget unit is consumed.
+	// retry a reviewed local proposal handler once. Never rerun browser actions,
+	// validation commands or a mixed batch after an uncertain external result.
 	if (!turn.trace.ok) {
 		size_t late_resolved_reviews = 0;
 		if (!synchronize_live_review_state(runtime_task, project_path,
@@ -571,19 +630,24 @@ bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
 			progress_supervisor.reset_after_external_progress();
 			read_context.clear();
 			read_coverage.clear();
-			if (turn.repair_blocked) {
-				executed_tool_calls +=
-				    turn.provider_tool_call_count;
-				turn.repair_blocked = false;
+			if (may_retry_coding_tool_after_review(turn.message.tool)) {
+				if (turn.repair_blocked) {
+					executed_tool_calls += turn.provider_tool_call_count;
+					turn.repair_blocked = false;
+				}
+				turn.trace = agent_tool_trace_t();
+				turn.tool_result = execute_workspace_tool(workspace,
+				    runtime_task->user_root, project_path,
+				    provider.allow_file_content, turn.message.tool,
+				    turn.trace, &changes, runtime_task->id,
+				    sandbox_limits, chinese, &unavailable_validation,
+				    &validation_cache, &saved_proposal_batch,
+				    &turn.batch_validation, turn.effect_key);
+			} else {
+				append_simple_operation_event(runtime_task,
+				    "tool_review_retry_blocked", turn.message.tool.name,
+				    turn.effect_key, executed_tool_calls);
 			}
-			turn.trace = agent_tool_trace_t();
-			turn.tool_result = execute_workspace_tool(workspace,
-			    runtime_task->user_root, project_path,
-			    provider.allow_file_content, turn.message.tool,
-			    turn.trace, &changes, runtime_task->id,
-			    sandbox_limits, chinese, &unavailable_validation,
-			    &validation_cache, &saved_proposal_batch,
-			    &turn.batch_validation);
 		}
 	}
 	if (!turn.repair_blocked)
@@ -649,7 +713,7 @@ void coding_tool_loop_t::record_tool_outputs(coding_turn_t &turn)
 		    turn.message.tool.name == "browser.patch_style") {
 			// Inspect the patched selector automatically, including after undo.
 			// The model may inspect a different region to judge the visual symptom.
-			const auto inspection = probe_browser_experiment();
+			const auto inspection = probe_browser_experiment(turn.effect_key.empty() ? "" : turn.effect_key + ".applied");
 			result.get_root().add_text(
 			    "runtime_inspection", inspection.c_str());
 			result.get_root().add_text("runtime_evidence_note",

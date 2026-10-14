@@ -53,7 +53,7 @@ const std::map<std::string, specs> tables = {
 	        "h:responses_reasoning_summary", "h:responses_text_verbosity",
 	        "h:responses_service_tier", "h:responses_cache_ttl",
 	        "h:openai_organization", "h:openai_project",
-	        "b:qwen_session_cache" } },
+	        "b:qwen_session_cache", "h:model_profile_json" } },
 	{ "WEBCOOL_AI_PROVIDER_HEALTH_V1",
 	    { "h:id", "h:last_test_status", "n:last_test_at",
 	        "n:last_test_http_status", "n:last_test_latency_ms",
@@ -215,8 +215,11 @@ std::vector<std::string> decode_fields(
 	auto found = tables.find(format + (type.empty() ? "" : "/" + type));
 	if (found == tables.end())
 		throw std::runtime_error("unknown record JSON schema");
-	for (const auto &spec : found->second)
-		fields.push_back(decode_cell(row, spec));
+	for (const auto &spec : found->second) {
+		if (format=="WEBCOOL_AI_PROVIDERS_V1" && spec=="h:model_profile_json" && !row["model_profile_json"])
+			fields.push_back(record_codec::hex_encode("{\"version\":1}"));
+		else fields.push_back(decode_cell(row, spec));
+	}
 	return fields;
 }
 std::string encode_master_key(const std::string &text)

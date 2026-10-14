@@ -36,13 +36,14 @@ bool coding_tool_loop_t::run_impl()
 {
 	preparation.bind(runtime_task);
 	preparation.phase("restore_checkpoint_and_draft");
+	if(!prepare_execution_revision())return false;
 	initialize_transcript();
 	if (!restore_checkpoint())
 		return false;
 	if (!require_browser_connection())
 		return false;
 	preparation.phase("validate_recovered_draft");
-	validate_recovered_draft();
+	if(!validate_recovered_draft())return false;
 	if (!prepare_model_tools())
 		return false;
 	preparation.phase("restore_read_context");
@@ -89,11 +90,15 @@ bool coding_tool_loop_t::run_impl()
 
 coding_tool_loop_t::step_t coding_tool_loop_t::run_turn(coding_turn_t &turn)
 {
+	if(!prepare_execution_revision())return step_t::failed;
 	build_model_request(turn);
 	log_model_request(turn);
 	if (!request_model(turn))
 		return step_t::failed;
-	step_t result = handle_preview_response(turn);
+	step_t result = validate_tool_schema(turn);
+	if (result != step_t::proceed)
+		return result;
+	result = handle_preview_response(turn);
 	if (result != step_t::proceed)
 		return result;
 	record_model_response(turn);
@@ -115,13 +120,13 @@ coding_tool_loop_t::step_t coding_tool_loop_t::run_turn(coding_turn_t &turn)
 	persist_staged_result(turn);
 	result = finish_validated_result(turn);
 	if (result != step_t::proceed)
-		return result;
+		return settle_tool_effect(turn,result);
 	build_tool_feedback(turn);
 	result = check_progress_limit(turn);
 	if (result != step_t::proceed)
-		return result;
+		return settle_tool_effect(turn,result);
 	if (compact_and_checkpoint(turn))
-		return step_t::proceed;
+		return settle_tool_effect(turn,step_t::proceed);
 	return step_t::failed;
 }
 

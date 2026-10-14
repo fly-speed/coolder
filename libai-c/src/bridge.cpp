@@ -57,7 +57,91 @@ static libai::run_options_t run_options(
 	return result;
 }
 
+class callback_execution_store : public libai::execution_store_t {
+    libai_execution_fn callback_;void *user_;
+    libai_execution_result call(const char *operation,const std::string &scope,
+        const std::string &revision="",const std::string &state="") {
+        libai_execution_result r;
+        callback_(user_,operation,scope.c_str(),revision.c_str(),state.c_str(),&r);
+        if(r.failed || !r.error.empty())throw std::runtime_error(r.error.empty()?"store callback failed":r.error);
+        return r;
+    }
+public:
+    callback_execution_store(libai_execution_fn callback,void *user):callback_(callback),user_(user){}
+    libai::execution_snapshot_t open(const std::string &scope) override {
+        auto r=call("open",scope);libai::execution_snapshot_t s;s.revision=r.revision;s.state_json=r.state_json;return s;
+    }
+    std::string commit(const std::string &scope,const std::string &revision,const std::string &state) override {
+        return call("commit",scope,revision,state).revision;
+    }
+    void close(const std::string &scope) noexcept override {try{call("close",scope);}catch(...){}}
+};
+
+std::shared_ptr<libai::execution_store_t> bridge_execution_store(libai_execution_fn callback,void *user) {
+    if(!callback)throw std::invalid_argument("store callback is null");
+    return std::make_shared<callback_execution_store>(callback,user);
+}
+
 extern "C" {
+int libai_agent_set_execution_store(libai_agent *agent,const char *scope,libai_execution_fn callback,void *user) {
+    try {
+        auto lock=idle_lock(agent);
+        const auto name=bridge_text(scope);
+        if(callback) {
+            libai::sdk_detail::durable_checkpoint_t validate(std::make_shared<callback_execution_store>(callback,user),name,"","");
+            agent->execution_store=std::make_shared<callback_execution_store>(callback,user);agent->execution_scope=name;
+        } else {agent->execution_store.reset();agent->execution_scope.clear();}
+        return 0;
+    }catch(const std::exception &e){bridge_error(e.what());}catch(...){bridge_error("execution configuration failed");}
+    return -1;
+}
+int libai_execution_confirm(libai_execution_fn callback,void *user,const char *scope,
+    const char *input,const char *instructions,const char *revision,const char *key,
+    const char *output,int error,const char *outcome,const char *reference) {
+    try {
+        if(!callback)throw std::invalid_argument("store callback is null");
+        libai::tool_result_t result;result.text=bridge_text(output);result.error=error!=0;
+        libai::confirm_execution_effect(std::make_shared<callback_execution_store>(callback,user),
+            bridge_text(scope),bridge_text(input),bridge_text(instructions),bridge_text(revision),bridge_text(key),
+            result,bridge_text(outcome),bridge_text(reference));
+        return 0;
+    }catch(const std::exception &e){bridge_error(e.what());}catch(...){bridge_error("execution reconciliation failed");}
+    return -1;
+}
+
+int libai_execution_adopt_deadline(libai_execution_fn callback,void *user,const char *scope,
+    const char *input,const char *instructions,const char *revision,int64_t remaining_ms,const char *reference)
+{
+    try {
+        if(!callback)throw std::invalid_argument("store callback is null");
+        libai::adopt_execution_deadline(std::make_shared<callback_execution_store>(callback,user),
+            bridge_text(scope),bridge_text(input),bridge_text(instructions),bridge_text(revision),
+            std::chrono::milliseconds(remaining_ms),bridge_text(reference));
+        return 0;
+    }catch(const std::exception &e){bridge_error(e.what());}catch(...){bridge_error("legacy deadline adoption failed");}
+    return -1;
+}
+
+int libai_agent_configure_output(libai_agent *agent, const char *schema_json, size_t repairs)
+{
+    try {
+        auto lock = idle_lock(agent);
+        agent->runtime->configure_output(bridge_text(schema_json), repairs);
+        return 0;
+    } catch (const std::exception &e) { bridge_error(e.what()); }
+    catch (...) { bridge_error("output contract configuration failed"); }
+    return -1;
+}
+int libai_agent_configure_model(libai_agent *agent, const char *profile_json)
+{
+	try {
+		auto lock = idle_lock(agent);
+		agent->runtime->configure_model(bridge_text(profile_json));
+		return 0;
+	} catch (const std::exception &e) { bridge_error(e.what()); }
+	catch (...) { bridge_error("model profile configuration failed"); }
+	return -1;
+}
 libai_agent *libai_agent_create(
     libai_model_fn model, void *user, const char *instructions)
 {
@@ -113,6 +197,18 @@ int libai_agent_add_tool(libai_agent *agent, const char *name,
     const char *description, const char *schema, int approval,
     libai_tool_fn tool, void *user)
 {
+    return libai_agent_add_tool_versioned(agent, name, description, schema, approval, "1", tool, user);
+}
+int libai_agent_add_tool_versioned(libai_agent *agent, const char *name,
+    const char *description, const char *schema, int approval, const char *execution_revision,
+    libai_tool_fn tool, void *user)
+{
+    return libai_agent_add_tool_governed(agent,name,description,schema,approval,execution_revision,0,tool,user);
+}
+int libai_agent_add_tool_governed(libai_agent *agent, const char *name,
+    const char *description, const char *schema, int approval, const char *execution_revision,
+    int side_effect_free, libai_tool_fn tool, void *user)
+{
 	try {
 		auto lock = idle_lock(agent);
 		if (!tool)
@@ -123,6 +219,8 @@ int libai_agent_add_tool(libai_agent *agent, const char *name,
 		if (schema)
 			spec.parameters = schema;
 		spec.requires_approval = approval != 0;
+		spec.execution_revision = bridge_text(execution_revision);
+		spec.side_effect_free = side_effect_free != 0;
 		agent->runtime->add_tool(spec,
 		    [tool, user](const libai::tool_call_t &call,
 		        const libai::tool_context_t &context) {
@@ -132,6 +230,7 @@ int libai_agent_add_tool(libai_agent *agent, const char *name,
 			libai_invocation invocation;
 			invocation.cancellation = context.cancellation;
 			invocation.deadline = context.deadline;
+			invocation.idempotency_key = context.idempotency_key;
 			tool(user, call.id.c_str(), call.name.c_str(),
 			    call.arguments.c_str(), &builder, &invocation);
 			if (builder.failed)
@@ -154,6 +253,8 @@ char *libai_agent_run_with_cancellation(libai_agent *agent, const char *input,
 	try {
 		auto lock = idle_lock(agent);
 		auto options = run_options(limits, hooks);
+		options.execution_store=agent->execution_store;
+		options.execution_scope=agent->execution_scope;
 		options.cancellation = cancellation ?
 		    cancellation->value :
 		    std::make_shared<libai::cancellation_t>();

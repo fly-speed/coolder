@@ -6,6 +6,7 @@ mod http;
 mod planning;
 mod projects;
 mod runs;
+mod run_execution;
 mod sandbox;
 mod store;
 mod validation;

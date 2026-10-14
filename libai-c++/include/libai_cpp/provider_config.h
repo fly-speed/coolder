@@ -26,6 +26,8 @@ struct ProviderConfig {
 	            responses_service_tier = "auto";
 	// Prompt cache retention and optional Qwen session cache.
 	std::string responses_cache_ttl = "30m";
+	// Persisted, versioned host model capabilities; no core types are exposed.
+	std::string model_profile_json = "{\"version\":1}";
 	// Opt into the provider's session cache accounting behavior.
 	bool qwen_session_cache = false;
 	// Optional organization/project routing headers.

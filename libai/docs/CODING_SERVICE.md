@@ -53,6 +53,9 @@ list 的 limit 默认 20；模块自身再限制可接受范围（例如 session
 | 操作 | 参数 | 结果或用途 |
 | --- | --- | --- |
 | capabilities / agents.list | {} | operations；agent/tool 元数据 |
+| tasks.evaluate | TaskContract v1 对象 | accepted、checks、unmet；无副作用验收评估，不执行构建、不接受变更 |
+| tasks.revision | changes（可选提案数组） | artifact_revision；受限项目清单合并待确认修改后的内容指纹 |
+| tasks.describe_run | id、status、changes、validation、test_validation | 当前成果的 TaskContract；从真实命令退出状态和带身份的审核记录派生 |
 | storage.migrate | {} | 将本 scope 下旧版私有元数据转换为 JSON，返回 migrated_files，保留 .legacy 备份；宿主必须先取得数据目录锁 |
 | workspace.list / read / outline / sha256 | path | entries；content/truncated；items；sha256 |
 | workspace.search | path, query | matches/truncated |
@@ -164,11 +167,49 @@ coolder 的 server/action 源文件保留在 C++ APP 中。coolder-java 和 cool
 | 操作 | 参数 | 结果 |
 | --- | --- | --- |
 | sandbox.capabilities | {} | available、reason；不可用时禁止执行 |
-| sandbox.execute | id、confirm: true、helper（可选，宿主受信配置） | 一次性消费 preview ID；started、exit_code、stdout、stderr、elapsed_ms 等 |
+| sandbox.execute | id、confirm: true、helper（可选，宿主受信配置）、idempotency_key、parent_idempotency_key（均可选） | 一次性消费 preview ID；idempotency_key、started、exit_code、stdout、stderr、elapsed_ms 等 |
+| browser.receipt.inspect | idempotency_key | found、revision、receipt_json、recovery_policy；POSIX只读浏览器动作诊断，与模型browser.inspect工具不同 |
+| browser.receipt.confirm | idempotency_key、revision、outcome、reference、result | 受信宿主核对running记录；none/applied确认；不派发、不开放旧键重放、不确认父任务 |
+| batches.inspect | idempotency_key | found、revision、receipt_json、recovery_policy；POSIX只读批次子调用诊断，不授权重放 |
+| batches.confirm | idempotency_key、revision、child_index、outcome、reference、result | 受信宿主确认running/returned子调用；none/applied；不执行、不重放、不确认父操作 |
+| sandbox.inspect | idempotency_key | found、revision、receipt_json、recovery_policy；POSIX只读命令收据诊断 |
+| sandbox.parent.inspect | idempotency_key、project_path | found、revision、children；C++验证器已关联的逐命令键，供宿主分别核对 |
+| sandbox.confirm | idempotency_key、revision、outcome、reference、result | POSIX受信宿主确认未知结果，返回新revision/state，不执行命令 |
 | sandbox.cancel | id | 对同 root 下活动执行发出取消；不可取消其他 scope |
 
 `projects.toolchain` 的 commands 增加 fixed_arguments、dynamic_arguments、requires_confirmation。
 `sandbox.preview` 增加 executable 和 fixed_arguments，供宿主完整展示确认内容。
+
+完整桌面服务的sandbox.execute接收最多4096字节的严格JSON对象，只允许上述五个
+字段；重复键、额外字段、错误类型及非法幂等键在消费计划前拒绝。键最多256字节，
+仅允许ASCII字母、数字、下划线、连字符、点和冒号；缺省使用`sandbox.<计划ID>`。
+宿主可传入Agent工具回调的idempotency_key，将逻辑执行关联到命令。POSIX broker
+通过固定环境变量`LIBAI_IDEMPOTENCY_KEY`传给进程，不追加命令参数、不继承服务
+环境。sandbox.history保存并返回同一键；旧审计记录保持空键，不补造历史证据。
+Java/Python/Rust/Objective-C与C/C++共用此JSON入口，无需新增外部库类型。
+该字段不授权执行，不对不同计划自动去重；业务命令须自己落实幂等键与结果收据。
+Windows沙箱当前仍失败关闭，尚未验证设备端命令执行。
+
+POSIX执行器现在对每个键持有进程间租约，先持久保存running元数据意图再派发，
+返回后持久保存finished元数据。记录位于root/.webcool_agent/sandbox_commands，
+使用SDK私有文件存储的版本检查、原子替换及文件/目录fsync；不保存stdout/stderr。
+已存在running或finished记录的键均拒绝执行，且在消费新计划之前拒绝，不能借
+新计划ID绕过同一执行键。sandbox.inspect只返回进程结果事实、命令/输出摘要等
+元数据；running要求host_reconciliation，finished要求do_not_replay。finished不
+证明外部业务成功、源码覆盖或任务验收通过。诊断需要已有安全目录，可能创建锁。
+命令级宿主确认使用sandbox.confirm，不应手工删除或修改记录解除未知状态。
+macOS helper既有规则拒绝沙箱读取/写入私有元数据；Linux helper在私有挂载命名
+空间对工作区中的.webcool_agent设置只读空遮蔽，并拒绝挂载管理系统调用，遮蔽
+失败则停止派发。本阶段未运行Linux环境测试，不能据此声称其运行验收完成。
+
+sandbox.confirm只用于已鉴权、已核实效果的宿主，不得注册为模型工具。参数严格
+为五个字段，最多16KiB；revision须匹配inspect返回版本，记录必须为running。
+outcome=none要求result为空对象，保存confirmed_none；outcome=applied要求result
+为与inspect相同的九字段结果元数据对象，保存confirmed_applied。reference为
+非空宿主审计引用（最多2048字节）；库不核实引用的签名或真实性。确认取得同一
+进程间租约并按版本提交，活动/陈旧/重复确认拒绝。确认不改命令身份或摘要，不
+写stdout/stderr，不执行或自动重试命令，confirmed_none同样不能重放旧键。
+它不确认外层Agent工具日志、不更新任务验收；宿主仍须分别核对相关父执行。
 这些是通用操作，现有 C/C++/Java/Rust/Python/Objective-C CodingService 都可直接调用；
 模型工具必须使用宿主明确授权的白名单，不能暴露全量 CodingService。
 
@@ -182,3 +223,12 @@ OpenAI Chat/Responses 兼容协议的 `base_url` 可配置完整 API 前缀，�
 `https://open.bigmodel.cn/api/paas/v4/`、`https://example.com/gateway/custom/`。
 请求路由直接追加到该前缀；只配置域名（无路径）时默认追加 `/v1`。
 无需将 `/chat/completions` 或 `/responses` 写入 `base_url`。
+
+任务状态、证据可信来源及实施范围见 [通用 Agent 平台实施记录](AGENT_PLATFORM_PROGRESS.md)。
+
+tasks.describe_run 的验证报告必须包含与当前成果匹配的 artifact_revision、commands；命令含 command_id、started、ok、exit_code、cancelled、timed_out。单独的 passed 状态或模型文字不会产生验证证据。审核提案须含 accepted_by 与 review_reference。指纹扫描排除私有/构建目录，有目录深度、条目及字节预算；变化和扫描失败应使验收失效。
+
+可选parent_idempotency_key使用相同键格式；缺省或空值保留无父关联行为。
+非空时，在保存running命令意图后、派发前提交父关联，可用sandbox.parent.inspect查询。
+关联提交失败不派发，但计划已消费且running意图保留，需宿主核对，不能直接重试。
+该字段不自动关联任意回调；父子记录必须使用同一持久存储root与项目。

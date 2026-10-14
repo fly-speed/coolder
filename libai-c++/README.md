@@ -78,7 +78,7 @@ cmake --build build/app-example
 ## 接口及运行语义
 
 - `Agent(ModelFunction, instructions)` 直接接收应用回调，也可传 `std::shared_ptr<Model>` 子类。
-- `add_tool(ToolSpec, ToolHandler)` 注册唯一能力。工具的 arguments/schema 为 JSON 文本，应用负责校验。
+- `add_tool(ToolSpec, ToolHandler)` 注册唯一能力。工具的 arguments/schema 为 JSON 文本，SDK 在执行前校验整批参数；应用负责业务规则。独立 `<libai_cpp/governance.h>` 提供 Schema 验证及治理能力查询。
 - `run(input, RunOptions)` 返回类型化状态、回答、错误和调用/token 统计；自动保留多轮会话。
 - `RunOptions` 设置调用、token、上下文、工具结果预算、重试、截止时间、授权、流式输出及事件。
 - `messages()` 复制空闲会话，`reset()` 清空会话，`cancel()` 请求当前运行协作停止。
@@ -143,8 +143,8 @@ if (service.available()) {
 
 ## 公开接口与内部实现
 
-`include/libai_cpp/` 根目录只保留 7 个公共头文件：`agent.h`、`types.h`、`export.h`、
-`coding.h`、`coding_service.h`、`provider_config.h`、`provider_model.h`。
+`include/libai_cpp/` 根目录保留独立公共接口，包括 Agent、执行存储、治理、MCP、
+Provider 与 CodingService；内部转换和后端类型放在 `src/`。
 第三方编码能力通过 `CodingService::call()` 使用，操作协议包含工作区、项目、会话、
 沙箱、Provider 和运行记录，无需包含内部头文件。
 
@@ -163,3 +163,124 @@ ACL/OpenSSL 的编译定义和头文件路径只给实现与内部宿主使用�
 `libai_cpp_internal_headers` 检查无后端副本及公开头文件隔离，`libai_cpp_types` 检查类型独立性，
 `tests/consumer` 只用安装后的公共头文件验证 C++11 第三方集成。
 VS 工程直接编译同一份 libai 原始源码，不生成改名的实现副本。
+
+
+`Agent::configure_output(schema, repairs)` 可要求最终回答满足 JSON Schema，并在限制内
+提供修正反馈。修正阶段不允许工具调用；结果通过后才发布完整 JSON。详见
+[结构化输出边界](../libai/docs/STRUCTURED_OUTPUT.md)。
+
+
+## MCP 工具接入
+
+`<libai_cpp/mcp.h>` 定义独立的 `McpClient`、`McpTransport`、`McpTool`、
+`McpOptions` 和 `McpBinding`，不引用 libai 头文件。轻量静态/动态库都包含此能力。
+
+```cpp
+#include <libai_cpp/agent.h>
+#include <libai_cpp/mcp.h>
+using namespace libai::cpp;
+McpStdioOptions options;
+options.executable = "/absolute/path/to/python3";
+options.arguments = {"/absolute/path/to/mcp_server.py"};
+auto client = McpClient::stdio(options);
+client->initialize("my-app", "1.0");
+auto tools = client->list_tools();
+McpBinding policy;
+policy.parameters_schema = R"({"type":"object","properties":{"query":{"type":"string"}},"required":["query"],"additionalProperties":false})";
+policy.execution_revision = "host-reviewed-search-v1";
+// agent 是绑定了应用模型的 Agent，run 时仍须提供授权回调。
+agent.add_mcp_tool(client, "search", "mcp_search", policy);
+```
+
+也可实现 `McpTransport` 注入自定义传输；回调使用独立 `McpRequestContext`。
+传输必须观察 control 的取消/期限；HTTP 协议版本、认证、会话及 framing 由宿主负责。
+stdio 工厂目前支持 macOS/Linux 等桌面 POSIX，iOS/Windows 返回不可用；以
+`stdio_available()` 查询。iOS 可通过宿主提供的其它传输使用 MCP 客户端。
+
+Agent 绑定默认需要授权，不信任服务端 readOnlyHint，必须提供本地受限Draft-04
+Schema及宿主执行版本。远程现代Schema不被静默转换。直接 `call_tool` 是宿主显式
+调用，不经过Agent授权/日志规则；需要这些规则时使用 `Agent::add_mcp_tool`。
+
+客户端操作不允许并行/重入，绑定配置要求Agent空闲。Agent持有绑定的底层连接；
+释放外层client不会使绑定悬空，最后一个绑定/客户端释放后关闭连接。显式close会
+使所有共享绑定停止可用。销毁/close不得与请求并行，取消可从其它线程触发。
+失败连接不自动恢复；宿主可建立新连接，但效果未知的持久写操作仍需核对收据，
+不会因为重连而重跑。更多协议、存储和平台边界见 [MCP.md](../libai/docs/MCP.md)。
+
+
+## 独立工作流接口
+
+`<libai_cpp/workflow.h>` 定义Workflow、WorkflowNode、WorkflowContext、WorkflowOptions、
+WorkflowNodeResult与WorkflowResult。公共类型不包含libai头文件，运行时、存储与取消
+转换放在src/workflow.cpp；轻量静态/动态包都可使用，无需完整编程后端。
+
+```cpp
+#include <libai_cpp/workflow.h>
+using namespace libai::cpp;
+Workflow graph;
+WorkflowNode step;
+step.name="answer";step.writes={"answer"};
+step.execute=[](const std::string &,const WorkflowContext &){
+    WorkflowNodeResult result;result.patch_json=R"({"answer":42})";return result;
+};
+graph.add_node(step);
+auto result=graph.run("{}");
+// result.status是图循环结果，不代表构建/测试/人工验收。
+```
+
+add_edge(from,to,label)支持条件分支，空label表示无条件。显式max_parallel>1且节点
+parallel_safe=true才在工作线程并行；同轮写入冲突在回调前拒绝，合流只提交完整有效
+增量。context.execution_scope可用于节点Agent的执行日志，不是整节点所有业务操作
+共用的幂等键；context.control提供取消/期限，用户需转发给自己的Agent/传输。
+
+设置options.execution_store及稳定scope启用图级日志。与子Agent使用不同存储owner，
+可共享物理目录；定义/输入漂移、未知效果、损坏或提交失败不会自动重跑。
+confirm_node提供受信任宿主none/applied收据确认，匹配日志revision、定义及节点；
+模型不能直接调用它。副作用声明默认false，已知节点/终态复用，预算只收紧。
+结果progress_available=false表示进度无法证明，此时不得把空状态和零计数当作事实。
+
+同一图的配置/运行/确认不允许并行或重入，销毁必须等调用结束。取消句柄可从其它
+线程触发；绑定控制对象共享原生取消状态，不依赖包装对象的指针身份。
+完整执行/存储/容量边界见 [WORKFLOW.md](../libai/docs/WORKFLOW.md)。
+
+## 独立 RAG 接口
+
+`<libai_cpp/rag.h>`提供Document、DocumentChunk、RetrievalContext/Request/Hit/Result、
+DocumentLoader、TextSplitter、EmbeddingModel、VectorStore、Retriever及Rag静态操作。
+所有公共类型独立声明，转换与SDK依赖仅在src；无数据库或模型厂商依赖。
+
+```cpp
+using namespace libai::cpp;
+RetrievalContext context;
+context.access_scope="tenant-a";
+auto documents=Rag::load_documents(loader,"manual-source",context);
+Utf8TextSplitter splitter;
+auto prepared=Rag::prepare_index(documents,splitter,*embedding,context);
+Rag::commit_index(*store,prepared,context);
+VectorRetriever retriever(embedding,store);
+RetrievalRequest query;query.query="How to restart?";
+auto result=Rag::retrieve(retriever,query,context);
+```
+
+loader/embedding/store由宿主实现或提供；可选MemoryVectorStore为有界临时cosine索引。
+FunctionRetriever可以直接适配SQL、全文或业务检索。prepare_index只准备批次，commit_index
+是显式外部副作用，适配器负责持久原子性/去重/收据；失败不证明没有写入。
+
+`Agent::add_retrieval_tool(shared_ptr<Retriever>, name, RagBinding)`注册受治理检索工具。
+绑定保留Retriever与其捕获资源；默认需要审批且不声明纯读取。RagBinding的scope、
+filter、execution_revision由宿主配置，模型只有query/top_k参数。版本必须覆盖语料、
+权限、模型、后端和过滤变化，不能以同版本绕过未知效果确认。结果保留引用/来源/
+版本，按整条命中截断，沿用Agent预算、授权、事件与持久日志。
+
+公共Context复用独立ToolContext/Cancellation，转换保留相同原子取消状态、期限与
+幂等键，不通过复制成新令牌丢失父停止状态。宿主捕获资源须满足自己的并发规则。
+适配器输入/输出转换前有硬大小检查，实际校验继续采用RagLimits。同步静态操作
+只借用loader/splitter/model/store至返回；VectorRetriever拥有EmbeddingModel/VectorStore。
+不提供SDK类型别名、对象布局假设或把实现头文件安装到公开目录。
+
+详细来源、UTF-8/span、scope/filter、维数、容量、索引替换及停止边界见
+[RAG.md](../libai/docs/RAG.md)。结构和引用正确不证明业务事实或任务验收。
+
+本阶段主目录静态/动态库各11项回归通过，含公开头文件隔离。两个仅用安装包
+find_package(libai_cpp)的独立消费项目均通过索引/检索/Agent/治理/缓存/取消测试。
+coolder重建与iOS arm64模拟器交叉编译成功，未验证设备或Windows运行。

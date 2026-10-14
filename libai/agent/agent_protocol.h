@@ -75,6 +75,8 @@ struct agent_change_proposal_t {
 	// review work; accepted/rejected generations remain in the durable artifact
 	// as an audit-friendly record of the user's decision.
 	std::string review_status = "pending";
+	// Trusted account and generation-bound review reference, never model-authored.
+	std::string accepted_by, review_reference;
 };
 
 // One decoded model turn. A turn is either a final message or a tool request;
@@ -95,6 +97,8 @@ struct agent_protocol_message_t {
 	std::string requirement_progress_json;
 	// Short human-readable label for the conversation selector (10-20 chars).
 	std::string session_title;
+	// Uncoerced fallback JSON retained for validation before tool execution.
+	std::string raw_tool_json;
 	// Normalized tool request selected for execution.
 	agent_tool_request_t tool;
 	// File proposals associated with this result or running task.
@@ -105,6 +109,9 @@ struct agent_protocol_message_t {
 // Callers may safely treat that output as a plain final response.
 bool parse_agent_protocol_message(
     const std::string &raw, agent_protocol_message_t &message);
+// Nonempty diagnostic only for an invalid explicit final protocol object.
+// Checks original JSON before scalar conversion or proposal truncation.
+std::string validate_agent_final_message(const std::string &raw);
 
 } // namespace ai
 } // namespace webcool

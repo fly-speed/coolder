@@ -93,6 +93,8 @@ struct workspace_tool_context_t {
 	size_t read_file_limit_bytes;
 	// Bounded proposal payload retained for follow-up batch operations.
 	std::string *saved_proposal_batch;
+	// Host-saved tool intent, never a model-supplied request parameter.
+	const std::string &tool_execution_key;
 };
 
 // Finalize the serialized tool response and its execution trace.
@@ -112,7 +114,8 @@ std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
     const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
     const unavailable_validation_t *unavailable_validation,
     validation_cache_t *validation_cache, std::string *saved_proposal_batch,
-    batch_validation_evidence_t *batch_validation);
+    batch_validation_evidence_t *batch_validation,
+    const std::string &tool_execution_key);
 
 // Execute the workspace validate tool against its authorized context.
 std::string execute_workspace_validate(workspace_tool_context_t &context);

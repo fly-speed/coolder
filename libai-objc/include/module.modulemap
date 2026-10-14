@@ -1,5 +1,11 @@
 module LibAI {
+    header "LAITaskContract.h"
+    header "LAIRag.h"
+    header "LAIWorkflow.h"
+    header "LAIMcpClient.h"
     header "LAIAgent.h"
+    header "LAIExecution.h"
+    header "LAIFileExecutionStore.h"
     header "LAICodingService.h"
     export *
 }

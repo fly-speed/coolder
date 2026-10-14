@@ -248,6 +248,30 @@ bool apply_seccomp(
 #ifdef __NR_umount2
 		WEBCOOL_DENY_SYSCALL(umount2),
 #endif
+#ifdef __NR_move_mount
+		WEBCOOL_DENY_SYSCALL(move_mount),
+#endif
+#ifdef __NR_open_tree
+		WEBCOOL_DENY_SYSCALL(open_tree),
+#endif
+#ifdef __NR_mount_setattr
+		WEBCOOL_DENY_SYSCALL(mount_setattr),
+#endif
+#ifdef __NR_fsopen
+		WEBCOOL_DENY_SYSCALL(fsopen),
+#endif
+#ifdef __NR_fsconfig
+		WEBCOOL_DENY_SYSCALL(fsconfig),
+#endif
+#ifdef __NR_fsmount
+		WEBCOOL_DENY_SYSCALL(fsmount),
+#endif
+#ifdef __NR_fspick
+		WEBCOOL_DENY_SYSCALL(fspick),
+#endif
+#ifdef __NR_pivot_root
+		WEBCOOL_DENY_SYSCALL(pivot_root),
+#endif
 #ifdef __NR_unshare
 		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_unshare, 0, 1),
 		BPF_STMT(BPF_RET | BPF_K,
@@ -397,6 +421,21 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 		if (!synchronized ||
 		    !setup_user_and_system_namespaces(
 		        options.loopback_network, options.outbound_network))
+			_exit(125);
+		// Landlock grants the writable workspace subtree and cannot subtract
+		// its private metadata child. Hide it in this private mount namespace
+		// before granting workspace access; no host mount is modified.
+		const auto metadata = project_root + "/.webcool_agent";
+		struct stat metadata_stat;
+		if (lstat(metadata.c_str(), &metadata_stat) == 0) {
+			if (!S_ISDIR(metadata_stat.st_mode) ||
+			    mount("tmpfs", metadata.c_str(), "tmpfs",
+			        MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC,
+			        "size=4096,mode=000") != 0) {
+				fputs("webcool-sandbox-helper: cannot isolate private metadata\n", stderr);
+				_exit(125);
+			}
+		} else if (errno != ENOENT)
 			_exit(125);
 		const pid_t namespaced = fork();
 		if (namespaced < 0)

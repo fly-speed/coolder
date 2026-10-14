@@ -7,6 +7,7 @@
 #include "../workspace/agent_workspace.h"
 #include "../common/ai_error_log.h"
 #include "../common/webcool_mutex.h"
+#include "../sdk/file_execution_store.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -88,6 +89,15 @@ bool prepare_directory(
 	return true;
 }
 
+#if defined(__unix__) || defined(__APPLE__)
+std::unique_ptr<libai::file_execution_store_t> result_update_lease(const std::string &directory)
+{
+    std::unique_ptr<libai::file_execution_store_t> lease(new libai::file_execution_store_t(directory,libai::execution_file_codec_t::plaintext()));
+    if(!lease->open("result_updates").state_json.empty())throw std::runtime_error("unexpected result update lease state");
+    return lease;
+}
+#endif
+
 using ::webcool::ai::file_ops::replace_file;
 
 std::string result_name(const std::string &run_id)
@@ -125,6 +135,7 @@ bool safe_result(const agent_result_t &result)
 	if (!valid_hex_id(result.run_id, false) ||
 	    !valid_hex_id(result.session_id, true) ||
 	    result.project_path.size() > 2048 ||
+	    result.acceptance_contract_json.size() > 64 * 1024 ||
 	    result.task_contract_json.size() > 512 * 1024 ||
 	    result.task_acceptance_json.size() > 1024 * 1024 ||
 	    result.task_acceptance_status.size() > 64 ||
@@ -148,6 +159,7 @@ bool safe_result(const agent_result_t &result)
 		if (!(change.path.empty() || change.path.size() > 2048 ||
 		        change.target_path.size() > 2048 ||
 		        change.reason.size() > 1000 ||
+		        change.accepted_by.size() > 128 || change.review_reference.size() > 128 ||
 		        change.base_hash.size() > 64 ||
 		        change.draft_hash.size() > 64 ||
 		        (change.review_status != "pending" &&
@@ -181,6 +193,7 @@ std::string serialize(const agent_result_t &result)
 	root.add_text("run_id", result.run_id.c_str());
 	root.add_text("project_path", result.project_path.c_str());
 	root.add_text("session_id", result.session_id.c_str());
+	root.add_text("acceptance_contract_json", result.acceptance_contract_json.c_str());
 	root.add_text("task_contract_json", result.task_contract_json.c_str());
 	root.add_text(
 	    "task_acceptance_json", result.task_acceptance_json.c_str());
@@ -201,6 +214,8 @@ std::string serialize(const agent_result_t &result)
 	root.add_child("changes", changes);
 	for (size_t i = 0; i < result.changes.size(); ++i) {
 		acl::json_node &item = changes.add_child(false, true);
+		item.add_text("accepted_by", result.changes[i].accepted_by.c_str());
+		item.add_text("review_reference", result.changes[i].review_reference.c_str());
 		item.add_text("operation", result.changes[i].operation.c_str());
 		item.add_text("path", result.changes[i].path.c_str());
 		item.add_text(
@@ -243,6 +258,7 @@ bool parse(const std::string &content, agent_result_t &result, std::string &err)
 	parsed.run_id = node_text(json["run_id"]);
 	parsed.project_path = node_text(json["project_path"]);
 	parsed.session_id = node_text(json["session_id"]);
+	parsed.acceptance_contract_json = node_text(json["acceptance_contract_json"]);
 	parsed.task_contract_json = node_text(json["task_contract_json"]);
 	parsed.task_acceptance_json = node_text(json["task_acceptance_json"]);
 	parsed.task_acceptance_status =
@@ -268,6 +284,8 @@ bool parse(const std::string &content, agent_result_t &result, std::string &err)
 				return false;
 			}
 			agent_change_proposal_t change;
+			change.accepted_by = node_text(object_child(item, "accepted_by"));
+			change.review_reference = node_text(object_child(item, "review_reference"));
 			change.operation =
 			    node_text(object_child(item, "operation"));
 			change.path = node_text(object_child(item, "path"));
@@ -528,6 +546,10 @@ void preserve_committed_reviews(
 			        prior.review_status != "rejected"))
 				continue;
 			incoming.changes[i].review_status = prior.review_status;
+            if (!prior.accepted_by.empty() && !prior.review_reference.empty()) {
+                incoming.changes[i].accepted_by = prior.accepted_by;
+                incoming.changes[i].review_reference = prior.review_reference;
+            }
 			break;
 		}
 	}
@@ -591,6 +613,11 @@ bool agent_result_store_t::save(
 	if (!prepare_directory(project, directory, err)) {
 		return ai_error("agent.result", "persist", err);
 	}
+#if defined(__unix__) || defined(__APPLE__)
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=result_update_lease(directory);}
+    catch(const std::exception &exception){err=std::string("result update lease unavailable: ")+exception.what();return false;}
+#endif
 	// Streaming generation and browser review are concurrent. Never allow a
 	// worker snapshot made before the click to overwrite a committed decision for
 	// the same generation. A later edit has a new generation/hash and is therefore
@@ -598,7 +625,9 @@ bool agent_result_store_t::save(
 	agent_result_t existing;
 	if (load_locked(directory, result.run_id, existing)) {
 		preserve_committed_reviews(existing, durable);
-	}
+	} else if(file_ops::path_entry_exists(join_path(directory,result_name(result.run_id)))) {
+        err="existing coding-agent result is unreadable or invalid";return false;
+    }
 	if (save_locked(directory, durable, err))
 		return true;
 	return ai_error("agent.result", "persist", err);
@@ -697,6 +726,30 @@ bool agent_result_store_t::list_pending(const std::string &session_id,
 	return true;
 }
 
+bool agent_result_store_t::update(const std::string &run_id,agent_result_t &result,
+    const std::function<bool(agent_result_t &,std::string &)> &change,std::string &err) const
+{
+    if(!valid_hex_id(run_id,false)){err="invalid coding-agent result id";return false;}
+    std::string project,directory;
+    if(!resolve_project(user_root_,project_path_,project,err))return false;
+    std::lock_guard<webcool::mutex> guard(g_result_mutex);
+    if(!prepare_directory(project,directory,err))return false;
+#if defined(__unix__) || defined(__APPLE__)
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=result_update_lease(directory);}
+    catch(const std::exception &exception){err=std::string("result update lease unavailable: ")+exception.what();return false;}
+#endif
+    agent_result_t current;
+    if(!load_locked(directory,run_id,current)||current.project_path!=project_path_) {
+        err="coding-agent result missing or invalid";return false;
+    }
+    mark_superseded_reviews(directory,current);
+    if(!change(current,err))return false;
+    if(!safe_result(current)){err="invalid updated coding-agent result";return false;}
+    if(!save_locked(directory,current,err))return false;
+    result=current;return true;
+}
+
 bool agent_result_store_t::set_decision(const std::string &run_id,
     const std::string &decision, agent_result_t &result, std::string &err) const
 {
@@ -705,13 +758,7 @@ bool agent_result_store_t::set_decision(const std::string &run_id,
 		    "coding-agent result decision must be accepted or rejected";
 		return ai_error("agent.result", "validate-decision", err);
 	}
-	bool found = false;
-	if (!load(run_id, result, found, err))
-		return false;
-	if (!found) {
-		err = "coding-agent result not found";
-		return ai_error("agent.result", "decision-not-found", err);
-	}
+    return update(run_id,result,[&](agent_result_t &result,std::string &err){
 	bool has_accepted_change = false;
 	bool has_pending_generation = false;
 	for (size_t i = 0; i < result.changes.size(); ++i) {
@@ -742,7 +789,8 @@ bool agent_result_store_t::set_decision(const std::string &run_id,
 			continue;
 		result.changes[i].review_status = decision;
 	}
-	return save(result, err);
+	return true;
+    },err);
 }
 
 bool agent_result_store_t::set_change_reviews(const std::string &run_id,
@@ -754,13 +802,7 @@ bool agent_result_store_t::set_change_reviews(const std::string &run_id,
 		    std::to_string(kMaxAgentChanges) + " file decisions";
 		return ai_error("agent.result", "validate-change-reviews", err);
 	}
-	bool found = false;
-	if (!load(run_id, result, found, err))
-		return false;
-	if (!found) {
-		err = "coding-agent result not found";
-		return ai_error("agent.result", "change-review-not-found", err);
-	}
+    return update(run_id,result,[&](agent_result_t &result,std::string &err){
 	for (size_t i = 0; i < reviews.size(); ++i) {
 		if ((reviews[i].decision != "accepted" &&
 		        reviews[i].decision != "rejected") ||
@@ -816,12 +858,13 @@ bool agent_result_store_t::set_change_reviews(const std::string &run_id,
 		    accepted || result.changes[i].review_status == "accepted";
 	}
 	if (pending)
-		return save(result, err);
+		return true;
 	result.decision = accepted ? "accepted" : "rejected";
 	// A review decision alone never proves that bytes reached the formal
 	// workspace. The authenticated review action sets changes_applied only after
 	// its compare-and-swap filesystem transaction succeeds.
-	return save(result, err);
+	return true;
+    },err);
 }
 
 } // namespace ai

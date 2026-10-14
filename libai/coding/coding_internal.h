@@ -6,12 +6,30 @@
 #include <cerrno>
 #include <string>
 #include <vector>
+#include <functional>
+#include <memory>
+namespace libai {class execution_store_t;}
 namespace webcool
 {
 namespace ai
 {
+struct sandbox_command_t;
+struct sandbox_limits_t;
+struct sandbox_result_t;
 namespace coding_detail
 {
+// Internal trusted command runner. The callback must use the reviewed command
+// and existing sandbox broker; never expose this as an arbitrary model tool.
+bool record_command_execution(const std::string &root,const std::string &project,
+    const sandbox_command_t &command,const sandbox_limits_t &limits,
+    const std::string &key,sandbox_result_t &result,
+    const std::function<bool(sandbox_result_t &)> &dispatch,std::string &error,
+    const std::string &parent_key = "");
+bool inspect_command_parent(const std::string &root, acl::json_node &args,
+    acl::json_node &out, std::string &error);
+bool lock_command_children(const std::string &root, const std::string &project,
+    const std::string &parent_key, const std::string &outcome,
+    std::vector<std::shared_ptr<libai::execution_store_t>> &leases, std::string &error);
 // Strict string argument decoder; never coerces objects into filesystem paths.
 inline std::string text(acl::json_node &a, const char *key)
 {
@@ -87,6 +105,9 @@ inline void strings(
 		array.add_child(out.get_json().create_array_text(item.c_str()));
 	out.add_child(key, array);
 }
+// Derive host task evidence from a bounded project inventory and real command results.
+bool tasks(const std::string &root, const std::string &op, acl::json_node &a,
+    acl::json_node &out, std::string &error);
 // Execute workspace, patch and reviewed transaction operations.
 bool workspace(const std::string &root, const std::string &op,
     acl::json_node &a, acl::json_node &out, std::string &error);
@@ -95,6 +116,9 @@ bool projects(const std::string &root, const std::string &op, acl::json_node &a,
     acl::json_node &out, std::string &error);
 // Execute persistent session and metadata history operations.
 bool storage(const std::string &root, const std::string &op, acl::json_node &a,
+    acl::json_node &out, std::string &error);
+// Trusted host receipt operation; never register as a model tool.
+bool confirm_progress(const std::string &root, const std::string &arguments,
     acl::json_node &out, std::string &error);
 // Execute fixed-command sandbox capabilities, execution and cancellation.
 bool sandbox(const std::string &root, const std::string &op,

@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 #include "../agent/agent_protocol.h"
 
@@ -32,6 +33,8 @@ struct agent_result_t {
 	// the task result.
 	// task_acceptance_status: Current outcome of the task acceptance
 	// checks.
+	// Independent TaskContract v1 evidence, separate from legacy task requirements.
+	std::string acceptance_contract_json;
 	std::string task_contract_json, task_acceptance_json,
 	    task_acceptance_status;
 	// File proposals associated with this result or running task.
@@ -116,6 +119,8 @@ public:
 	std::string relative_path(const std::string &run_id) const;
 
 private:
+    bool update(const std::string &run_id, agent_result_t &result,
+        const std::function<bool(agent_result_t &, std::string &)> &change, std::string &err) const;
 	// Filesystem root belonging to the authenticated user.
 	std::string user_root_;
 	// Logical path identifying the selected project.

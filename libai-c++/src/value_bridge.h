@@ -42,6 +42,8 @@ template <class Target, class Source> Target spec_value(const Source &source)
 	target.description = source.description;
 	target.parameters = source.parameters;
 	target.requires_approval = source.requires_approval;
+	target.side_effect_free = source.side_effect_free;
+	target.execution_revision = source.execution_revision;
 	return target;
 }
 // Preserve every conversation role explicitly, independent of enum values.
@@ -135,6 +137,9 @@ inline Event event_value(const libai::agent_event_t &source)
 	case libai::agent_event_t::kind_t::tool_end:
 		kind = Event::kind_t::tool_end;
 		break;
+    case libai::agent_event_t::kind_t::tool_intent_committed: kind=Event::kind_t::tool_intent_committed;break;
+    case libai::agent_event_t::kind_t::tool_result_committed: kind=Event::kind_t::tool_result_committed;break;
+    case libai::agent_event_t::kind_t::tool_result_reused: kind=Event::kind_t::tool_result_reused;break;
 	case libai::agent_event_t::kind_t::finished:
 		kind = Event::kind_t::finished;
 		break;
@@ -145,10 +150,26 @@ inline Event event_value(const libai::agent_event_t &source)
 	target.error = source.error;
 	return target;
 }
+// Copy evidence without exposing original SDK types in installed headers.
+inline TaskEvidence evidence_value(const libai::task_evidence_t &source)
+{
+    return TaskEvidence(source.state, source.revision, source.authority, source.reference);
+}
 // Preserve terminal state and accounting independently of backend enum numbering.
 inline RunResult result_value(const libai::run_result_t &source)
 {
 	RunResult target;
+	target.task_contract.loop_finished = source.task_contract.loop_finished;
+	target.task_contract.loop_outcome = source.task_contract.loop_outcome;
+    target.task_contract.artifact_revision = source.task_contract.artifact_revision;
+    target.task_contract.require_generation = source.task_contract.require_generation;
+    target.task_contract.require_build = source.task_contract.require_build;
+    target.task_contract.require_tests = source.task_contract.require_tests;
+    target.task_contract.require_review = source.task_contract.require_review;
+    target.task_contract.generation = evidence_value(source.task_contract.generation);
+    target.task_contract.build = evidence_value(source.task_contract.build);
+    target.task_contract.tests = evidence_value(source.task_contract.tests);
+    target.task_contract.review = evidence_value(source.task_contract.review);
 	switch (source.status) {
 	case libai::run_status_t::completed:
 		target.status = RunStatus::completed;
@@ -167,6 +188,9 @@ inline RunResult result_value(const libai::run_result_t &source)
 		break;
 	case libai::run_status_t::protocol_error:
 		target.status = RunStatus::protocol_error;
+		break;
+	case libai::run_status_t::recovery_required:
+		target.status = RunStatus::recovery_required;
 		break;
 	case libai::run_status_t::callback_error:
 		target.status = RunStatus::callback_error;

@@ -1383,6 +1383,14 @@
                 data-i18n-placeholder="编辑时留空保留原密钥"
               />
             </label>
+            <details>
+              <summary data-i18n="模型能力与限制">模型能力与限制</summary>
+              <label class="check"><input name="cap_tool_calling" type="checkbox" checked /><span data-i18n="允许模型调用工具">允许模型调用工具</span></label>
+              <label class="check"><input name="cap_multiple_tool_calls" type="checkbox" checked /><span data-i18n="允许单轮请求多个工具">允许单轮请求多个工具</span></label>
+              <label><span data-i18n="单次输出 token 上限">单次输出 token 上限</span><input name="cap_output_tokens" type="number" min="1" max="1073741824" step="1" /></label>
+              <label><span data-i18n="请求大小上限（字节）">请求大小上限（字节）</span><input name="cap_context_bytes" type="number" min="1" max="1073741824" step="1" /></label>
+              <p class="muted" data-i18n="上限留空时使用运行预算；多个调用不代表工具并发执行。">上限留空时使用运行预算；多个调用不代表工具并发执行。</p>
+            </details>
             <label class="check">
               <input name="allow_file_content" type="checkbox" /><span
                 data-i18n="允许向此模型发送项目代码"

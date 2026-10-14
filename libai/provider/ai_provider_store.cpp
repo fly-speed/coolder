@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../sdk/model_profile.h"
 #include "ai_provider_store_internal.h"
 #include "../common/file_ops.h"
 #include "../common/identifiers.h"
@@ -193,6 +194,10 @@ bool provider_store_t::save(
 		}
 		providers.push_back(item);
 		target = &providers.back();
+	}
+	if (!input.model_profile_json.empty()) {
+		try {target->model_profile_json=libai::parse_model_profile(input.model_profile_json).json;}
+		catch (const std::exception &) {err="invalid model capability profile";return false;}
 	}
 	target->name = input.name;
 	target->protocol = input.protocol;
@@ -525,6 +530,10 @@ bool provider_store_t::record_test_result(const std::string &id, bool succeeded,
 bool provider_store_t::validate_input(
     const provider_input_t &input, bool allow_insecure_remote, std::string &err)
 {
+	if (!input.model_profile_json.empty()) {
+		try {libai::parse_model_profile(input.model_profile_json);}
+		catch (const std::exception &) {err="invalid model capability profile";return false;}
+	}
 	if (input.name.empty() || input.name.size() > 80) {
 		err =
 		    "AI provider name is required and must not exceed 80 characters";

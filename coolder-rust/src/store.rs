@@ -109,10 +109,18 @@ pub fn write(p: &Path, v: &Value) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         file.set_permissions(fs::Permissions::from_mode(0o600))?;
     }
-    file.write_all(v.to_string().as_bytes())?;
-    file.sync_all()?;
-    fs::rename(temp, p)?;
-    Ok(())
+    let result = (|| -> Result<()> {
+        file.write_all(v.to_string().as_bytes())?;
+        file.sync_all()?;
+        fs::rename(&temp, p)?;
+        #[cfg(unix)]
+        fs::File::open(p.parent().unwrap())?.sync_all()?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
 }
 pub struct State {
     pub accounts: Value,

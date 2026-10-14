@@ -1,4 +1,5 @@
 #pragma once
+namespace libai {class execution_store_t;}
 #include "../stdafx.h"
 
 // Transport-independent coding runtime contract shared by library workers
@@ -132,8 +133,25 @@ struct agent_tool_trace_t {
 	bool native;
 };
 
+// Owns the worker finalization interval; releases the transferred lease on every exit.
+class coding_worker_lease_guard_t {
+public:
+    explicit coding_worker_lease_guard_t(const std::shared_ptr<agent_runtime_task_t> &task);
+    ~coding_worker_lease_guard_t();
+    coding_worker_lease_guard_t(const coding_worker_lease_guard_t &) = delete;
+    coding_worker_lease_guard_t &operator=(const coding_worker_lease_guard_t &) = delete;
+private:
+    std::shared_ptr<agent_runtime_task_t> task_;
+};
+
 // Shared live state of an agent run, coordinated by the runtime mutex.
 struct agent_runtime_task_t {
+    // Worker-owned lease survives the loop until final durable publication/cleanup.
+    bool retain_coding_worker_lease = false;
+    std::shared_ptr<libai::execution_store_t> coding_worker_lease;
+    webcool::ai::agent_validation_receipt_t validation_receipt;
+    std::string coding_execution_revision;
+    std::vector<webcool::ai::agent_tool_effect_t> tool_effects;
 	// Requested size of the generated image.
 	std::string image_size;
 	// In-memory live state keyed by user_root + run ID. Completed details expire
@@ -414,6 +432,10 @@ std::string runtime_reasoning_for_save(
 void mark_runtime_recovery_available(
     const std::shared_ptr<agent_runtime_task_t> &task,
     const std::string &progress_file);
+// Cancellation retains receipts and private drafts; no cleanup or confirmation.
+std::string preserve_cancelled_coding_progress(
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::string &project_path);
 
 // Append bounded reasoning text to the live runtime snapshot.
 bool append_runtime_reasoning_delta(
@@ -495,6 +517,12 @@ void add_durable_recovery_json(acl::json_node &root,
     const std::string &user_root, const webcool::ai::agent_run_record_t &record,
     const std::string &session_hint);
 
+// Refresh common acceptance evidence from trusted result and report records.
+void refresh_result_task_contract(const std::string &user_root,
+    const std::string &status, webcool::ai::agent_result_t &result);
+// Attach and durably refresh a common contract on HTTP/SSE status reads.
+void add_current_task_contract_json(acl::json_node &root, const std::string &user_root,
+    const webcool::ai::agent_run_record_t &record);
 // Serialize saved result metadata for the authenticated browser request.
 void add_persisted_result_json(acl::json_node &root,
     const webcool::ai::agent_result_t &result,
@@ -605,6 +633,12 @@ bool repeated_repair_failure(const std::string &report,
 // Check whether the requested action only inspects repair-review evidence.
 bool repair_review_read_only(const agent_tool_request_t &request);
 
+// Only local proposal handlers may be retried after a concurrent review.
+// External commands and aggregate batches never inherit this permission.
+bool may_retry_coding_tool_after_review(const agent_tool_request_t &request);
+// Failed external/aggregate handlers require reconciliation, not replay.
+bool coding_tool_requires_confirmation(const agent_tool_request_t &request);
+
 // Mark required source versions satisfied by the latest read result.
 void consume_repair_reads(const std::string &name, const std::string &result,
     std::map<std::string, std::string> &required);
@@ -651,7 +685,8 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
     const unavailable_validation_t *unavailable_validation = NULL,
     validation_cache_t *validation_cache = NULL,
     std::string *saved_proposal_batch = NULL,
-    batch_validation_evidence_t *batch_validation = NULL);
+    batch_validation_evidence_t *batch_validation = NULL,
+    const std::string &tool_execution_key = "");
 
 // Drafts helpers.
 // Verify that the workspace already contains every reviewed result change.
@@ -694,12 +729,28 @@ bool schedule_reviewed_worktree_cleanup(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     std::string &err);
 
+// Trusted child reconciliation and parent lease guard; never model tools.
+bool confirm_workspace_batch_child(const std::string &root, const std::string &arguments,
+    acl::json_node &out, std::string &error);
+bool lock_workspace_batch_parent_receipt(const std::string &root, const std::string &project,
+    const std::string &key, size_t count, const std::string &outcome,
+    std::vector<std::shared_ptr<libai::execution_store_t>> &leases, std::string &error);
+
+// Read batch dispatch/return metadata for a trusted host.
+bool inspect_workspace_batch_receipt(const std::string &root, const std::string &key,
+    acl::json_node &out, std::string &error);
+
+// Check independent command evidence before reusing a validation report.
+bool validate_cached_command_receipts(const std::string &user_root,
+    const std::string &project_path, const std::string &report, std::string &error);
+
 // Run the permitted fixed validation commands against the private draft.
 std::string validate_staged_draft(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     const std::vector<agent_change_proposal_t> &changes,
     const webcool::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
-    std::string *source_fingerprint = NULL, bool build_only = false);
+    std::string *source_fingerprint = NULL, bool build_only = false,
+    const std::string &tool_execution_key = "");
 
 // Compute a stable identity for the current ordered change proposals.
 std::string staged_change_fingerprint(

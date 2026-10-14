@@ -11,3 +11,10 @@ license = "MIT"
 [lib]
 name = "libai"
 path = "src/lib.rs"
+
+[features]
+default = ["rag"]
+rag = ["dep:serde_json"]
+
+[dependencies]
+serde_json = { version = "1", optional = true, features = ["float_roundtrip"] }

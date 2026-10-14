@@ -26,6 +26,30 @@ static libai_options options(JNIEnv *env, jlongArray values)
 }
 
 extern "C" {
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeConfigureOutput(
+    JNIEnv *env, jobject, jlong pointer, jstring schema, jlong repairs)
+{
+    try {
+        auto *context = reinterpret_cast<jni_agent_t *>(pointer);
+        if (!context || repairs<0 || repairs>8) throw std::invalid_argument("invalid output configuration");
+        const auto wire = jni_utf8(env, schema);
+        if (libai_agent_configure_output(context->agent,wire.c_str(),static_cast<size_t>(repairs)))
+            jni_throw(env,libai_last_error());
+    } catch (const std::exception &e) { jni_throw(env,e.what()); }
+    catch (...) { jni_throw(env,"output contract configuration failed"); }
+}
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeConfigureModel(
+    JNIEnv *env, jobject, jlong pointer, jstring profile)
+{
+	try {
+		auto *context = reinterpret_cast<jni_agent_t *>(pointer);
+		if (!context) throw std::invalid_argument("agent is null");
+		const auto wire = jni_utf8(env, profile);
+		if (libai_agent_configure_model(context->agent, wire.c_str()))
+			jni_throw(env, libai_last_error());
+	} catch (const std::exception &e) { jni_throw(env, e.what()); }
+	catch (...) { jni_throw(env, "model profile configuration failed"); }
+}
 JNIEXPORT jlong JNICALL Java_io_coolder_libai_Agent_nativeCreate(JNIEnv *env,
     jobject owner, jstring instructions, jstring config, jstring key)
 {
@@ -72,17 +96,18 @@ JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeDestroy(
 	env->DeleteGlobalRef(context->owner);
 	delete context;
 }
-JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeAddTool(JNIEnv *env,
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeAddToolGoverned(JNIEnv *env,
     jobject, jlong pointer, jstring name, jstring description, jstring schema,
-    jboolean approval)
+    jboolean approval, jstring revision, jboolean side_effect_free)
 {
 	try {
 		auto *context = reinterpret_cast<jni_agent_t *>(pointer);
 		const auto tool_name = jni_utf8(env, name),
 		           text = jni_utf8(env, description),
-		           parameters = jni_utf8(env, schema);
-		if (libai_agent_add_tool(context->agent, tool_name.c_str(),
-		        text.c_str(), parameters.c_str(), approval, jni_tool,
+		           parameters = jni_utf8(env, schema),
+                   version = jni_utf8(env, revision);
+		if (libai_agent_add_tool_governed(context->agent, tool_name.c_str(),
+		        text.c_str(), parameters.c_str(), approval, version.c_str(), side_effect_free, jni_tool,
 		        context))
 			jni_throw(env, libai_last_error());
 	} catch (const std::exception &error) {
@@ -90,6 +115,25 @@ JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeAddTool(JNIEnv *env,
 	} catch (...) {
 		jni_throw(env, "JNI tool registration failed");
 	}
+}
+// Preserve the previous versioned entry point and its conservative default.
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeAddToolVersioned(JNIEnv *env,
+    jobject owner, jlong pointer, jstring name, jstring description, jstring schema,
+    jboolean approval, jstring revision)
+{
+    Java_io_coolder_libai_Agent_nativeAddToolGoverned(env, owner, pointer, name,
+        description, schema, approval, revision, JNI_FALSE);
+}
+// Preserve the original JNI signature for applications using an older JAR.
+JNIEXPORT void JNICALL Java_io_coolder_libai_Agent_nativeAddTool(JNIEnv *env,
+    jobject owner, jlong pointer, jstring name, jstring description, jstring schema,
+    jboolean approval)
+{
+    jstring version = env->NewStringUTF("1");
+    if (!version) return;
+    Java_io_coolder_libai_Agent_nativeAddToolVersioned(env, owner, pointer,
+        name, description, schema, approval, version);
+    env->DeleteLocalRef(version);
 }
 JNIEXPORT jstring JNICALL Java_io_coolder_libai_Agent_nativeRun(JNIEnv *env,
     jobject, jlong pointer, jstring input, jlongArray limits, jboolean stream,

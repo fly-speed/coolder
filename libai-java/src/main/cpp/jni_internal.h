@@ -31,3 +31,9 @@ int jni_text(void *, const char *);
 int jni_authorize(void *, const char *, const char *, int);
 /* Forward native lifecycle events as UTF-8 JSON. */
 void jni_event(void *, const char *);
+
+/* Durable store dispatch uses the Java caller thread and retained owner. */
+void jni_execution(void *, const char *, const char *, const char *, const char *, libai_execution_result *);
+
+/* Borrowed store and current caller env; valid only through synchronous dispatch. */
+void jni_store_dispatch(JNIEnv *,jobject,const char *,const char *,const char *,const char *,libai_execution_result *);

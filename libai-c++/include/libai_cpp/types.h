@@ -1,5 +1,6 @@
 #pragma once
 #include "export.h"
+#include "execution.h"
 
 #include <cstddef>
 #include <chrono>
@@ -42,6 +43,10 @@ struct ToolSpec {
 	std::string parameters = "{\"type\":\"object\",\"properties\":{}}";
 	// Require host authorization before executing this capability.
 	bool requires_approval = false;
+	// Trusted assertion permitting replay of an unconfirmed side-effect-free handler.
+	bool side_effect_free = false;
+	// Host version of tool execution semantics; change when implementation changes.
+	std::string execution_revision = "1";
 };
 
 // Thread-safe cooperative cancellation without exposing a backend handle.
@@ -65,6 +70,9 @@ private:
 	friend class Agent;
 	// Permit only the compiled provider adapter to share cancellation state.
 	friend class NativeProviderModel;
+	friend class McpClient;
+	friend class Workflow;
+    friend class Rag;
 	// Backend-owned cancellation storage.
 	struct Impl;
 	// Retain the private token for this public object's lifetime.
@@ -73,6 +81,8 @@ private:
 
 // Provider-neutral request snapshot for one logical model attempt.
 struct ModelRequest {
+	// Host capability profile as versioned JSON, independent of core types.
+	std::string model_profile_json = "{\"version\":1}";
 	// Stable system instructions supplied by the application.
 	std::string instructions;
 	// Typed session history including assistant/tool exchanges.
@@ -122,6 +132,8 @@ using ModelFunction =
 
 // Execution boundary passed to each application tool handler.
 struct ToolContext {
+	// Stable durable effect key; empty when persistence is disabled.
+	std::string idempotency_key;
 	// Shared cancellation flag for long-running tool callbacks.
 	std::shared_ptr<Cancellation> cancellation;
 	// Run deadline observed cooperatively by the tool.
@@ -166,10 +178,36 @@ enum class RunStatus {
 	budget_exceeded,
 	model_error,
 	protocol_error,
-	callback_error
+	callback_error,
+	recovery_required
 };
+// Evidence is supplied by a trusted host, never inferred from model prose.
+struct TaskEvidence {
+    std::string state = "unknown";
+    std::string revision, authority, reference;
+    TaskEvidence() = default;
+    TaskEvidence(std::string state_, std::string revision_, std::string authority_, std::string reference_)
+        : state(state_), revision(revision_), authority(authority_), reference(reference_) {}
+
+};
+// Versioned acceptance contract; all requirements are conservative by default.
+struct TaskContract {
+    bool loop_finished = false;
+    std::string loop_outcome, artifact_revision;
+    bool require_generation = true, require_build = true,
+         require_tests = true, require_review = true;
+    TaskEvidence generation, build, tests, review;
+
+    // Evidence must belong to the current artifact revision and trusted producer.
+    LIBAI_CPP_API bool proves(const TaskEvidence &e, const char *state,
+        const char *authority) const;
+    // Invalid host text or evidence states fail closed, including disabled stages.
+    LIBAI_CPP_API bool accepted() const;
+};
+
 // Terminal state and accumulated accounting for one agent run.
 struct RunResult {
+	TaskContract task_contract;
 	// Explicit lifecycle outcome independent of display text.
 	RunStatus status = RunStatus::model_error;
 	// Final answer and a separate terminal diagnostic.
@@ -186,7 +224,10 @@ struct Event {
 		model_end,
 		tool_start,
 		tool_end,
-		finished
+		finished,
+        tool_intent_committed,
+        tool_result_committed,
+        tool_result_reused
 	};
 	// Phase being observed on the current run thread.
 	kind_t kind;
@@ -201,8 +242,17 @@ struct Event {
 	}
 };
 
+// Independent event snapshot; existing Event/RunOptions value ABI is unchanged.
+struct EventExecution {
+    std::string execution_scope, idempotency_key, journal_revision, effect_state;
+    std::size_t attempts=0;
+};
+
 // Host-selected budgets, cancellation, authorization and presentation hooks.
 struct RunOptions {
+	// Optional durable store and stable host-owned task ID, retained throughout run.
+	std::shared_ptr<ExecutionStore> execution_store;
+	std::string execution_scope;
 	// Hard limits on logical model attempts and executed tool handlers.
 	std::size_t max_model_calls = 16, max_tool_calls = 64;
 	// Reported output token budget and per-request generation ceiling.

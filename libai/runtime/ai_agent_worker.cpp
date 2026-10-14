@@ -7,6 +7,24 @@ namespace action
 namespace agent_detail
 {
 
+coding_worker_lease_guard_t::coding_worker_lease_guard_t(const std::shared_ptr<agent_runtime_task_t> &task):task_(task)
+{
+    std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+    if(task_->retain_coding_worker_lease||task_->coding_worker_lease)
+        throw std::logic_error("coding worker lease scope already active");
+    task_->retain_coding_worker_lease=true;
+}
+coding_worker_lease_guard_t::~coding_worker_lease_guard_t()
+{
+    std::shared_ptr<libai::execution_store_t> lease;
+    {
+        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        task_->retain_coding_worker_lease=false;
+        lease.swap(task_->coding_worker_lease);
+    }
+    // Release outside the runtime mutex; the file store destructor closes its scope.
+}
+
 class checkpoint_cleanup_guard_t {
 public:
 	explicit checkpoint_cleanup_guard_t(
@@ -31,6 +49,25 @@ private:
 	std::shared_ptr<agent_runtime_task_t> task_;
 };
 
+std::string preserve_cancelled_coding_progress(
+    const std::shared_ptr<agent_runtime_task_t> &task,
+    const std::string &project_path)
+{
+	if(task->text_preview)return "";
+	webcool::ai::agent_progress_store_t store(task->user_root,project_path,task->session_id);
+	webcool::ai::agent_progress_t progress;bool found=false;std::string error;
+	if(!store.load(progress,found,error)) {
+		webcool::ai::ai_log_error("agent.runtime","inspect-cancelled-progress",error);
+		{std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);task->recovery_available=false;task->progress_file=store.relative_path();}
+		return "Task cancelled; private progress and evidence were retained, but the checkpoint requires host inspection.";
+	}
+	if(!found){std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);task->recovery_available=false;task->progress_file.clear();return "";}
+	mark_runtime_recovery_available(task,store.relative_path());
+	for(const auto &effect:progress.tool_effects)if(effect.state=="running")
+		return "Task cancelled; an unconfirmed tool effect requires host reconciliation: "+effect.key;
+	return "Task cancelled; private checkpoint, tool receipts and drafts were retained.";
+}
+
 static void finish_failed_coding_task(
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
     const std::string &project_path, webcool::ai::agent_run_store_t &run_store,
@@ -45,16 +82,10 @@ static void finish_failed_coding_task(
 			    "agent.runtime", "audit-cancel", audit_err);
 		}
 		finish_runtime_task(
-		    runtime_task, "cancelled", "", NULL, NULL, NULL, 0);
-		webcool::ai::agent_progress_store_t progress_store(
-		    runtime_task->user_root, project_path,
-		    runtime_task->session_id);
-		std::string progress_err;
-		if (!runtime_task->text_preview &&
-		    !progress_store.remove(progress_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
-			    "remove-cancelled-progress", progress_err);
-		}
+		    runtime_task, "cancelled", preserve_cancelled_coding_progress(runtime_task,project_path), NULL, NULL, NULL, 0);
+		// Cancellation stops execution; it does not prove the effects absent.
+		// Keep the private worktree for receipt/proposal inspection as well.
+		if(!runtime_task->text_preview)return;
 		std::string draft_err;
 		if (!remove_persistent_worktree(runtime_task->user_root,
 		        project_path, runtime_task->id, draft_err)) {
@@ -169,15 +200,8 @@ static void finish_late_cancelled_task(
 		webcool::ai::ai_log_error(
 		    "agent.runtime", "audit-late-cancel", audit_err);
 	}
-	finish_runtime_task(runtime_task, "cancelled", "", NULL, NULL, NULL, 0);
-	webcool::ai::agent_progress_store_t progress_store(
-	    runtime_task->user_root, project_path, runtime_task->session_id);
-	std::string progress_err;
-	if (!runtime_task->text_preview &&
-	    !progress_store.remove(progress_err)) {
-		webcool::ai::ai_log_error(
-		    "agent.runtime", "remove-cancelled-progress", progress_err);
-	}
+	finish_runtime_task(runtime_task, "cancelled", preserve_cancelled_coding_progress(runtime_task,project_path), NULL, NULL, NULL, 0);
+	if(!runtime_task->text_preview)return;
 	std::string draft_err;
 	if (remove_persistent_worktree(runtime_task->user_root, project_path,
 	        runtime_task->id, draft_err))
@@ -202,6 +226,13 @@ void run_async_coding_task(
 {
 	// Normal completion, failure and cancellation all retire the encrypted
 	// checkpoint. A process crash skips this destructor, leaving it for recovery.
+    // Declared first so the encrypted checkpoint cleanup also remains leased.
+    std::unique_ptr<coding_worker_lease_guard_t> worker_lease;
+    try {worker_lease.reset(new coding_worker_lease_guard_t(runtime_task));}
+    catch(const std::exception &exception) {
+        webcool::ai::ai_log_error("agent.runtime","worker-scope-unavailable",exception.what());
+        return; // A duplicate worker must not mutate the active owner's task/checkpoint.
+    }
 	checkpoint_cleanup_guard_t checkpoint_cleanup(runtime_task);
 	webcool::ai::completion_result_t output;
 	std::vector<agent_tool_trace_t> traces;
@@ -286,6 +317,7 @@ void run_async_coding_task(
 	durable_result.rejected_changes = rejected_changes;
 	durable_result.decision = changes.empty() ? "accepted" : "pending";
 	durable_result.saved_at = static_cast<long long>(time(NULL));
+    refresh_result_task_contract(runtime_task->user_root, "completed", durable_result);
 	webcool::ai::agent_result_store_t result_store(
 	    runtime_task->user_root, project_path);
 	std::string result_err;

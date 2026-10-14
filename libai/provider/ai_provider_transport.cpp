@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "model_profile_payload.h"
 #include "ai_provider_transport_internal.h"
 #include "fiber/fiber_base.h"
 #include "../agent/ai_admin_policy.h"
@@ -238,6 +239,7 @@ bool post_json(const provider_config_t &provider, const std::string &api_key,
     const std::string &url, const std::string &payload, acl::json &body,
     int &status, long long &latency_ms, std::string &err)
 {
+	if (!model_profile_payload(provider,payload,err)) {status=0;return false;}
 	parsed_url_t parsed;
 	if (!parse_http_url(url, parsed, err))
 		return false;

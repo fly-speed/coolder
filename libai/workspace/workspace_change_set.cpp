@@ -9,6 +9,7 @@
 #include "../common/ai_error_log.h"
 #include "diff_preview.h"
 #include "../common/webcool_mutex.h"
+#include "../sdk/file_execution_store.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -111,6 +112,17 @@ std::string legacy_pending_path(const std::string &directory)
 	// upgraded server restarted. New previews never use this singleton path.
 	return join_path(directory, "pending.v1");
 }
+
+#if defined(__unix__) || defined(__APPLE__)
+std::unique_ptr<libai::file_execution_store_t> change_set_lease(const std::string &root)
+{
+    std::string directory,error;
+    if(!prepare_directory(root,directory,error))throw std::runtime_error(error);
+    std::unique_ptr<libai::file_execution_store_t> lease(new libai::file_execution_store_t(directory,libai::execution_file_codec_t::plaintext()));
+    if(!lease->open("workspace_transaction").state_json.empty())throw std::runtime_error("unexpected workspace transaction lease state");
+    return lease;
+}
+#endif
 
 std::string journal_path(const std::string &directory)
 {
@@ -367,6 +379,11 @@ bool workspace_change_set_store_t::create(
     workspace_change_set_preview_t &preview, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+#if defined(__unix__) || defined(__APPLE__)
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=change_set_lease(user_root_);}
+    catch(const std::exception &exception){err=std::string("workspace transaction lease unavailable: ")+exception.what();return false;}
+#endif
 	return create_locked(changes, preview, err);
 }
 
@@ -624,6 +641,11 @@ bool workspace_change_set_store_t::apply(const std::string &id,
     std::vector<workspace_change_result_t> &results, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+#if defined(__unix__) || defined(__APPLE__)
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=change_set_lease(user_root_);}
+    catch(const std::exception &exception){err=std::string("workspace transaction lease unavailable: ")+exception.what();return false;}
+#endif
 	return apply_locked(id, results, err);
 }
 
@@ -846,6 +868,11 @@ bool workspace_change_set_store_t::create_and_apply(
     std::vector<workspace_change_result_t> &results, std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+#if defined(__unix__) || defined(__APPLE__)
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=change_set_lease(user_root_);}
+    catch(const std::exception &exception){err=std::string("workspace transaction lease unavailable: ")+exception.what();return false;}
+#endif
 	if (create_locked(changes, preview, err))
 		return apply_locked(preview.id, results, err);
 	return false;
@@ -854,6 +881,11 @@ bool workspace_change_set_store_t::create_and_apply(
 bool workspace_change_set_store_t::recover(std::string &err) const
 {
 	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+#if defined(__unix__) || defined(__APPLE__)
+    std::unique_ptr<libai::file_execution_store_t> lease;
+    try {lease=change_set_lease(user_root_);}
+    catch(const std::exception &exception){err=std::string("workspace transaction lease unavailable: ")+exception.what();return false;}
+#endif
 	std::string directory;
 	if (!(!prepare_directory(user_root_, directory, err) ||
 	        !recover_locked(directory, user_root_, err)))

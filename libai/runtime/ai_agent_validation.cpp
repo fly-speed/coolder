@@ -1,11 +1,65 @@
 #include "stdafx.h"
 #include "coding_runtime.h"
+#include "../coding/coding_service.h"
+#include "../coding/coding_internal.h"
 #include "../validation/repair_scope.h"
 #include "../validation/diagnostic_source.h"
 namespace action
 {
 namespace agent_detail
 {
+// A cached parent report cannot hide an unknown or lost child execution.
+bool validate_cached_command_receipts(const std::string &user_root,
+    const std::string &project_path, const std::string &report, std::string &error)
+{
+    try {
+        acl::json cached(report.c_str());
+        if (!cached.finish() || !cached.get_root().is_object())
+            throw std::runtime_error("invalid cached validation report");
+        const auto owner = json_text(cached["tool_execution_key"]);
+        const auto commands = webcool::ai::coding_detail::array_value(cached["commands"]);
+        if (!commands || !commands->is_array())
+            throw std::runtime_error("cached validation command list missing");
+        for (auto *command = commands->first_child(); command; command = commands->next_child()) {
+            const auto key = json_text((*command)["idempotency_key"]);
+            // Legacy unbound reports do not claim durable command evidence.
+            if (key.empty() && owner.empty()) continue;
+            if (key.empty()) throw std::runtime_error("cached validation command key missing");
+            for (const auto &selected : {key, json_text((*command)["inventory_idempotency_key"])}) {
+                if (selected.empty()) continue;
+                acl::json input, output;
+                auto &args = input.create_node();
+                args.add_text("idempotency_key", selected.c_str());
+                auto &result = output.create_node();
+                std::string reason;
+                if (!webcool::ai::coding_detail::sandbox(user_root, "sandbox.inspect", args, result, reason) ||
+                    !json_bool(result["found"], false))
+                    throw std::runtime_error("cached validation command receipt unavailable: " + selected + " " + reason);
+                const auto wire = json_text(result["receipt_json"]);
+                acl::json receipt(wire.c_str());
+                if (!receipt.finish()) throw std::runtime_error("invalid cached command receipt");
+                const auto state = json_text(receipt["state"]);
+                if ((state != "finished" && state != "confirmed_applied") ||
+                    json_text(receipt["project_path"]) != project_path ||
+                    json_text(receipt["command_id"]) != json_text((*command)["command_id"]))
+                    throw std::runtime_error("cached validation command requires host reconciliation: " + selected);
+                if (selected != key) continue; // Inventory has its own validated metadata.
+                auto metadata = receipt["result"];
+                if (metadata && !metadata->is_object()) metadata = metadata->get_obj();
+                if (!metadata || json_number((*metadata)["exit_code"], -2) != json_number((*command)["exit_code"], -3) ||
+                    json_bool((*metadata)["cancelled"], true) != json_bool((*command)["cancelled"], true) ||
+                    json_bool((*metadata)["timed_out"], true) != json_bool((*command)["timed_out"], true) ||
+                    (json_bool((*command)["started"], false) && !json_bool((*metadata)["started"], false)))
+                    throw std::runtime_error("cached validation command metadata mismatch: " + selected);
+            }
+        }
+        return true;
+    } catch (const std::exception &exception) {
+        error = exception.what();
+        return false;
+    }
+}
+
 // Inspect CTest's evaluated commands instead of guessing CMake source syntax.
 // Paths are metadata only until resolved through the private workspace reader.
 struct ctest_io_contract_t {
@@ -319,23 +373,35 @@ static bool dispatch_validation_command(
     const std::string &draft_root, const webcool::ai::sandbox_limits_t &limits,
     const std::vector<std::string> &readonly_roots,
     const std::function<bool()> &should_cancel,
-    webcool::ai::sandbox_result_t &result, ctest_io_contract_t &io_contract)
+    webcool::ai::sandbox_result_t &result, ctest_io_contract_t &io_contract,
+    const std::string &execution_key,const std::string &receipt_root,
+    const std::string &project_path,bool &receipt_unconfirmed,const std::string &parent_key)
 {
-	webcool::ai::program_sandbox_t sandbox(draft_root, "",
-	    std::vector<webcool::ai::sandbox_command_t>(1, command), limits, "",
-	    readonly_roots);
+	auto execute_recorded = [&](const webcool::ai::sandbox_command_t &selected,
+	                            const webcool::ai::sandbox_request_t &request,
+	                            webcool::ai::sandbox_result_t &output) {
+		webcool::ai::program_sandbox_t broker(draft_root,"",{selected},limits,"",readonly_roots);
+		auto dispatch=[&](webcool::ai::sandbox_result_t &value){return broker.execute(request,value,NULL,should_cancel);};
+		if(request.idempotency_key.empty())return dispatch(output); // Legacy unbound host calls.
+		std::string error;
+		const bool ok=webcool::ai::coding_detail::record_command_execution(receipt_root,project_path,
+		    selected,limits,request.idempotency_key,output,dispatch,error,parent_key);
+		if(!ok&&!error.empty()) {output.error=error;receipt_unconfirmed=true;}
+		return ok;
+	};
 	webcool::ai::sandbox_request_t request;
 	request.command_id = command.id;
+	request.idempotency_key = execution_key;
 	bool inventory_ok = true;
 	if (command.id == "cpp.ctest" || command.id == "c.ctest") {
 		auto inventory_command = command;
 		inventory_command.fixed_arguments = { "--test-dir",
 			".webcool-build", "--show-only=json-v1" };
-		webcool::ai::program_sandbox_t inventory_sandbox(draft_root, "",
-		    { inventory_command }, limits, "", readonly_roots);
 		webcool::ai::sandbox_result_t inventory;
-		inventory_ok = inventory_sandbox.execute(
-		                   request, inventory, NULL, should_cancel) &&
+		auto inventory_request = request;
+		if (!execution_key.empty())
+			inventory_request.idempotency_key = execution_key + ".inventory";
+		inventory_ok = execute_recorded(inventory_command,inventory_request,inventory) &&
 		    inventory.exit_code == 0 && !inventory.timed_out &&
 		    !inventory.output_truncated && inventory.error.empty();
 		if (inventory_ok)
@@ -349,7 +415,7 @@ static bool dispatch_validation_command(
 	bool dispatched = false;
 	if (io_contract.error.empty())
 		dispatched =
-		    sandbox.execute(request, result, NULL, should_cancel);
+		    execute_recorded(command,request,result);
 	else {
 		dispatched = true;
 		result.exit_code = 1;
@@ -362,14 +428,21 @@ static long long append_validation_command(acl::json &json,
     acl::json_node &commands, const webcool::ai::sandbox_command_t &command,
     const webcool::ai::sandbox_result_t &result,
     const ctest_io_contract_t &io_contract, const std::string &draft_root,
-    bool test_command, bool no_tests, bool dispatched, bool command_passed)
+    bool test_command, bool no_tests, bool dispatched, bool command_passed,
+    const std::string &execution_key)
 {
 	acl::json_node &item = commands.add_child(false, true);
+	item.add_text("idempotency_key", execution_key.c_str());
+	if ((command.id == "cpp.ctest" || command.id == "c.ctest") && !execution_key.empty())
+		item.add_text("inventory_idempotency_key", (execution_key + ".inventory").c_str());
 	if (test_command)
 		item.add_text("test_status",
 		    no_tests || !dispatched ? "not-run" :
 		        command_passed      ? "passed" :
 		                              "failed");
+	item.add_bool("started", dispatched && result.started && !(test_command && no_tests));
+    item.add_bool("ok", command_passed && !result.cancelled);
+    item.add_bool("cancelled", result.cancelled);
 	item.add_text("command_id", command.id.c_str());
 	item.add_text("executable", command.executable.c_str());
 	item.add_text("scope",
@@ -488,8 +561,12 @@ std::string validate_staged_draft(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     const std::vector<agent_change_proposal_t> &changes,
     const webcool::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
-    std::string *source_fingerprint, bool build_only)
+    std::string *source_fingerprint, bool build_only,
+    const std::string &tool_execution_key)
 {
+	trace.ok=false;
+	if (!webcool::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
+		return tool_error_json("invalid validation tool execution key");
 	const auto should_cancel = [user_root, run_id] {
 		const auto task = find_runtime_task(user_root, run_id);
 		return task && runtime_cancel_requested(task);
@@ -530,9 +607,15 @@ std::string validate_staged_draft(const std::string &user_root,
 	bool build_executed = false, build_passed = true;
 	acl::json json;
 	acl::json_node &root = json.create_node();
+	root.add_text("tool_execution_key", tool_execution_key.c_str());
 	acl::json_node &skipped =
 	    initialize_validation_report(json, root, source_fingerprint,
 	        changes, build_only, focused, draft_reused, skipped_files);
+    const auto revision_wire = webcool::ai::coding_service_call(draft_root, "tasks.revision", "{}");
+    acl::json revision(revision_wire.c_str());
+    if (revision.finish() && json_bool(revision["ok"], false))
+        root.add_text("artifact_revision", json_text(revision["artifact_revision"]).c_str());
+
 	acl::json_node &commands = json.create_array();
 	root.add_child("commands", commands);
 	bool passed = true;
@@ -569,9 +652,23 @@ std::string validate_staged_draft(const std::string &user_root,
 		}
 		webcool::ai::sandbox_result_t result;
 		ctest_io_contract_t io_contract;
+		acl::json identity;auto &input=identity.create_node();
+		input.add_text("tool_key",tool_execution_key.c_str())
+		    .add_text("source",source_fingerprint->c_str())
+		    .add_text("proposals",staged_change_fingerprint(changes).c_str())
+		    .add_text("command_id",command.id.c_str())
+		    .add_text("executable",command.executable.c_str())
+		    .add_number("ordinal",static_cast<long long>(i));
+		auto &args=identity.create_array();input.add_child("arguments",args);
+		for(const auto &value:command.fixed_arguments)args.add_array_text(value.c_str());
+		const std::string execution_key = tool_execution_key.empty() ? "" :
+		    "validation." + webcool::ai::agent_workspace_t::content_sha256(serialize_json(input));
+		bool receipt_unconfirmed=false;
 		const bool dispatched =
 		    dispatch_validation_command(command, draft_root, limits,
-		        readonly_roots, should_cancel, result, io_contract);
+		        readonly_roots, should_cancel, result, io_contract, execution_key,user_root,project_path,receipt_unconfirmed,tool_execution_key);
+		if(receipt_unconfirmed)
+			return tool_error_json("validation command receipt requires host reconciliation: "+execution_key+" "+result.error);
 
 		const bool command_passed = dispatched &&
 		    result.exit_code == 0 && !result.timed_out &&
@@ -613,7 +710,7 @@ std::string validate_staged_draft(const std::string &user_root,
 		}
 		diagnostic_count += append_validation_command(json, commands,
 		    command, result, io_contract, draft_root, test_command,
-		    no_tests, dispatched, command_passed);
+		    no_tests, dispatched, command_passed, execution_key);
 		++executed;
 		if (result.cancelled || should_cancel())
 			return tool_error_json("agent run cancelled");

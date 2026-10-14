@@ -18,9 +18,28 @@ struct agent_progress_tool_output_t {
 	std::string output;
 };
 
+// Host-owned dispatch identity; model text never confirms its outcome.
+struct agent_tool_effect_t {
+    std::string key, name, arguments_sha256, state, output_sha256, reference;
+    size_t completed_before=0, completed_after=0;
+    // Frozen before dispatch for trusted receipt reconstruction. Empty IDs
+    // mean transcript-only recovery, never invented provider identifiers.
+    std::string response_id;
+    std::vector<std::string> native_call_ids;
+    size_t tool_call_count=0;
+};
+
+struct agent_validation_receipt_t {
+    std::string effect_key, execution_revision, source_sha256, proposal_sha256, report_json;
+};
+
 // Recoverable coding-agent state stored inside the selected project. Unlike the
 // run audit, this intentionally contains model context and must remain private.
 struct agent_progress_t {
+    agent_validation_receipt_t validation_receipt;
+    // Host execution configuration fingerprint; empty only for legacy data.
+    std::string execution_revision;
+    std::vector<agent_tool_effect_t> tool_effects;
 	// Durable review ledger owning the generations captured by this checkpoint.
 	std::string source_run_id;
 	// Identifier of the configured model provider.
@@ -66,10 +85,19 @@ public:
 
 	// Persist the supplied record; report failures through err.
 	bool save(const agent_progress_t &progress, std::string &err) const;
+	// POSIX compare-and-save under the same record lease used by normal save
+	// and remove. Requires an existing exact snapshot; returns its new digest.
+	bool save_if_revision(const agent_progress_t &progress,
+	    const std::string &expected_revision, std::string &revision,
+	    std::string &err) const;
 	// Load persisted data into the output record; report failures through
 	// err.
 	bool load(
 	    agent_progress_t &progress, bool &found, std::string &err) const;
+	// Digest of the exact validated file bytes, from the same bounded read.
+	// Empty on missing/error. This is a snapshot identity, not a receipt.
+	bool load_snapshot(agent_progress_t &progress, bool &found,
+	    std::string &revision, std::string &err) const;
 	// Cheap metadata probe used by the conversation list. It deliberately does
 	// not parse or return the private prompt/transcript stored in the checkpoint.
 	bool exists(bool &found, std::string &err) const;
@@ -79,6 +107,9 @@ public:
 	std::string relative_path() const;
 
 private:
+	bool save_impl(const agent_progress_t &progress,
+	    const std::string *expected_revision, std::string &revision,
+	    std::string &err) const;
 	// Filesystem root belonging to the authenticated user.
 	std::string user_root_;
 	// Logical path identifying the selected project.

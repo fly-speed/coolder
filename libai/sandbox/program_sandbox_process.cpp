@@ -326,6 +326,8 @@ bool execute_posix_sandbox(const sandbox_request_t &request,
 	environment_values.push_back("GIT_TERMINAL_PROMPT=0");
 	environment_values.push_back("GIT_CONFIG_NOSYSTEM=1");
 	environment_values.push_back("GIT_CONFIG_GLOBAL=/dev/null");
+	if (!request.idempotency_key.empty())
+		environment_values.push_back("LIBAI_IDEMPOTENCY_KEY=" + request.idempotency_key);
 	std::vector<std::vector<char>> environment_storage;
 	std::vector<char *> envp;
 	environment_storage.reserve(environment_values.size());

@@ -43,6 +43,7 @@ public:
 		target.background = false;
 		target.compact_context = false;
 		target.strict_tools = false;
+		target.allow_multiple_tool_calls = source.profile.multiple_tool_calls;
 		std::set<std::string> names;
 		for (const auto &spec : source.tools) {
 			std::string wire = spec.name;

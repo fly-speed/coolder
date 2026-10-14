@@ -39,6 +39,28 @@ std::string workspace_read_path_to_project(const std::string &project_path,
 
 using namespace workspace_tool_detail;
 
+bool may_retry_coding_tool_after_review(const agent_tool_request_t &request)
+{
+	// These handlers only prepare local review proposals. Never infer replay
+	// safety from model arguments, registry mutating flags or a batch rollback.
+	return request.name == "workspace.propose" ||
+	    request.name == "workspace.propose_batch" ||
+	    request.name == "workspace.patch_set" ||
+	    request.name == "workspace.replace" ||
+	    request.name == "workspace.propose_delete" ||
+	    request.name == "workspace.propose_move" ||
+	    request.name == "workspace.propose_mkdir";
+}
+
+bool coding_tool_requires_confirmation(const agent_tool_request_t &request)
+{
+	// Batches may have started validation commands before a later failure.
+	// rolled_back only describes the candidate draft, never external effects.
+	return request.name.compare(0, 8, "browser.") == 0 ||
+	    request.name == "workspace.validate" ||
+	    request.name == "workspace.execute_batch";
+}
+
 std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
     const std::string &user_root, const std::string &project_path,
     bool allow_file_content, const agent_tool_request_t &request,
@@ -48,7 +70,8 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
     const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
     const unavailable_validation_t *unavailable_validation,
     validation_cache_t *validation_cache, std::string *saved_proposal_batch,
-    batch_validation_evidence_t *batch_validation)
+    batch_validation_evidence_t *batch_validation,
+    const std::string &tool_execution_key)
 {
 	trace.name = request.name;
 	trace.path = request.path;
@@ -56,6 +79,8 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 	trace.ok = false;
 	trace.truncated = false;
 	trace.native = false;
+	if (!webcool::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
+		return tool_error_json("invalid workspace tool execution key");
 	const webcool::ai::ai_admin_policy_t read_policy =
 	    webcool::ai::ai_runtime_policy_get();
 	const size_t read_chunk_bytes = read_policy.read_chunk_kib * 1024;
@@ -68,7 +93,7 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 		    project_path, allow_file_content, request, trace,
 		    staged_changes, run_id, sandbox_limits, chinese,
 		    unavailable_validation, validation_cache,
-		    saved_proposal_batch, batch_validation);
+		    saved_proposal_batch, batch_validation, tool_execution_key);
 	}
 	const webcool::ai::agent_definition_t *definition =
 	    webcool::ai::agent_registry_t::instance().find("coding");
@@ -86,7 +111,7 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 			    "Provider is not authorized to receive page content");
 		const auto result =
 		    webcool::ai::browser_debug_tool(user_root, project_path,
-		        run_id, request.name, request.query, request.content);
+		        run_id, request.name, request.query, request.content, tool_execution_key);
 		acl::json evidence(result.c_str());
 		const auto *ok = evidence["ok"];
 		trace.ok = ok && ok->get_bool() && *ok->get_bool();
@@ -165,7 +190,7 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 		run_id, sandbox_limits, chinese, unavailable_validation,
 		validation_cache, draft_workspace, read_workspace, path,
 		draft_path, err, live_source_view, json, read_chunk_bytes,
-		read_file_limit_bytes, saved_proposal_batch };
+		read_file_limit_bytes, saved_proposal_batch, tool_execution_key };
 	if (request.name == "workspace.validate") {
 		return execute_workspace_validate(context);
 	}

@@ -1,4 +1,5 @@
 #include "bridge_internal.h"
+#include <libai/sdk/governance.h>
 #include <cstdlib>
 
 /* No exception, allocator ownership or C++ object crosses the language boundary. */
@@ -21,6 +22,24 @@ void bridge_error(const char *text) noexcept
 }
 
 extern "C" {
+void libai_execution_result_set(libai_execution_result *r,const char *revision,const char *state,const char *error) {
+    if(!r)return;
+    try{r->revision=bridge_text(revision);r->state_json=bridge_text(state);r->error=bridge_text(error);}
+    catch(...){r->failed=true;}
+}
+const char *libai_invocation_idempotency_key(const libai_invocation *invocation) {
+    return invocation?invocation->idempotency_key.c_str():"";
+}
+
+char *libai_governance_call(const char *operation,const char *arguments)
+{
+    try {
+        return bridge_owned(libai::governance_call(bridge_text(operation),
+            arguments?bridge_text(arguments):"{}"));
+    } catch (const std::exception &e) { bridge_error(e.what()); }
+    catch (...) { bridge_error("governance operation failed"); }
+    return nullptr;
+}
 unsigned libai_abi_version(void)
 {
 	return 1;

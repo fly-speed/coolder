@@ -3,7 +3,7 @@
 ## 快速开始
 
 SDK 要求 C++11，入口 `<libai/agent.h>`，CMake 目标 `libai::agent`。
-它只使用标准库，可运行在 CLI、桌面程序、服务或嵌入应用中。
+它使用标准库及内置的私有 Schema 验证器，无需额外安装 JSON 库，可运行在 CLI、桌面程序、服务或嵌入应用中。
 完整库入口与原编程运行时保持兼容；链接 `libai::ai` 可使用原生 HTTP provider 和工作区能力。
 
 ```cpp
@@ -79,7 +79,7 @@ tool.requires_approval = true;
 ```
 
 工具处理器收到完整 `tool_call_t.arguments` JSON 字符串和 `tool_context_t`。
-工具自身负责解析与验证业务参数；SDK 不带 JSON 依赖或通用 schema validator。
+SDK 在注册时验证 Schema，执行前对整批参数做受限 Draft4 校验；任何调用不符合 Schema 时整批不执行，并返回错误供模型修复。工具仍负责业务权限、领域规则和执行时前置条件。详见 [工具治理](GOVERNANCE.md)。
 可用它接入数据库、检索、业务接口、沙盒命令、其他 agent 或宿主插件。
 同一模型轮的多个工具按顺序执行，避免隐式并发修改。
 未注册工具、拒绝授权和工具异常转为 `tool_error` 结果返回模型。

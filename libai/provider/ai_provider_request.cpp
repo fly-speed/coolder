@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../sdk/model_profile.h"
 #include "ai_provider_client_internal.h"
 #include "../common/utf8_text.h"
 #include "../prompt/prompt_language.h"
@@ -106,7 +107,7 @@ void add_completion_tools(acl::json &json, acl::json_node &root,
 	// are intentionally left untouched because several reject unknown fields.
 	if (provider.protocol == "openai_chat" ||
 	    provider.protocol == "openai_responses") {
-		root.add_bool("parallel_tool_calls", true);
+		root.add_bool("parallel_tool_calls", input.allow_multiple_tool_calls);
 	}
 	// A proposal-only repair turn is different from an ordinary model turn: all
 	// required source context is already present and another prose promise would
@@ -852,8 +853,14 @@ static void normalize_completion_reasoning(const provider_config_t &provider,
 }
 
 bool build_completion_payload(const provider_config_t &provider,
-    const completion_request_t &input, bool stream, std::string &payload)
+    const completion_request_t &original, bool stream, std::string &payload)
 {
+	completion_request_t input=original;
+	const auto profile=libai::parse_model_profile(provider.model_profile_json);
+	input.max_output_tokens=static_cast<long long>(std::min(static_cast<size_t>(std::max(0LL,input.max_output_tokens)),profile.max_output_tokens));
+	input.allow_multiple_tool_calls=input.allow_multiple_tool_calls && profile.multiple_tool_calls;
+	if (!profile.tool_calling) {input.tools.clear();input.require_tool_call=false;}
+
 	for (const auto &tool : input.tools) {
 		if (tool.parameters_json.empty())
 			continue;

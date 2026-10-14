@@ -17,6 +17,11 @@ bool load_matching_coding_progress(webcool::ai::agent_progress_store_t &store,
 	bool found = false;
 	if (!store.load(progress, found, err))
 		return false;
+    // Check before matching a new prompt/provider; a new plan cannot erase an
+    // uncertain dispatch in this conversation's checkpoint.
+    if(found)for(const auto &effect:progress.tool_effects)if(effect.state=="running") {
+        err="unconfirmed tool effect requires host reconciliation: "+effect.key;return false;
+    }
 	resumed = found && progress.provider_id == provider.id &&
 	    (progress.provider_model.empty() ||
 	        progress.provider_model == provider.model) &&

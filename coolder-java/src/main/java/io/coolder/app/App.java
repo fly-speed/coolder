@@ -64,7 +64,7 @@ final class App implements AutoCloseable {
     auth =
         new Auth(data, workspace, Paths.get(Json.text(cfg, "html")).toAbsolutePath().normalize());
     projects = new Projects(auth);
-    runs = new Runs(projects);
+    runs = new Runs(projects, Json.text(cfg, "sandbox_helper"));
     sandbox = new Sandbox(projects, Json.text(cfg, "sandbox_helper"));
     policy =
         Json.map(
@@ -383,7 +383,8 @@ final class App implements AutoCloseable {
         } else if (op.equals("runs/start")) {
           result = runs.start(a, b, policy);
           status = 202;
-        } else if (op.equals("runs/status")) result = runs.record(a, Json.text(b, "id"));
+        } else if (op.equals("runs/recovery")) result = runs.recovery(a, Json.text(b, "id"));
+        else if (op.equals("runs/status")) result = runs.record(a, Json.text(b, "id"));
         else if (op.equals("runs"))
           result = Json.obj("ok", true, "runs", projects.records("runs", a));
         else if (op.startsWith("runs/")) {

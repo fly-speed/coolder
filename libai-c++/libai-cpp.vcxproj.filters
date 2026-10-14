@@ -10,6 +10,7 @@
     <ClCompile Include="..\libai\agent\ai_admin_policy.cpp" />
     <ClCompile Include="..\libai\coding\coding_projects.cpp" />
     <ClCompile Include="..\libai\coding\coding_providers.cpp" />
+    <ClCompile Include="..\libai\coding\coding_tasks.cpp" />
     <ClCompile Include="..\libai\coding\coding_service.cpp" />
     <ClCompile Include="..\libai\coding\coding_storage.cpp" />
     <ClCompile Include="..\libai\coding\coding_workspace.cpp" />
@@ -40,6 +41,7 @@
     <ClCompile Include="..\libai\runtime\ai_agent_drafts.cpp" />
     <ClCompile Include="..\libai\runtime\ai_agent_events.cpp" />
     <ClCompile Include="..\libai\runtime\ai_agent_loop.cpp" />
+    <ClCompile Include="..\libai\runtime\ai_agent_task_contract.cpp" />
     <ClCompile Include="..\libai\runtime\ai_agent_results.cpp" />
     <ClCompile Include="..\libai\runtime\ai_agent_runtime.cpp" />
     <ClCompile Include="..\libai\runtime\ai_agent_tools.cpp" />
@@ -94,9 +96,14 @@
     <ClCompile Include="..\libai\workspace\workspace_change_records.cpp" />
     <ClCompile Include="..\libai\workspace\workspace_change_set.cpp" />
     <ClCompile Include="..\libai\workspace\workspace_patch.cpp" />
+    <ClCompile Include="src\workflow.cpp" />
+    <ClCompile Include="src\mcp.cpp" />
     <ClCompile Include="src\agent.cpp" />
     <ClCompile Include="src\coding_service.cpp" />
     <ClCompile Include="src\provider_model.cpp" />
+    <ClInclude Include="src\mcp_bridge.h" />
+    <ClInclude Include="include\libai_cpp\workflow.h" />
+    <ClInclude Include="include\libai_cpp\mcp.h" />
     <ClInclude Include="include\libai_cpp\agent.h" />
     <ClInclude Include="include\libai_cpp\coding.h" />
     <ClInclude Include="include\libai_cpp\coding_service.h" />
@@ -113,4 +120,5 @@
   <ItemGroup><ClCompile Include="..\libai\coding\coding_migration.cpp"></ClCompile></ItemGroup>
   <ItemGroup><ClCompile Include="..\libai\common\record_json.cpp"></ClCompile></ItemGroup>
   <ItemGroup><ClInclude Include="..\libai\common\record_json.h" /></ItemGroup>
+  <ItemGroup><ClCompile Include="src\rag.cpp" /><ClInclude Include="src\rag_bridge.h" /><ClInclude Include="include\libai_cpp\rag.h" /></ItemGroup>
 </Project>

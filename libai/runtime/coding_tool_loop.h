@@ -78,6 +78,9 @@ public:
 	bool run();
 
 private:
+	friend struct coding_loop_test_access_t;
+	// Persist an undo intent before invoking the external browser broker.
+	bool cleanup_browser_style(const std::function<std::string(const std::string &)> &dispatch);
 	// Number of relevant reports that triggers a browser-debug prompt.
 	unsigned long browser_debug_report_threshold;
 	// Tracks browser observations required before and after UI changes.
@@ -86,7 +89,7 @@ private:
 	// evidence.
 	void refresh_browser_evidence();
 	// Run the requested browser observation and return bounded evidence.
-	std::string probe_browser_experiment();
+	std::string probe_browser_experiment(const std::string &execution_key);
 	// Element selector used by the current browser experiment.
 	std::string browser_experiment_selector;
 	// browser_experiment_images: Screenshots captured for the current
@@ -109,7 +112,7 @@ private:
 	void record_acceptance_evidence(const std::string &report);
 	// Persist the final task-acceptance outcome for the completed
 	// invocation.
-	void finish_task_acceptance(bool completed);
+	bool finish_task_acceptance(bool completed);
 	// task_contract: Task requirements and acceptance conditions supplied
 	// to the model.
 	// acceptance_report: Validation report retained as task acceptance
@@ -142,7 +145,11 @@ private:
 	bool restore_checkpoint();
 	// Recheck recovered proposals before making them available to the
 	// model.
-	void validate_recovered_draft();
+	bool validate_recovered_draft();
+	bool prepare_execution_revision();
+	// Shared standalone automatic validation: intent, budget, cancellation and receipt.
+	bool run_automatic_validation(const std::string &operation,
+	    agent_tool_trace_t &trace,std::string &report);
 	// Select the authorized tool catalog for this invocation.
 	bool prepare_model_tools();
 	// Restore compact conversation and source context for the resumed
@@ -186,6 +193,8 @@ private:
 	void build_request_contract(coding_turn_t &turn);
 	// Apply provider controls, token limits and continuation options.
 	void build_request_options(coding_turn_t &turn);
+	// Validate the complete response against the advertised tool schemas.
+	step_t validate_tool_schema(coding_turn_t &turn);
 	// Select the tool schemas allowed for the current model turn.
 	void select_request_tools(coding_turn_t &turn);
 	// Attach retained source, repair and validation evidence to the
@@ -222,6 +231,8 @@ private:
 	// Execute the admitted workspace action and retain its trace and
 	// result.
 	bool execute_tool(coding_turn_t &turn);
+    bool begin_tool_effect(coding_turn_t &turn);
+    step_t settle_tool_effect(coding_turn_t &turn,step_t result);
 	// Pair executed native calls with outputs for provider continuation.
 	void record_tool_outputs(coding_turn_t &turn);
 	// Publish staged edits into the private draft or restore the previous
@@ -375,6 +386,8 @@ private:
 
 	// A resumed run gets a fresh window while checkpoint counts stay cumulative.
 	size_t executed_tool_calls;
+	// Recovery verification may consume tools before the first provider turn.
+	size_t initial_model_tool_calls = 0;
 	// Consecutive model turns that did not execute a workspace tool.
 	size_t non_tool_turns = 0;
 	// Additional source reads used to supply missing repair evidence.

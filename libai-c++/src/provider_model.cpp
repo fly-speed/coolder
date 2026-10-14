@@ -26,6 +26,7 @@ static webcool::ai::provider_config_t native_config(
 	target.responses_text_verbosity = source.responses_text_verbosity;
 	target.responses_service_tier = source.responses_service_tier;
 	target.responses_cache_ttl = source.responses_cache_ttl;
+	target.model_profile_json = source.model_profile_json;
 	target.qwen_session_cache = source.qwen_session_cache;
 	target.openai_organization = source.openai_organization;
 	target.openai_project = source.openai_project;
@@ -52,6 +53,7 @@ ModelResponse NativeProviderModel::complete(
 {
 	libai::model_request_t native;
 	native.instructions = request.instructions;
+	native.profile = libai::parse_model_profile(request.model_profile_json);
 	native.messages = detail::convert_values<libai::message_t>(
 	    request.messages, detail::native_message);
 	native.tools = detail::convert_values<libai::tool_spec_t>(

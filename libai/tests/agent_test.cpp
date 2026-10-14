@@ -239,9 +239,9 @@ static void test_control()
 	    never.run(empty, "start", pre).status == run_status_t::cancelled &&
 	    empty.messages.empty());
 	pre.cancellation.reset();
-	pre.timeout = std::chrono::milliseconds(0);
+	pre.timeout = std::chrono::milliseconds(-1);
 	assert(never.run(empty, "start", pre).status ==
-	    run_status_t::deadline_exceeded);
+	    run_status_t::callback_error);
 	pre.timeout = std::chrono::milliseconds(1000);
 	pre.max_context_bytes = 1;
 	assert(never.run(empty, "start", pre).status ==

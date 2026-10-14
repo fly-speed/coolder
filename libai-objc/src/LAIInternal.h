@@ -18,6 +18,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, assign) libai_cancellation *native;
 /** Retain the same stop state while protecting the handle from disposal. */
 - (libai_cancellation *)retainNative;
+/** Adopt an owning token without allocating a second native stop state. */
+- (instancetype)initWithOwnedNative:(libai_cancellation *)token;
 @end
 
 /** Agent state accessed only while its facade remains alive. */
@@ -30,6 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) NSMutableDictionary<NSString *, LAITool> *tools;
 /** Observer snapshot retained for the active run. */
 @property(nonatomic, strong, nullable) LAIRunHooks *hooks;
+/** Host store retained while native callbacks refer to it. */
+@property(nonatomic, strong, nullable) id<LAIExecutionStore> executionStore;
 /** Prevent close, mutation or simultaneous session runs. */
 @property(nonatomic) BOOL busy;
 @end
@@ -49,5 +53,7 @@ int lai_text(void *, const char *);
 int lai_authorize(void *, const char *, const char *, int);
 /** Forward one lifecycle event to the active run's observer block. */
 void lai_event(void *, const char *);
+
+void lai_execution(void *, const char *, const char *, const char *, const char *, libai_execution_result *);
 
 NS_ASSUME_NONNULL_END

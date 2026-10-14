@@ -21,6 +21,8 @@ struct sandbox_execution_plan_t {
 	sandbox_limits_t limits;
 	// Creation time as seconds since the Unix epoch.
 	long long created_at = 0;
+	// Assigned by the trusted execution host after consuming the plan.
+	std::string idempotency_key;
 };
 
 // One coalesced run reconstructed from the append-only metadata audit. Output
@@ -52,6 +54,8 @@ struct sandbox_run_history_t {
 	bool output_truncated = false;
 	// Diagnostic explaining why the operation failed.
 	std::string error;
+	// Empty for historical records without an execution key.
+	std::string idempotency_key;
 };
 
 // Stores a single short-lived, one-time sandbox authorization per user.

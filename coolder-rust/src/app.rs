@@ -532,6 +532,7 @@ impl App {
                 status = 202;
                 runs::start(self, s, a, b)?
             }
+            "runs/recovery" => runs::recovery(s, a, text(b, "id"))?,
             "runs/status" => runs::status(s, a, text(b, "id"))?,
             "runs" => json!({"ok":true,"runs":s.rows("runs",a)}),
             op if op.starts_with("runs/") => {

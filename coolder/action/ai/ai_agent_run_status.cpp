@@ -271,6 +271,7 @@ bool AiAgentRunStatusAction::run(request_t &req, response_t &res)
 		    root, user_root, record, session_hint);
 	}
 	add_model_interactions_json(root, user_root, record, runtime_task);
+	add_current_task_contract_json(root, user_root, record);
 	return sendJson(res, 200, root, req.isKeepAlive());
 }
 
@@ -473,6 +474,8 @@ bool AiAgentRunEventsAction::run(request_t &req, response_t &res)
 			add_runtime_result_json(root, runtime_task, NULL,
 			    record.status != "running" ||
 			        staged_version != last_staged_version);
+            if (record.status != "running")
+                add_current_task_contract_json(root, user_root, record);
 			if (!runtime_task) {
 				add_durable_recovery_json(
 				    root, user_root, record, session_hint);

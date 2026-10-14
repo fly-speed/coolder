@@ -21,7 +21,15 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 	    context.unavailable_validation->matches(
 	        staged_change_fingerprint(validation_changes))) {
 		context.trace.ok = true;
-		return context.unavailable_validation->report;
+		acl::json cached(context.unavailable_validation->report.c_str());
+		if (!cached.finish() || !cached.get_root().is_object()) {
+			context.trace.ok = false;
+			return tool_error_json("invalid cached validation report");
+		}
+		cached.get_root().add_bool("validation_reused", true)
+		    .add_bool("executed_this_call", false)
+		    .add_text("reused_for_tool_execution_key", context.tool_execution_key.c_str());
+		return serialize_json(cached.get_root());
 	}
 	// No cached report means there is nothing to compare. Materialization
 	// already computes the source fingerprint; reuse that result below.
@@ -38,9 +46,16 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 	    !context.validation_cache->draft_fingerprint.empty() &&
 	    context.validation_cache->draft_fingerprint ==
 	        validation_baseline_fingerprint(context.draft_workspace, "")) {
+        std::string receipt_error;
+        if (!validate_cached_command_receipts(context.user_root, context.project_path,
+                context.validation_cache->report, receipt_error)) {
+            context.trace.ok = false;
+            return tool_error_json(receipt_error);
+        }
 		acl::json cached(context.validation_cache->report.c_str());
 		cached.get_root().add_bool("validation_reused", true);
 		cached.get_root().add_bool("executed_this_call", false);
+		cached.get_root().add_text("reused_for_tool_execution_key", context.tool_execution_key.c_str());
 		cached.get_root().add_text("reuse_note",
 		    prompt_text(json_bool(cached["validation_passed"], false) ?
 		            prompt_id::validation_success_reused :
@@ -52,7 +67,8 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 	std::string validated_source;
 	const std::string report = validate_staged_draft(context.user_root,
 	    context.project_path, context.run_id, validation_changes,
-	    context.sandbox_limits, context.trace, &validated_source);
+	    context.sandbox_limits, context.trace, &validated_source, false,
+	    context.tool_execution_key);
 	if (!context.validation_cache)
 		return report;
 	context.validation_cache->report.clear();

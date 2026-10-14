@@ -202,12 +202,13 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
     const std::string &project_path, const std::string &original_prompt,
     const std::string &transcript, const std::string &reasoning,
     const std::string &last_error, size_t completed_tool_calls,
-    std::string &err)
+    std::string &err, const std::string &complete_effect)
 {
 	if (runtime_task->text_preview)
 		return true;
 	webcool::ai::agent_progress_t progress;
 	progress.source_run_id = runtime_task->id;
+	progress.execution_revision = runtime_task->coding_execution_revision;
 	progress.provider_id = provider.id;
 	progress.provider_model = provider.model;
 	progress.project_path = project_path;
@@ -220,6 +221,8 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 	progress.updated_at = static_cast<long long>(time(NULL));
 	{
 		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		progress.tool_effects = runtime_task->tool_effects;
+		progress.validation_receipt = runtime_task->validation_receipt;
 		progress.staged_changes = runtime_task->changes;
 		progress.provider_response_id =
 		    runtime_task->provider_response_id;
@@ -255,7 +258,18 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 		webcool::ai::ai_log_error("agent.runtime",
 		    "load-review-state-for-progress", reviewed_err);
 	}
-	return store.save(progress, err);
+    if(!complete_effect.empty()) {
+        if(progress.tool_effects.empty() || progress.tool_effects.back().key!=complete_effect ||
+            progress.tool_effects.back().state!="running") {err="tool effect receipt identity mismatch";return false;}
+        auto &effect=progress.tool_effects.back();effect.state="done";
+        effect.completed_after=completed_tool_calls;effect.reference="progress:"+complete_effect;
+    }
+    if(!store.save(progress,err))return false;
+    if(!complete_effect.empty()) {
+        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        runtime_task->tool_effects=progress.tool_effects;
+    }
+    return true;
 }
 
 std::string compact_coding_transcript(const std::string &original_prompt,

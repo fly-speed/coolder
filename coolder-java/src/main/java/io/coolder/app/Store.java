@@ -90,6 +90,11 @@ final class Store {
         c.force(true);
       }
       Files.move(tmp, p, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      if (p.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+        try (FileChannel parent = FileChannel.open(p.getParent(), StandardOpenOption.READ)) {
+          parent.force(true);
+        }
+      }
     } finally {
       Files.deleteIfExists(tmp);
     }

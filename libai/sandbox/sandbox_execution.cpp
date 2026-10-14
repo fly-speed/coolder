@@ -246,6 +246,10 @@ bool append_audit(const std::string &user_root,
     const sandbox_execution_plan_t &plan, const char *event,
     const sandbox_result_t *result, std::string &err)
 {
+	if (!program_sandbox_t::valid_idempotency_key(plan.idempotency_key)) {
+		err = "invalid sandbox audit idempotency key";
+		return false;
+	}
 	std::string directory;
 	if (!ensure_store_directory(user_root, directory, err))
 		return false;
@@ -281,7 +285,8 @@ bool append_audit(const std::string &user_root,
 	       << (result && result->timed_out ? 1 : 0) << '\t'
 	       << (result && result->output_truncated ? 1 : 0) << '\t'
 	       << hex_encode(result_error) << '\t'
-	       << (result && result->cancelled ? 1 : 0);
+	       << (result && result->cancelled ? 1 : 0) << '\t'
+	       << hex_encode(plan.idempotency_key);
 	records.push_back(record.str());
 	const std::string temporary = path + ".tmp";
 	record_json::output out(temporary.c_str(),
@@ -340,10 +345,9 @@ bool parse_audit_record(const std::string &line, long long &timestamp,
 {
 	std::vector<std::string> fields;
 	split_tabs(line, fields);
-	// V1 originally had 11 fields. Field 12 was appended for cancellation so
-	// the prefix remains readable by old installations and old files remain
-	// readable by this version.
-	if (fields.size() != 11 && fields.size() != 12)
+	// Historical 11/12-field records have no key. Field 13 carries a host key;
+	// do not infer it from an old plan ID or silently discard malformed keys.
+	if (fields.size() != 11 && fields.size() != 12 && fields.size() != 13)
 		return false;
 	long long exit_code = 0;
 	long long signal = 0;
@@ -361,8 +365,11 @@ bool parse_audit_record(const std::string &line, long long &timestamp,
 	    !parse_integer(fields[8], 0, 1, timed_out) ||
 	    !parse_integer(fields[9], 0, 1, truncated) ||
 	    !hex_decode(fields[10], run.error) ||
-	    (fields.size() == 12 &&
-	        !parse_integer(fields[11], 0, 1, cancelled)))
+	    (fields.size() >= 12 &&
+	        !parse_integer(fields[11], 0, 1, cancelled)) ||
+	    (fields.size() == 13 &&
+	        (!hex_decode(fields[12], run.idempotency_key) ||
+	            !program_sandbox_t::valid_idempotency_key(run.idempotency_key))))
 		return false;
 	event = fields[1];
 	run.id = fields[2];
@@ -553,11 +560,19 @@ bool sandbox_execution_store_t::list_history(size_t limit,
 		}
 		sandbox_run_history_t &current = runs[position->second];
 		if (event == "started") {
+			current.idempotency_key = parsed.idempotency_key;
 			current.project_path = parsed.project_path;
 			current.command_id = parsed.command_id;
 			current.started_at = timestamp;
 			current.status = "interrupted";
 		} else {
+			if (!current.idempotency_key.empty() && !parsed.idempotency_key.empty() &&
+			    current.idempotency_key != parsed.idempotency_key) {
+				err = "sandbox audit execution key mismatch";
+				return false;
+			}
+			if (parsed.idempotency_key.empty())
+				parsed.idempotency_key = current.idempotency_key;
 			const long long started_at = current.started_at;
 			current = parsed;
 			current.started_at = started_at;

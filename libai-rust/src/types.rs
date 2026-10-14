@@ -66,6 +66,24 @@ pub struct Invocation<'a> {
     pub(crate) lifetime: PhantomData<&'a mut ()>,
 }
 impl Invocation<'_> {
+    /// Parent deadline: -1 unlimited, 0 expired. Never turn 0 into an unlimited child.
+    pub fn remaining_ms(&self) -> i64 {
+        unsafe { ffi::libai_invocation_remaining_ms(self.pointer) }
+    }
+    /// Own a copy of the shared stop state. Fail if absent or allocation fails.
+    pub fn retain_cancellation(&self) -> Result<crate::Cancellation, Error> {
+        let pointer = unsafe { ffi::libai_invocation_retain_cancellation(self.pointer) };
+        if pointer.is_null() {
+            return Err(Error(
+                "invocation has no cancellation token or retain failed".into(),
+            ));
+        }
+        Ok(crate::Cancellation { pointer })
+    }
+    /// Copy the stable durable effect key while inside a callback; empty if disabled.
+    pub fn idempotency_key(&self) -> String {
+        unsafe { crate::callbacks::text(ffi::libai_invocation_idempotency_key(self.pointer)) }
+    }
     pub fn stopped(&self) -> bool {
         unsafe { ffi::libai_invocation_stopped(self.pointer) != 0 }
     }

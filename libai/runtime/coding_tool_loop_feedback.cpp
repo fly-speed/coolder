@@ -415,10 +415,8 @@ bool coding_tool_loop_t::finish_budget_boundary()
 			agent_tool_trace_t validation_trace;
 			validation_trace.name = "workspace.validate";
 			validation_trace.path = project_path;
-			const std::string validation =
-			    validate_staged_draft(runtime_task->user_root,
-			        project_path, runtime_task->id, changes,
-			        sandbox_limits, validation_trace);
+			std::string validation;
+			if(!run_automatic_validation("coding.budget_validation",validation_trace,validation))return false;
 			traces.push_back(validation_trace);
 			record_acceptance_evidence(validation);
 			if (validation.find("\"validation_passed\":true") !=
@@ -429,6 +427,8 @@ bool coding_tool_loop_t::finish_budget_boundary()
 				validation_state =
 				    successful_validation_summary(
 				        validation, chinese);
+			} else if(validation.find("tool_budget_exhausted")!=std::string::npos) {
+				validation_state="工具额度已用尽，未启动固定验证";
 			} else if (validation.find("\"commands_executed\":0") !=
 			    std::string::npos) {
 				validation_state = "固定验证工具不可用";

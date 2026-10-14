@@ -1,5 +1,6 @@
 #pragma once
 #include "coding_internal.h"
+#include "../storage/run_timing.h"
 #include "../storage/agent_session_store.h"
 #include "../storage/agent_run_store.h"
 #include "../sandbox/sandbox_execution.h"
@@ -12,6 +13,7 @@ namespace coding_detail
 // Encode non-secret persistent sandbox_run_history_t metadata for every language binding.
 inline void record(acl::json_node &out, const sandbox_run_history_t &p)
 {
+	out.add_text("idempotency_key", p.idempotency_key.c_str());
 	out.add_text("id", p.id.c_str());
 	out.add_text("project_path", p.project_path.c_str());
 	out.add_text("command_id", p.command_id.c_str());
@@ -38,6 +40,11 @@ inline void record(acl::json_node &out, const agent_run_record_t &p)
 	out.add_text("project_path", p.project_path.c_str());
 	out.add_number("started_at", static_cast<long long>(p.started_at));
 	out.add_number("finished_at", static_cast<long long>(p.finished_at));
+	const auto timing = run_timing(p.started_at, p.finished_at, p.status);
+	out.add_number("elapsed_ms", timing.elapsed_ms);
+	out.add_bool("elapsed_available", timing.available);
+	out.add_number("elapsed_resolution_ms", 1000);
+	out.add_text("elapsed_source", "unix_seconds");
 	out.add_number("input_tokens", static_cast<long long>(p.input_tokens));
 	out.add_number("cached_input_tokens",
 	    static_cast<long long>(p.cached_input_tokens));

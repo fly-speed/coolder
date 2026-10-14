@@ -78,6 +78,7 @@ void add_provider_json(acl::json_node &node,
 	node.add_bool("enabled", item.enabled);
 	node.add_bool("allow_file_content", item.allow_file_content);
 	node.add_bool("is_default", item.is_default);
+	node.add_text("model_profile_json", item.model_profile_json.c_str());
 	node.add_bool("responses_store", item.responses_store);
 	node.add_bool("responses_background", item.responses_background);
 	node.add_bool("responses_compact", item.responses_compact);
@@ -128,6 +129,10 @@ bool parse_provider_input(request_t &req,
 	    json_bool((*body)["allow_file_content"], false);
 	input.is_default = json_bool((*body)["is_default"], false);
 	input.clear_api_key = json_bool((*body)["clear_api_key"], false);
+	if ((*body)["model_profile_json"]) {
+		if (!(*body)["model_profile_json"]->is_string()) {err="model_profile_json must be a string";return false;}
+		input.model_profile_json=json_text((*body)["model_profile_json"]);
+	}
 	input.responses_store = json_bool((*body)["responses_store"], true);
 	input.responses_background =
 	    json_bool((*body)["responses_background"], false);

@@ -496,6 +496,10 @@ bool program_sandbox_t::resolve_request(const sandbox_request_t &request,
     const sandbox_command_t *&command, std::string &err) const
 {
 	command = NULL;
+	if (!valid_idempotency_key(request.idempotency_key)) {
+		err = "invalid sandbox idempotency key";
+		return false;
+	}
 	std::string user_root;
 	if (!canonical_existing_directory(user_root_, user_root, err))
 		return false;
@@ -629,6 +633,18 @@ bool program_sandbox_t::resolve_request(const sandbox_request_t &request,
 		return true;
 	err = "sandbox resource limits are outside the safe range";
 	return false;
+}
+
+bool program_sandbox_t::valid_idempotency_key(const std::string &key)
+{
+	if (key.size() > 256)
+		return false;
+	for (unsigned char c : key)
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		        (c >= '0' && c <= '9') || c == '_' || c == '-' ||
+		        c == '.' || c == ':'))
+			return false;
+	return true;
 }
 
 bool program_sandbox_t::validate(

@@ -6,6 +6,14 @@ use std::{
     panic::{catch_unwind, AssertUnwindSafe},
 };
 
+pub(crate) fn discard_panic(payload: Box<dyn std::any::Any + Send>) {
+    // A panic payload may itself have a panicking destructor. Keep that second
+    // unwind inside Rust too; only such faulty nested payloads are abandoned.
+    if let Err(nested) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
+        std::mem::forget(nested);
+    }
+}
+
 pub type Model = dyn FnMut(&str, &Invocation<'_>) -> ModelResponse;
 pub type Tool = dyn FnMut(ToolCall, &Invocation<'_>) -> ToolResult;
 pub struct ModelHolder {
@@ -65,7 +73,10 @@ pub unsafe extern "C" fn model(
             let message = cstring(&error.0).unwrap();
             ffi::libai_response_error(builder, message.as_ptr(), 0);
         }
-        Err(_) => ffi::libai_response_error(builder, c"Rust model callback panicked".as_ptr(), 0),
+        Err(payload) => {
+            discard_panic(payload);
+            ffi::libai_response_error(builder, c"Rust model callback panicked".as_ptr(), 0);
+        }
     }
 }
 pub unsafe extern "C" fn tool(
@@ -92,8 +103,14 @@ pub unsafe extern "C" fn tool(
         ffi::libai_tool_result_set(builder, content.as_ptr(), output.error as c_int);
         Ok::<(), Error>(())
     }));
-    if !matches!(result, Ok(Ok(()))) {
-        ffi::libai_tool_result_set(builder, c"Rust tool callback failed".as_ptr(), 1);
+    match result {
+        Ok(Ok(())) => (),
+        other => {
+            if let Err(payload) = other {
+                discard_panic(payload);
+            }
+            ffi::libai_tool_result_set(builder, c"Rust tool callback failed".as_ptr(), 1);
+        }
     }
 }
 pub unsafe extern "C" fn stream(user: *mut c_void, delta: *const c_char) -> c_int {
@@ -101,10 +118,14 @@ pub unsafe extern "C" fn stream(user: *mut c_void, delta: *const c_char) -> c_in
     let result = catch_unwind(AssertUnwindSafe(|| {
         (holder.hooks.on_text.as_mut().unwrap())(&text(delta))
     }));
-    if result.is_err() {
-        ffi::libai_agent_cancel(holder.agent);
+    match result {
+        Ok(value) => value as c_int,
+        Err(payload) => {
+            discard_panic(payload);
+            ffi::libai_agent_cancel(holder.agent);
+            0
+        }
     }
-    result.unwrap_or(false) as c_int
 }
 pub unsafe extern "C" fn authorize(
     user: *mut c_void,
@@ -116,18 +137,21 @@ pub unsafe extern "C" fn authorize(
     let result = catch_unwind(AssertUnwindSafe(|| {
         (holder.hooks.authorize.as_mut().unwrap())(&text(name), &text(args), required != 0)
     }));
-    if result.is_err() {
-        ffi::libai_agent_cancel(holder.agent);
+    match result {
+        Ok(value) => value as c_int,
+        Err(payload) => {
+            discard_panic(payload);
+            ffi::libai_agent_cancel(holder.agent);
+            0
+        }
     }
-    result.unwrap_or(false) as c_int
 }
 pub unsafe extern "C" fn event(user: *mut c_void, value: *const c_char) {
     let holder = &mut *(user as *mut HookHolder<'_>);
-    if catch_unwind(AssertUnwindSafe(|| {
+    if let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
         (holder.hooks.on_event.as_mut().unwrap())(&text(value))
-    }))
-    .is_err()
-    {
+    })) {
+        discard_panic(payload);
         ffi::libai_agent_cancel(holder.agent);
     }
 }

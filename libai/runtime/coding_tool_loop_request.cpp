@@ -1,6 +1,7 @@
 #include "stdafx.h"
 // Model request construction and request telemetry.
 #include "coding_tool_loop_internal.h"
+#include "../sdk/model_profile.h"
 #include "browser_debug.h"
 #include "ai_agent_tools_internal.h"
 
@@ -202,7 +203,7 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 	}
 	// Images belong only to the first provider turn. Subsequent tool turns use
 	// the model's existing conversation transcript and must not resend bytes.
-	if (turn.call == initial_completed_tool_calls ||
+	if (turn.call == initial_model_tool_calls ||
 	    runtime_task->text_preview)
 		turn.input.images = request_images;
 	// Browser images are transient evidence, never base64 in tool transcripts/checkpoints.
@@ -464,6 +465,10 @@ void coding_tool_loop_t::build_model_request(coding_turn_t &turn)
 	build_request_options(turn);
 	select_request_tools(turn);
 	restore_request_evidence(turn);
+	const auto profile=libai::parse_model_profile(provider.model_profile_json);
+	turn.input.max_output_tokens=static_cast<long long>(std::min(static_cast<size_t>(turn.input.max_output_tokens),profile.max_output_tokens));
+	turn.input.allow_multiple_tool_calls=profile.multiple_tool_calls;
+	if (!profile.tool_calling) {turn.input.tools.clear();turn.input.require_tool_call=false;}
 }
 
 void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
@@ -473,6 +478,13 @@ void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
 	acl::json request_json;
 	acl::json_node &request_event = request_json.create_node();
 	request_event.add_text("event", "model_request_started");
+	const auto policy = webcool::ai::ai_runtime_policy_get();
+	request_event.add_number("request_timeout_ms",
+	    static_cast<long long>(policy.provider_request_timeout_seconds) * 1000);
+	request_event.add_number("stream_idle_timeout_ms",
+	    static_cast<long long>(policy.provider_stream_timeout_seconds) * 1000);
+	request_event.add_number("effective_output_timeout_ms",
+	    static_cast<long long>(policy.provider_effective_output_timeout_seconds) * 1000);
 	// Persist a bounded overview of the actual request, including native replay.
 	request_event.add_text("task_overview",
 	    sanitize_operation_detail(original_prompt).c_str());

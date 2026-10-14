@@ -84,6 +84,11 @@ std::string bridge_request_json(const libai::model_request_t &request)
 	std::ostringstream out;
 	out << '{';
 	field(out, "instructions", request.instructions);
+    if(!request.output_schema.empty()) {
+        out << ','; field(out,"output_schema",request.output_schema);
+        out << ",\"output_repair\":" << (request.output_repair?"true":"false");
+    }
+	out << ",\"model_profile\":" << request.profile.json;
 	out << ",\"max_output_tokens\":" << request.max_output_tokens
 	    << ",\"messages\":" << bridge_messages_json(request.messages);
 	out << ",\"tools\":[";
@@ -109,7 +114,7 @@ std::string bridge_result_json(const libai::run_result_t &result)
 {
 	const char *names[] = { "completed", "cancelled", "deadline_exceeded",
 		"budget_exceeded", "model_error", "protocol_error",
-		"callback_error" };
+		"callback_error", "recovery_required" };
 	std::ostringstream out;
 	out << '{';
 	field(out, "status", names[static_cast<unsigned>(result.status)]);
@@ -121,14 +126,37 @@ std::string bridge_result_json(const libai::run_result_t &result)
 	    << ",\"tool_calls\":" << result.tool_calls;
 	out << ",\"input_tokens\":" << result.input_tokens
 	    << ",\"output_tokens\":" << result.output_tokens;
-	out << '}';
+    out << ",\"output_validated\":" << (result.output_validated?"true":"false")
+        << ",\"output_repairs\":" << result.output_repairs;
+	out << ",\"task_contract\":{\"version\":1,\"loop_finished\":"
+        << (result.task_contract.loop_finished ? "true" : "false") << ',';
+    field(out, "loop_outcome", result.task_contract.loop_outcome);
+    const auto &c = result.task_contract;
+    out << ',';
+    field(out, "artifact_revision", c.artifact_revision);
+    out << ",\"requirements\":{\"generation\":"
+        << (c.require_generation ? "true" : "false") << ",\"build\":"
+        << (c.require_build ? "true" : "false") << ",\"tests\":"
+        << (c.require_tests ? "true" : "false") << ",\"review\":"
+        << (c.require_review ? "true" : "false") << '}';
+    const char *stages[] = { "generation", "build", "tests", "review" };
+    const libai::task_evidence_t *evidence[] = { &c.generation, &c.build, &c.tests, &c.review };
+    for (unsigned i = 0; i < 4; ++i) {
+        out << ',' << quoted(stages[i]) << ":{";
+        field(out, "state", evidence[i]->state);
+        out << ','; field(out, "revision", evidence[i]->revision);
+        out << ','; field(out, "authority", evidence[i]->authority);
+        out << ','; field(out, "reference", evidence[i]->reference);
+        out << '}';
+    }
+    out << ",\"accepted\":" << (c.accepted() ? "true" : "false") << "}}";
 	return out.str();
 }
 
 std::string bridge_event_json(const libai::agent_event_t &event)
 {
 	const char *names[] = { "model_start", "model_end", "tool_start",
-		"tool_end", "finished" };
+		"tool_end", "finished", "tool_intent_committed", "tool_result_committed", "tool_result_reused" };
 	std::ostringstream out;
 	out << '{';
 	field(out, "kind", names[static_cast<unsigned>(event.kind)]);
@@ -136,6 +164,16 @@ std::string bridge_event_json(const libai::agent_event_t &event)
 	field(out, "tool_name", event.tool_name);
 	out << ',';
 	field(out, "call_id", event.call_id);
-	out << ",\"error\":" << (event.error ? "true" : "false") << '}';
+	out << ",\"error\":" << (event.error ? "true" : "false");
+    out << ',';field(out,"execution_scope",event.execution_scope);
+    out << ',';field(out,"idempotency_key",event.idempotency_key);
+    out << ',';field(out,"journal_revision",event.journal_revision);
+    out << ',';field(out,"effect_state",event.effect_state);
+    out << ",\"attempts\":" << event.attempts << '}';
 	return out.str();
+}
+
+std::string bridge_execution_snapshot_json(const libai::execution_snapshot_t &snapshot)
+{
+    return "{\"revision\":" + quoted(snapshot.revision) + ",\"state_json\":" + quoted(snapshot.state_json) + "}";
 }

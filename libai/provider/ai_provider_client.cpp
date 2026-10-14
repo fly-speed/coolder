@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../sdk/model_profile.h"
 #include "../context/agent_context_limits.h"
 #include "ai_provider_client_internal.h"
 #include "fiber/fiber_base.h"
@@ -159,6 +160,10 @@ bool completion_call_t::initialize_request()
 	// streaming selection, retries and polling so saved background settings do
 	// not disable streaming or accidentally enter the background polling path.
 	input = requested_input;
+	const auto profile=libai::parse_model_profile(provider.model_profile_json);
+	input.max_output_tokens=static_cast<long long>(std::min(static_cast<size_t>(std::max(0LL,input.max_output_tokens)), profile.max_output_tokens));
+	input.allow_multiple_tool_calls=input.allow_multiple_tool_calls && profile.multiple_tool_calls;
+	if (!profile.tool_calling) {input.tools.clear();input.require_tool_call=false;}
 	if (deepseek_responses_endpoint(provider) ||
 	    kimi_responses_endpoint(provider) ||
 	    qwen_responses_endpoint(provider)) {
@@ -811,6 +816,11 @@ bool completion_call_t::run()
 		return false;
 	if (!poll_background_response())
 		return false;
+	const auto profile=libai::parse_model_profile(provider.model_profile_json);
+	if ((!profile.tool_calling && !result.tool_calls.empty()) ||
+	    (!profile.multiple_tool_calls && result.tool_calls.size()>1)) {
+		err="provider response violates declared tool capabilities";return false;
+	}
 	merge_recovered_usage();
 	return true;
 }

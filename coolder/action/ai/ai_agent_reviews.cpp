@@ -1,6 +1,7 @@
 #include "stdafx.h"
 // Generated result decisions, per-file reviews and apply HTTP actions.
 #include "ai_agent_actions_internal.h"
+#include "server/auth.h"
 
 namespace action
 {
@@ -580,6 +581,21 @@ bool persist_file_review_state(file_review_context_t &context, request_t &req,
 	context.result.changes_applied = true;
 	context.result.changes_applied_at = static_cast<long long>(time(NULL));
 	context.result.changes_apply_error.clear();
+    coolder::account_t actor;
+    if (coolder::current_account(req, actor)) {
+        for (auto &change : context.result.changes) {
+            for (const auto &review : context.reviews) {
+                if (review.decision == "accepted" && change.path == review.path &&
+                    change.generation == review.generation && change.draft_hash == review.draft_hash) {
+                    change.accepted_by = actor.id;
+                    change.review_reference = libai::cpp::coding::agent_workspace_t::content_sha256(
+                        context.run_id + ":" + actor.id + ":" + change.path + ":" +
+                        std::to_string(change.generation) + ":" + change.draft_hash);
+                }
+            }
+        }
+    }
+    refresh_result_task_contract(context.user_root, context.record.status, context.result);
 	if (context.result_store->save(context.result, context.err))
 		return true;
 	libai::cpp::coding::ai_log_error(
@@ -775,7 +791,15 @@ bool AiAgentRunResultApplyAction::run(request_t &req, response_t &res)
 			if (!(result.changes[i].review_status == "pending"))
 				continue;
 			result.changes[i].review_status = "accepted";
+            coolder::account_t actor;
+            if (coolder::current_account(req, actor)) {
+                result.changes[i].accepted_by = actor.id;
+                result.changes[i].review_reference = libai::cpp::coding::agent_workspace_t::content_sha256(
+                    run_id + ":" + actor.id + ":" + result.changes[i].path + ":" +
+                    std::to_string(result.changes[i].generation) + ":" + result.changes[i].draft_hash);
+            }
 		}
+        refresh_result_task_contract(user_root, record.status, result);
 		if (!result_store.save(result, err)) {
 			libai::cpp::coding::ai_log_error(
 			    "agent.result", "save-applied-state", err);

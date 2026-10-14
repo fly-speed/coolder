@@ -510,7 +510,7 @@ libai 同时提供通用 Agent SDK 和可选的桌面完整编码服务。C++、
 
 完整能力通过各语言的 `CodingService` / C `libai_coding_*` 暴露，使用一致的 JSON 操作协议。应先查询 `available` 与 `capabilities`；默认轻量构建和当前移动端包不启用完整编码后端。全部操作、参数及调用示例见 [跨语言 CodingService 协议](libai/docs/CODING_SERVICE.md)，会话快照、取消和内置 Provider 的对应 API 见 [Agent 能力对照表](libai/docs/CODING_SERVICE.md#agent-接口能力补齐)。
 
-通用 Agent 的 `completed` 表示模型与工具循环结束，不保证代码已经编译或通过测试。APP 必须根据实际执行证据判断任务完成。例如 Rust APP 在临时目录合并待确认修改并编译，失败后反馈给模型，最多三轮修复；工具缺失或无法验证时明确报告未验证，正式目录仍由用户审核后写入。
+通用 Agent 的 `completed` 表示模型与工具循环结束，不保证代码已经编译或通过测试。APP 必须根据实际执行证据判断任务完成。例如 Java/Rust APP 在临时目录合并待确认修改并编译，失败后反馈给模型，最多三轮修复；工具缺失或无法验证时明确报告未验证，正式目录仍由用户审核后写入。
 
 ### 构建、清理与第三方部署
 
@@ -543,7 +543,7 @@ libai 同时提供通用 Agent SDK 和可选的桌面完整编码服务。C++、
 | APP | 绑定 | 实现与入口 |
 | --- | --- | --- |
 | [coolder](coolder/README.md) | `libai-c++` | C++ HTTP 宿主与编程工作台，通过 C++ 封装复用核心能力 |
-| [coolder-java](coolder-java/README.md) | `libai-java` | Java 自行实现 HTTP、账户、项目、会话、任务及审核业务；`./coolder-java/build.sh` / `run.sh` / `clean.sh` |
+| [coolder-java](coolder-java/README.md) | `libai-java` | Java 自行实现 HTTP、账户、项目、会话、任务及审核业务，包含完成前编译验证；`./coolder-java/build.sh` / `run.sh` / `clean.sh` |
 | [coolder-rust](coolder-rust/README.md) | `libai-rust` | Rust 自行实现对应宿主业务，包含完成前编译验证与检查点继续；`./coolder-rust/build.sh` / `run.sh` / `clean.sh` |
 
 Java/Rust APP 不转发原 C++ APP 的路由，不需要同时启动原 APP。网页资源位于各 APP 的 `html/`，与 `src/` 平级；`build/` 是临时编译目录，`dist/` 保存运行产物。并行运行时分别配置端口与数据目录；JSON 持久化结构和跨 APP 使用边界见 [存储说明](coolder/docs/JSON_STORAGE.md)。绑定提供通用 AI 能力，账户鉴权、界面、平台权限与任务验收仍由宿主实现。
@@ -556,9 +556,9 @@ Java/Rust APP 不转发原 C++ APP 的路由，不需要同时启动原 APP。�
 | --- | --- | --- | --- |
 | `coolder` | C++ / `libai-c++` | 18095 | 完整编程运行时，草稿验证、诊断反馈与修复、人工审核 |
 | `coolder-rust` | Rust / `libai-rust` | 18097 | 完成前在临时目录合并草稿并执行受控编译/语法检查，编译失败最多反馈三轮；支持检查点继续 |
-| `coolder-java` | Java / `libai-java` | 18096 | 增量文件提案、读取当前任务待确认草稿、同路径草稿合并与批量接受、持久化请求进度；支持检查点继续 |
+| `coolder-java` | Java / `libai-java` | 18096 | 完成前临时草稿编译/语法检查、失败诊断与最多三轮修复、增量提案与批量审核；支持检查点继续 |
 
-**Java 版目前没有与 Rust 相同的自动完成前编译验证门槛。** 它的 `completed` 表示模型和工具循环结束，仍须验证生成代码的构建、测试和实际行为。Rust 的编译/语法检查通过同样不等于业务测试全部通过；三个 APP 的正式文件写入都需要人工审核。
+**Java/Rust 版均在模型结束前执行受控编译或语法检查。** 在临时项目副本中合并当前会话的待审核修改，失败诊断交回模型，最多三轮修复；工具链缺失则报告未验证。仅文档或没有文件修改时明确标记无需编译。报告绑定成果版本并先持久化，再返回模型。构建通过仍不等于业务测试全部通过；三个 APP 的正式文件写入都需要人工审核。
 
 Java 标准模式的单次模型输出上限为 16,384 tokens，大项目模式为 32,768 tokens，并受管理员总输出预算约束；快速模式采用管理员配置。GLM-5.3 系列请求使用 `reasoning_effort=low`。较大的输出额度不保证任务更快完成，复杂项目建议按可验证的功能逐步实现。
 
@@ -720,9 +720,10 @@ python3 coolder/tests/json_storage_test.py --cpp coolder/build/coolder --java co
 python3 coolder/tests/java_incremental_run_test.py coolder-java/dist/bin/coolder-java
 python3 coolder/tests/java_draft_review_test.py coolder-java/dist/bin/coolder-java
 python3 coolder/tests/rust_completion_validation_test.py coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/java_completion_validation_test.py --binary coolder-java/dist/bin/coolder-java
 ```
 
-这些脚本覆盖密码校验、管理员恢复、跨 APP JSON 迁移、Java 增量草稿与批量审核、Rust 完成前验证。模拟模型测试不消耗真实模型额度；实际编译验证仍要求安装对应工具链。
+这些脚本覆盖密码校验、管理员恢复、跨 APP JSON 迁移、Java 增量草稿与批量审核、Java/Rust 完成前验证。模拟模型测试不消耗真实模型额度；实际编译验证仍要求安装对应工具链。
 
 - [构建与贡献规范](BUILD.md)：依赖构建、C++ 格式、函数与文件规模、接口注释检查。
 - [应用使用与部署说明](coolder/README.md)：账户、API、编辑器、附件、Windows 构建和安装细节。
@@ -1249,7 +1250,7 @@ libai provides a portable Agent SDK and an optional full desktop coding service.
 
 Full capabilities use the same JSON operation protocol through each language's `CodingService` or the C `libai_coding_*` API. Check `available` and `capabilities` first: portable builds and current mobile packages do not enable the full backend. See the [operation reference and examples](libai/docs/CODING_SERVICE.md) and [Agent API correspondence](libai/docs/CODING_SERVICE.md#agent-接口能力补齐).
 
-Agent `completed` means the model/tool loop ended; it does not certify compilation or tests. Hosts must enforce completion using execution evidence. The Rust APP compiles pending revisions in a temporary project copy, feeds failures back to the model for up to three repair rounds, and reports unavailable validation explicitly. Formal files are still written only after review.
+Agent `completed` means the model/tool loop ended; it does not certify compilation or tests. Hosts must enforce completion using execution evidence. The Java and Rust APPs compile pending revisions in a temporary project copy, feed failures back to the model for up to three repair rounds, and report unavailable validation explicitly. Formal files are still written only after review.
 
 ### Build, Clean, and Deploy
 
@@ -1295,9 +1296,9 @@ Each APP runs independently, reuses libai AI capabilities, and implements its ow
 | --- | --- | --- | --- |
 | `coolder` | C++ / `libai-c++` | 18095 | Complete coding runtime, draft validation, diagnostic feedback and repair, human review |
 | `coolder-rust` | Rust / `libai-rust` | 18097 | Compiles or syntax-checks a temporary draft overlay before completion; up to three compiler-feedback repair rounds; checkpoint continuation |
-| `coolder-java` | Java / `libai-java` | 18096 | Incremental proposals, pending-draft reads within the current run, latest-draft coalescing and bulk acceptance, durable request progress, checkpoint continuation |
+| `coolder-java` | Java / `libai-java` | 18096 | Temporary draft compilation/syntax checks, diagnostic feedback and up to three repair rounds, incremental proposals and review; checkpoint continuation |
 
-**Java currently does not have Rust's automatic pre-completion compilation gate.** Its `completed` status means the model/tool loop ended; builds, tests, and behavior still need verification. Rust compilation or syntax-check success also does not establish that all business tests passed. Formal writes require human review in all three APPs.
+**Java and Rust both enforce compilation or syntax checks before model completion.** Pending session changes are overlaid in a temporary project copy; failed diagnostics are fed back for up to three repair rounds. Missing toolchains remain unverified, while documentation-only or unchanged tasks explicitly require no compilation. Reports are tied to the artifact revision and persisted before model feedback. Passing compilation does not establish that business tests passed. Formal writes require human review in all three APPs.
 
 Java caps each standard-mode model response at 16,384 tokens and large-mode responses at 32,768, subject to the administrator's total output budget. Quick mode uses the configured budget. GLM-5.3 requests use `reasoning_effort=low`. Larger output budgets do not guarantee faster completion; split complex projects into verifiable increments.
 
@@ -1459,9 +1460,10 @@ python3 coolder/tests/json_storage_test.py --cpp coolder/build/coolder --java co
 python3 coolder/tests/java_incremental_run_test.py coolder-java/dist/bin/coolder-java
 python3 coolder/tests/java_draft_review_test.py coolder-java/dist/bin/coolder-java
 python3 coolder/tests/rust_completion_validation_test.py coolder-rust/dist/bin/coolder-rust
+python3 coolder/tests/java_completion_validation_test.py --binary coolder-java/dist/bin/coolder-java
 ```
 
-Coverage includes password checks, administrator recovery, cross-APP JSON migration, Java incremental drafts and bulk review, and Rust completion validation. Mock-model tests consume no real provider quota; actual compilation checks still require the relevant language tools.
+Coverage includes password checks, administrator recovery, cross-APP JSON migration, Java incremental drafts and bulk review, and Java/Rust completion validation. Mock-model tests consume no real provider quota; actual compilation checks still require the relevant language tools.
 
 The following supporting documents are currently in Chinese:
 

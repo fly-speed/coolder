@@ -67,6 +67,9 @@ struct sandbox_request_t {
 	std::vector<std::string> arguments;
 	// Workspace-relative directory in which to run the command.
 	std::string working_directory;
+	// Host-owned logical operation key; forwarded only as a fixed environment
+	// entry, never interpreted as arguments, authorization or a dedupe promise.
+	std::string idempotency_key;
 };
 
 // Bounded in-memory result. stdout/stderr are returned to the confirming HTTP
@@ -104,6 +107,8 @@ struct sandbox_result_t {
 // server never performs complex sandbox setup between fork and exec.
 class program_sandbox_t {
 public:
+	// Empty preserves legacy requests; otherwise bounded printable identifiers.
+	static bool valid_idempotency_key(const std::string &key);
 	// Configure a trusted helper for hosts whose executable is a language runtime.
 	static void set_default_helper(const std::string &path);
 	// Initialize program sandbox state from the supplied arguments.

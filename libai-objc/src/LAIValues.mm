@@ -54,6 +54,28 @@
 }
 @end
 @implementation LAIInvocation
+- (int64_t)remainingMs {
+    if (!_pointer || _thread != [NSThread currentThread])
+        [NSException raise:NSInternalInconsistencyException format:@"Invocation expired or wrong thread"];
+    return libai_invocation_remaining_ms(_pointer);
+}
+- (LAICancellation *)retainCancellation:(NSError **)error {
+    if (!_pointer || _thread != [NSThread currentThread])
+        [NSException raise:NSInternalInconsistencyException format:@"Invocation expired or wrong thread"];
+    libai_cancellation *token=libai_invocation_retain_cancellation(_pointer);
+    if(!token){lai_error(error,@"Invocation has no cancellation token or retain failed");return nil;}
+    LAICancellation *owner=nil;
+    @try {owner=[[LAICancellation alloc] initWithOwnedNative:token];}
+    @catch(NSException *failure){libai_cancellation_destroy(token);@throw;}
+    if(!owner){libai_cancellation_destroy(token);lai_error(error,@"Cancellation wrapper allocation failed");}
+    return owner;
+}
+- (NSString *)idempotencyKey
+{
+    if (!_pointer || _thread != [NSThread currentThread])
+        [NSException raise:NSInternalInconsistencyException format:@"Invocation expired or wrong thread"];
+    return [NSString stringWithUTF8String:libai_invocation_idempotency_key(_pointer)];
+}
 - (BOOL)stopped
 {
 	if (!_pointer || _thread != [NSThread currentThread])
@@ -94,6 +116,10 @@ BOOL lai_error(NSError **error, NSString *message)
 }
 
 @implementation LAICancellation
+- (instancetype)initWithOwnedNative:(libai_cancellation *)token {
+    if((self=[super init]))_native=token;
+    return self;
+}
 - (instancetype)init
 {
 	if ((self = [super init])) {

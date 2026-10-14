@@ -327,6 +327,15 @@
     <ClCompile Include="agent\ai_admin_policy.cpp" />
     <ClInclude Include="agent\ai_admin_policy.h" />
     <ClInclude Include="agent.h" />
+    <ClInclude Include="mcp_stdio.h" />
+    <ClInclude Include="sdk\mcp_stdio.h" />
+    <ClInclude Include="workflow.h" />
+    <ClInclude Include="sdk\workflow.h" />
+    <ClInclude Include="sdk\workflow_journal.h" />
+    <ClInclude Include="sdk\workflow_durable_run.h" />
+    <ClInclude Include="mcp.h" />
+    <ClInclude Include="sdk\mcp.h" />
+    <ClInclude Include="sdk\mcp_agent.h" />
     <ClInclude Include="coding\coding_internal.h" />
     <ClCompile Include="coding\coding_projects.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -335,6 +344,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClInclude Include="coding\coding_records.h" />
+    <ClCompile Include="coding\coding_tasks.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="coding\coding_service.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -416,6 +428,7 @@
     <ClCompile Include="runtime\ai_agent_drafts.cpp" />
     <ClCompile Include="runtime\ai_agent_events.cpp" />
     <ClCompile Include="runtime\ai_agent_loop.cpp" />
+    <ClCompile Include="runtime\ai_agent_task_contract.cpp" />
     <ClCompile Include="runtime\ai_agent_results.cpp" />
     <ClCompile Include="runtime\ai_agent_runtime.cpp" />
     <ClCompile Include="runtime\ai_agent_tools.cpp" />
@@ -518,4 +531,15 @@
   </ItemGroup>
   <ItemGroup><ClCompile Include="coding\coding_runtime.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
   <ItemGroup><ClCompile Include="coding\coding_sandbox.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile></ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="rag.h" />
+    <ClInclude Include="sdk\rag.h" />
+    <ClInclude Include="sdk\rag_types.h" />
+    <ClInclude Include="sdk\rag_validation.h" />
+    <ClInclude Include="sdk\rag_index.h" />
+    <ClInclude Include="sdk\rag_memory.h" />
+    <ClInclude Include="sdk\rag_agent.h" />
+    <ClInclude Include="task_contract.h" />
+    <ClInclude Include="sdk\task_contract_json.h" />
+  </ItemGroup>
 </Project>
