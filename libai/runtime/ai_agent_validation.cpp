@@ -17,7 +17,7 @@ bool validate_cached_command_receipts(const std::string &user_root,
         if (!cached.finish() || !cached.get_root().is_object())
             throw std::runtime_error("invalid cached validation report");
         const auto owner = json_text(cached["tool_execution_key"]);
-        const auto commands = webcool::ai::coding_detail::array_value(cached["commands"]);
+        const auto commands = libai::ai::coding_detail::array_value(cached["commands"]);
         if (!commands || !commands->is_array())
             throw std::runtime_error("cached validation command list missing");
         for (auto *command = commands->first_child(); command; command = commands->next_child()) {
@@ -32,7 +32,7 @@ bool validate_cached_command_receipts(const std::string &user_root,
                 args.add_text("idempotency_key", selected.c_str());
                 auto &result = output.create_node();
                 std::string reason;
-                if (!webcool::ai::coding_detail::sandbox(user_root, "sandbox.inspect", args, result, reason) ||
+                if (!libai::ai::coding_detail::sandbox(user_root, "sandbox.inspect", args, result, reason) ||
                     !json_bool(result["found"], false))
                     throw std::runtime_error("cached validation command receipt unavailable: " + selected + " " + reason);
                 const auto wire = json_text(result["receipt_json"]);
@@ -137,7 +137,7 @@ ctest_io_contract_t inspect_ctest_io(
 			        draft_root + "/") == 0)
 				path.erase(0, draft_root.size() + 1);
 			std::string normalized, err;
-			if (webcool::ai::agent_workspace_t::normalize_path(
+			if (libai::ai::agent_workspace_t::normalize_path(
 			        path, normalized, false, err))
 				files.insert(normalized);
 		};
@@ -162,7 +162,7 @@ ctest_io_contract_t inspect_ctest_io(
 
 static long long append_validation_diagnostics(acl::json &json,
     acl::json_node &item, const ctest_io_contract_t &io_contract,
-    const webcool::ai::sandbox_result_t &result, const std::string &draft_root,
+    const libai::ai::sandbox_result_t &result, const std::string &draft_root,
     std::string diagnostic)
 {
 	acl::json_node &related = json.create_array();
@@ -195,22 +195,22 @@ static long long append_validation_diagnostics(acl::json &json,
 		item.add_text("diagnostic", diagnostic.c_str());
 	if (!result.error.empty())
 		item.add_text("error", result.error.c_str());
-	std::vector<webcool::ai::project_diagnostic_t> parsed;
-	webcool::ai::parse_project_diagnostics(
+	std::vector<libai::ai::project_diagnostic_t> parsed;
+	libai::ai::parse_project_diagnostics(
 	    result.standard_error + "\n" + result.standard_output, draft_root,
 	    "", parsed);
 	std::vector<std::string> source_files;
 	if (std::any_of(parsed.begin(), parsed.end(),
-	        [](const webcool::ai::project_diagnostic_t &source_diagnostic) {
+	        [](const libai::ai::project_diagnostic_t &source_diagnostic) {
 		return source_diagnostic.path.find('/') == std::string::npos;
 	}))
-		source_files = webcool::ai::diagnostic_source_files(
-		    webcool::ai::agent_workspace_t(draft_root));
+		source_files = libai::ai::diagnostic_source_files(
+		    libai::ai::agent_workspace_t(draft_root));
 	for (auto &source_diagnostic : parsed) {
 		if (!(source_diagnostic.path.find('/') == std::string::npos))
 			continue;
 
-		const auto resolved = webcool::ai::unique_diagnostic_source(
+		const auto resolved = libai::ai::unique_diagnostic_source(
 		    source_diagnostic.path, source_files);
 		if (resolved.empty())
 			continue;
@@ -239,7 +239,7 @@ static long long append_validation_diagnostics(acl::json &json,
 // Invoke a fixed project file inside the existing sandbox. No model-supplied
 // command text or service environment is passed to the interpreter.
 static void append_build_arguments(
-    const webcool::ai::sandbox_command_t &command,
+    const libai::ai::sandbox_command_t &command,
     const std::function<void(const std::string &)> &add_directory,
     std::vector<std::string> &arguments)
 {
@@ -267,11 +267,11 @@ static void append_build_arguments(
 }
 
 static void prepend_project_build_script(const std::string &draft_root,
-    webcool::ai::project_toolchain_t &toolchain,
+    libai::ai::project_toolchain_t &toolchain,
     std::vector<std::string> &readonly_roots)
 {
 #ifndef _WIN32
-	webcool::ai::agent_workspace_t draft(draft_root);
+	libai::ai::agent_workspace_t draft(draft_root);
 	bool exists = false, is_directory = false;
 	std::string error;
 	if (!workspace_entry_state(
@@ -310,9 +310,9 @@ static void prepend_project_build_script(const std::string &draft_root,
 			readonly_roots.push_back(root);
 	};
 	for (const auto &command : toolchain.commands) {
-		if (webcool::ai::compile_command(command.id))
+		if (libai::ai::compile_command(command.id))
 			allowed_build = true;
-		if (!webcool::ai::compile_command(command.id) &&
+		if (!libai::ai::compile_command(command.id) &&
 		    command.id != "cpp.cmake.configure" &&
 		    command.id != "c.cmake.configure")
 			continue;
@@ -326,12 +326,12 @@ static void prepend_project_build_script(const std::string &draft_root,
 	    "PATH=" + search_path + "/usr/bin:/bin:/usr/sbin:/sbin");
 	arguments.push_back("/bin/sh");
 	arguments.push_back("./build.sh");
-	webcool::ai::sandbox_command_t command;
+	libai::ai::sandbox_command_t command;
 	command.id = "project.script-build";
 	command.executable = "/usr/bin/env";
 	command.fixed_arguments = arguments;
 	command.allow_outbound_network =
-	    webcool::ai::ai_runtime_policy_get().allow_build_network;
+	    libai::ai::ai_runtime_policy_get().allow_build_network;
 	toolchain.commands.insert(toolchain.commands.begin(), command);
 #else
 	(void)draft_root;
@@ -341,11 +341,11 @@ static void prepend_project_build_script(const std::string &draft_root,
 }
 
 static bool select_compile_repair_command(
-    webcool::ai::sandbox_command_t &command,
+    libai::ai::sandbox_command_t &command,
     const std::vector<std::string> &packages)
 {
 	if (!(command.id == "go.test" && !packages.empty()))
-		return webcool::ai::compile_command(command.id) ||
+		return libai::ai::compile_command(command.id) ||
 		    command.id == "cpp.cmake.configure" ||
 		    command.id == "c.cmake.configure";
 	command.fixed_arguments = { "test", "-count=1", "-timeout=20s" };
@@ -365,31 +365,31 @@ static std::vector<std::string> validation_go_packages(
 			continue;
 		paths.push_back(change.target_path);
 	}
-	return webcool::ai::changed_go_packages(project_path, paths);
+	return libai::ai::changed_go_packages(project_path, paths);
 }
 
 static bool dispatch_validation_command(
-    const webcool::ai::sandbox_command_t &command,
-    const std::string &draft_root, const webcool::ai::sandbox_limits_t &limits,
+    const libai::ai::sandbox_command_t &command,
+    const std::string &draft_root, const libai::ai::sandbox_limits_t &limits,
     const std::vector<std::string> &readonly_roots,
     const std::function<bool()> &should_cancel,
-    webcool::ai::sandbox_result_t &result, ctest_io_contract_t &io_contract,
+    libai::ai::sandbox_result_t &result, ctest_io_contract_t &io_contract,
     const std::string &execution_key,const std::string &receipt_root,
     const std::string &project_path,bool &receipt_unconfirmed,const std::string &parent_key)
 {
-	auto execute_recorded = [&](const webcool::ai::sandbox_command_t &selected,
-	                            const webcool::ai::sandbox_request_t &request,
-	                            webcool::ai::sandbox_result_t &output) {
-		webcool::ai::program_sandbox_t broker(draft_root,"",{selected},limits,"",readonly_roots);
-		auto dispatch=[&](webcool::ai::sandbox_result_t &value){return broker.execute(request,value,NULL,should_cancel);};
+	auto execute_recorded = [&](const libai::ai::sandbox_command_t &selected,
+	                            const libai::ai::sandbox_request_t &request,
+	                            libai::ai::sandbox_result_t &output) {
+		libai::ai::program_sandbox_t broker(draft_root,"",{selected},limits,"",readonly_roots);
+		auto dispatch=[&](libai::ai::sandbox_result_t &value){return broker.execute(request,value,NULL,should_cancel);};
 		if(request.idempotency_key.empty())return dispatch(output); // Legacy unbound host calls.
 		std::string error;
-		const bool ok=webcool::ai::coding_detail::record_command_execution(receipt_root,project_path,
+		const bool ok=libai::ai::coding_detail::record_command_execution(receipt_root,project_path,
 		    selected,limits,request.idempotency_key,output,dispatch,error,parent_key);
 		if(!ok&&!error.empty()) {output.error=error;receipt_unconfirmed=true;}
 		return ok;
 	};
-	webcool::ai::sandbox_request_t request;
+	libai::ai::sandbox_request_t request;
 	request.command_id = command.id;
 	request.idempotency_key = execution_key;
 	bool inventory_ok = true;
@@ -397,7 +397,7 @@ static bool dispatch_validation_command(
 		auto inventory_command = command;
 		inventory_command.fixed_arguments = { "--test-dir",
 			".webcool-build", "--show-only=json-v1" };
-		webcool::ai::sandbox_result_t inventory;
+		libai::ai::sandbox_result_t inventory;
 		auto inventory_request = request;
 		if (!execution_key.empty())
 			inventory_request.idempotency_key = execution_key + ".inventory";
@@ -425,8 +425,8 @@ static bool dispatch_validation_command(
 }
 
 static long long append_validation_command(acl::json &json,
-    acl::json_node &commands, const webcool::ai::sandbox_command_t &command,
-    const webcool::ai::sandbox_result_t &result,
+    acl::json_node &commands, const libai::ai::sandbox_command_t &command,
+    const libai::ai::sandbox_result_t &result,
     const ctest_io_contract_t &io_contract, const std::string &draft_root,
     bool test_command, bool no_tests, bool dispatched, bool command_passed,
     const std::string &execution_key)
@@ -508,23 +508,23 @@ static const char *validation_next_action(bool compile_repair_completed,
 
 static bool prepare_validation_environment(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
-    const std::string &draft_root, webcool::ai::project_toolchain_t &toolchain,
+    const std::string &draft_root, libai::ai::project_toolchain_t &toolchain,
     std::vector<std::string> &readonly_roots, std::string &err)
 {
 	std::map<std::string, std::string> mounts;
-	if (!webcool::ai::agent_draft_store_t(user_root, project_path, run_id)
+	if (!libai::ai::agent_draft_store_t(user_root, project_path, run_id)
 	         .readonly_dependencies(mounts, err))
 		return false;
 	for (const auto &mount : mounts)
 		readonly_roots.push_back(mount.second);
-	webcool::ai::project_toolchain_catalog_t catalog(draft_root);
+	libai::ai::project_toolchain_catalog_t catalog(draft_root);
 	if (!catalog.discover("", toolchain, err))
 		return false;
 	prepend_project_build_script(draft_root, toolchain, readonly_roots);
 	std::string backend_reason;
-	if (webcool::ai::program_sandbox_t::backend_available(backend_reason))
+	if (libai::ai::program_sandbox_t::backend_available(backend_reason))
 		return true;
-	webcool::ai::ai_log_error(
+	libai::ai::ai_log_error(
 	    "agent.draft", "sandbox-unavailable", backend_reason);
 	err = backend_reason;
 	return false;
@@ -537,12 +537,12 @@ static acl::json_node &initialize_validation_report(acl::json &json,
 {
 	root.add_text("source_baseline_sha256", source_fingerprint->c_str());
 	root.add_text("proposal_sha256",
-	    webcool::ai::agent_workspace_t::content_sha256(
+	    libai::ai::agent_workspace_t::content_sha256(
 	        staged_change_fingerprint(changes))
 	        .c_str());
 	root.add_text("environment_scope", "private_draft_sandbox");
 	root.add_bool("build_network_enabled",
-	    webcool::ai::ai_runtime_policy_get().allow_build_network);
+	    libai::ai::ai_runtime_policy_get().allow_build_network);
 	root.add_text("validation_scope",
 	    build_only  ? "build-only" :
 	        focused ? "compile-repair" :
@@ -560,12 +560,12 @@ static acl::json_node &initialize_validation_report(acl::json &json,
 std::string validate_staged_draft(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     const std::vector<agent_change_proposal_t> &changes,
-    const webcool::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
+    const libai::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
     std::string *source_fingerprint, bool build_only,
     const std::string &tool_execution_key)
 {
 	trace.ok=false;
-	if (!webcool::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
+	if (!libai::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
 		return tool_error_json("invalid validation tool execution key");
 	const auto should_cancel = [user_root, run_id] {
 		const auto task = find_runtime_task(user_root, run_id);
@@ -580,7 +580,7 @@ std::string validate_staged_draft(const std::string &user_root,
 	std::string validated_source;
 	if (!source_fingerprint)
 		source_fingerprint = &validated_source;
-	if (!webcool::ai::agent_draft_store_t(user_root, project_path, run_id)
+	if (!libai::ai::agent_draft_store_t(user_root, project_path, run_id)
 	         .materialize(changes, skipped_files, err, &draft_reused,
 	             source_fingerprint, [user_root, run_id] {
 		const auto task = find_runtime_task(user_root, run_id);
@@ -588,21 +588,21 @@ std::string validate_staged_draft(const std::string &user_root,
 	}))
 		return tool_error_json(err);
 
-	webcool::ai::project_toolchain_t toolchain;
+	libai::ai::project_toolchain_t toolchain;
 	std::vector<std::string> readonly_roots;
 	if (!prepare_validation_environment(user_root, project_path, run_id,
 	        draft_root, toolchain, readonly_roots, err))
 		return tool_error_json(err);
 	const auto task = find_runtime_task(user_root, run_id);
 	const bool focused =
-	    task && webcool::ai::focused_compile_repair(task->original_prompt);
+	    task && libai::ai::focused_compile_repair(task->original_prompt);
 	const auto packages = validation_go_packages(project_path, changes);
 	// Finish every build before running any advisory tests in mixed-language projects.
 	if (focused || build_only)
 		std::stable_partition(toolchain.commands.begin(),
 		    toolchain.commands.end(),
-		    [](const webcool::ai::sandbox_command_t &command) {
-			return !webcool::ai::is_test_command(command.id);
+		    [](const libai::ai::sandbox_command_t &command) {
+			return !libai::ai::is_test_command(command.id);
 		});
 	bool build_executed = false, build_passed = true;
 	acl::json json;
@@ -611,7 +611,7 @@ std::string validate_staged_draft(const std::string &user_root,
 	acl::json_node &skipped =
 	    initialize_validation_report(json, root, source_fingerprint,
 	        changes, build_only, focused, draft_reused, skipped_files);
-    const auto revision_wire = webcool::ai::coding_service_call(draft_root, "tasks.revision", "{}");
+    const auto revision_wire = libai::ai::coding_service_call(draft_root, "tasks.revision", "{}");
     acl::json revision(revision_wire.c_str());
     if (revision.finish() && json_bool(revision["ok"], false))
         root.add_text("artifact_revision", json_text(revision["artifact_revision"]).c_str());
@@ -632,9 +632,9 @@ std::string validate_staged_draft(const std::string &user_root,
 	for (size_t i = 0; i < toolchain.commands.size(); ++i) {
 		if (should_cancel())
 			return tool_error_json("agent run cancelled");
-		webcool::ai::sandbox_command_t command = toolchain.commands[i];
+		libai::ai::sandbox_command_t command = toolchain.commands[i];
 		if (!command.browser_probe_node.empty() &&
-		    !webcool::ai::agent_workspace_t::resolve_project_root(
+		    !libai::ai::agent_workspace_t::resolve_project_root(
 		        user_root, project_path, command.browser_evidence_root,
 		        err))
 			return tool_error_json(err);
@@ -650,7 +650,7 @@ std::string validate_staged_draft(const std::string &user_root,
 			skipped.add_array_text(command.id.c_str());
 			continue;
 		}
-		webcool::ai::sandbox_result_t result;
+		libai::ai::sandbox_result_t result;
 		ctest_io_contract_t io_contract;
 		acl::json identity;auto &input=identity.create_node();
 		input.add_text("tool_key",tool_execution_key.c_str())
@@ -662,7 +662,7 @@ std::string validate_staged_draft(const std::string &user_root,
 		auto &args=identity.create_array();input.add_child("arguments",args);
 		for(const auto &value:command.fixed_arguments)args.add_array_text(value.c_str());
 		const std::string execution_key = tool_execution_key.empty() ? "" :
-		    "validation." + webcool::ai::agent_workspace_t::content_sha256(serialize_json(input));
+		    "validation." + libai::ai::agent_workspace_t::content_sha256(serialize_json(input));
 		bool receipt_unconfirmed=false;
 		const bool dispatched =
 		    dispatch_validation_command(command, draft_root, limits,
@@ -673,7 +673,7 @@ std::string validate_staged_draft(const std::string &user_root,
 		const bool command_passed = dispatched &&
 		    result.exit_code == 0 && !result.timed_out &&
 		    result.error.empty();
-		if (webcool::ai::compile_command(command.id)) {
+		if (libai::ai::compile_command(command.id)) {
 			build_executed = true;
 			build_passed = build_passed && command_passed;
 		}
@@ -697,12 +697,12 @@ std::string validate_staged_draft(const std::string &user_root,
 		            std::string::npos))
 			build_passed = false;
 		const bool test_command =
-		    webcool::ai::is_test_command(command.id);
+		    libai::ai::is_test_command(command.id);
 		const bool no_tests = test_command && command_passed &&
 		    !(command.id == "go.test" &&
 		        result.standard_output.find("ok ") !=
 		            std::string::npos) &&
-		    webcool::ai::reports_no_tests(
+		    libai::ai::reports_no_tests(
 		        result.standard_error + "\n" + result.standard_output);
 		if (test_command && dispatched && !no_tests) {
 			tests_executed = true;
@@ -726,7 +726,7 @@ std::string validate_staged_draft(const std::string &user_root,
 	// A focused task may finish with test warnings; never label failing tests as passed.
 	const bool compile_repair_completed = focused && build_executed &&
 	    build_passed &&
-	    (passed || webcool::ai::is_test_command(failed_command_id));
+	    (passed || libai::ai::is_test_command(failed_command_id));
 	root.add_bool("compile_repair_completed", compile_repair_completed);
 	root.add_bool("validation_passed", passed && executed > 0);
 	root.add_text("test_status",

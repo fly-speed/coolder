@@ -29,7 +29,7 @@
 #include <sys/stat.h>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -39,7 +39,7 @@ namespace
 // A pending plan contains the proposed content because confirmation may arrive
 // in a later request. It is private to the current user, bounded to 1 MiB and
 // removed after successful application or expiry.
-webcool::mutex g_patch_store_mutex;
+libai::mutex g_patch_store_mutex;
 const char *kPatchHeader = "WEBCOOL_WORKSPACE_PATCH_V1";
 const long long kPatchLifetimeSeconds = 30 * 60;
 const size_t kMaxPatchBytes = 1024 * 1024;
@@ -57,19 +57,19 @@ struct stored_patch_t {
 	long long created_at;
 };
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
-using ::webcool::ai::file_ops::safe_directory;
+using ::libai::ai::file_ops::safe_directory;
 
 bool ensure_directory(const std::string &path)
 {
@@ -89,7 +89,7 @@ bool ensure_directory(const std::string &path)
 
 bool replace_plan_file(const std::string &temporary, const std::string &target)
 {
-	return ::webcool::ai::file_ops::replace_file(temporary, target);
+	return ::libai::ai::file_ops::replace_file(temporary, target);
 }
 
 bool ensure_plan_directory(
@@ -295,7 +295,7 @@ bool workspace_patch_store_t::create(const std::string &relative_file,
 	preview.original_sha256 = patch.original_sha256;
 	preview.proposed_sha256 = patch.proposed_sha256;
 	build_preview(patch.path, original, proposed_content, preview);
-	std::lock_guard<webcool::mutex> guard(g_patch_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_patch_store_mutex);
 	std::string directory;
 	if (!ensure_plan_directory(user_root_, directory, err)) {
 		return ai_error(
@@ -309,7 +309,7 @@ bool workspace_patch_store_t::create(const std::string &relative_file,
 bool workspace_patch_store_t::apply(const std::string &patch_id,
     workspace_patch_result_t &result, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_patch_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_patch_store_mutex);
 	std::string directory;
 	if (!ensure_plan_directory(user_root_, directory, err)) {
 		return ai_error("workspace.patch", "prepare-apply-store", err);
@@ -338,4 +338,4 @@ bool workspace_patch_store_t::apply(const std::string &patch_id,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

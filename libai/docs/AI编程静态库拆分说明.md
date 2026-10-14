@@ -6,7 +6,7 @@
 
 - 独立模块：`ai/`，包含 46 个实现文件。
 - 已生成 macOS 通用静态库：`ai/libwebcool_ai_coding.a`，架构为 arm64、x86_64。
-- API 入口：`ai/coding.h`；CMake 目标：`webcool::ai_coding`。
+- API 入口：`ai/coding.h`；CMake 目标：`libai::ai_coding`。
 - 构建支持：独立 CMake / Make、安装与 find_package 导出、Visual Studio 静态库工程。
 - webcool 的 Make、CMake、Visual Studio 工程均改为链接静态库，避免再次直接编译库内实现。
 - HTTP、鉴权与访问授权保留在宿主；模型、存储、工作区、沙盒、工具循环和后台运行时由库拥有。
@@ -39,14 +39,14 @@ HTTP 回归中同步修复了两个过时断言：固定 5 个脚手架文件改
 
 `ai/` 是可单独复制、构建和安装的 C++ 静态库目录。产物为
 `libwebcool_ai_coding.a`（Unix/macOS）或 `webcool_ai_coding.lib`（Windows），
-CMake 目标为 `webcool::ai_coding`。库仍使用 ACL/fiber 和 OpenSSL；这些依赖不合并进归档。
+CMake 目标为 `libai::ai_coding`。库仍使用 ACL/fiber 和 OpenSSL；这些依赖不合并进归档。
 
 ## 边界与接口
 
 - 本目录拥有模型协议与传输、Provider 配置与密钥存储、Agent 注册与协议、项目/会话/运行记录、工作区修改与审核、工具链及沙盒执行。
 - `runtime/` 拥有上下文组装、编程工具循环、后台 worker、调度/取消/暂停/恢复及结果持久化。图片助手共用这一运行时，也随库构建。
 - webcool 的 `action/ai/` 只保留 HTTP 请求处理、用户鉴权、路径访问授权及响应适配；前端资源和路由不变。
-- `coding.h` 是聚合入口。底层类型位于 `webcool::ai`，运行时通过 `webcool::ai::coding` 访问；为兼容原调用代码，运行时原命名空间 `action::agent_detail` 暂时保留。
+- `coding.h` 是聚合入口。底层类型位于 `libai::ai`，运行时通过 `libai::ai::coding` 访问；为兼容原调用代码，运行时原命名空间 `action::agent_detail` 暂时保留。
 - 宿主在鉴权后显式传入 upload root、user root、provider、sandbox policy 等已有参数。库不读取 webcool HTTP 请求或宿主的全局上传目录。
 - 使用现有 fiber 运行模型；宿主负责 ACL/fiber 初始化和工作线程生命周期。进程沙盒仍需要部署独立的 `webcool-sandbox-helper`，路径/策略按 `program_sandbox.h`、`ai_admin_policy.h` 配置。
 
@@ -73,7 +73,7 @@ macOS 通用库可额外传入 `-DCMAKE_OSX_ARCHITECTURES='arm64;x86_64'`；
 ```cmake
 find_package(webcool_ai_coding CONFIG REQUIRED)
 add_executable(my_agent main.cpp)
-target_link_libraries(my_agent PRIVATE webcool::ai_coding)
+target_link_libraries(my_agent PRIVATE libai::ai_coding)
 ```
 
 配置外部项目时设置 `CMAKE_PREFIX_PATH` 指向 SDK 安装目录，并提供 `ACL_PATH`、
@@ -82,7 +82,7 @@ target_link_libraries(my_agent PRIVATE webcool::ai_coding)
 
 ## webcool 集成
 
-- CMake：`add_subdirectory(ai)` 后链接 `webcool::ai_coding`。
+- CMake：`add_subdirectory(ai)` 后链接 `libai::ai_coding`。
 - Make：`make ai-coding-lib` 只构建库；`make` 自动构建并链接 `ai/libwebcool_ai_coding.a`。
   AI 对象不会再次直接参与 webcool 链接；配置变化、头文件依赖和 clean 同样覆盖库对象。
 - Visual Studio：`webcool.sln` 包含静态库工程，webcool 通过 `ProjectReference` 链接，

@@ -30,7 +30,7 @@
 #include <chrono>
 #include <thread>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -51,8 +51,8 @@ const int kMaxSearchDepth = 24;
 // Upper bound for outline items.
 const size_t kMaxOutlineItems = 400;
 
-using ::webcool::ai::file_ops::join_path;
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::join_path;
+using ::libai::ai::file_ops::replace_file;
 
 enum path_component_state_t {
 	PATH_COMPONENT_NORMAL,

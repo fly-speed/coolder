@@ -1,6 +1,6 @@
 #pragma once
 #include <cstddef>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

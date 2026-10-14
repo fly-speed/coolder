@@ -27,7 +27,7 @@
 #include <sys/stat.h>
 #include "../common/webcool_mutex.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -37,7 +37,7 @@ namespace provider_store_detail
 // providers.v1 contains metadata plus AES-256-GCM ciphertext. The 32-byte
 // installation master key is separate from every user's provider file, and
 // additional authenticated data binds ciphertext to username + provider ID.
-extern webcool::mutex g_provider_store_mutex;
+extern libai::mutex g_provider_store_mutex;
 // Private metadata directory name used by the provider store.
 extern const char *kAgentDir;
 // Filename of the encrypted provider configuration records.
@@ -90,20 +90,20 @@ struct cleanse_vector_t {
 	std::vector<unsigned char> &value_;
 };
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 // Lowercase ASCII letters without locale-dependent conversions.
 std::string lower_ascii(std::string value);
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
 // Create or validate a private storage directory with the required
 // permissions.
@@ -161,12 +161,12 @@ struct rotation_user_t {
 // Validate a username before opening its credential store.
 bool valid_rotation_username(const std::string &username);
 
-using ::webcool::ai::file_ops::safe_directory;
+using ::libai::ai::file_ops::safe_directory;
 
 // Verify that a storage path refers to an acceptable regular file.
 bool safe_regular_file(const std::string &path);
 
-using ::webcool::ai::file_ops::path_entry_exists;
+using ::libai::ai::file_ops::path_entry_exists;
 
 // A restart checkpoint is encrypted with the current provider keyring. Retiring
 // either key while a checkpoint exists could make an interrupted run

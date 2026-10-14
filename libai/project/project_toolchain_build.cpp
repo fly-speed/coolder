@@ -22,7 +22,7 @@
 #endif
 
 #include "project_toolchain_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

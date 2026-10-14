@@ -3,7 +3,7 @@
 
 #include <map>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -115,4 +115,4 @@ std::string select_next_agent_run(const std::vector<agent_run_slot_t> &runs,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

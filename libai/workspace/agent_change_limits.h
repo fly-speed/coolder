@@ -5,7 +5,7 @@
 #define WEBCOOL_STRINGIFY_IMPL(x) #x
 #define WEBCOOL_STRINGIFY(x) WEBCOOL_STRINGIFY_IMPL(x)
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

@@ -27,38 +27,38 @@
 #include <sys/stat.h>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_project_index_mutex;
+libai::mutex g_project_index_mutex;
 const char *kHeader = "WEBCOOL_AGENT_PROJECT_INDEX_V1";
 const size_t kMaxFiles = 20000;
 const size_t kMaxDirectories = 4096;
 const size_t kMaxDepth = 32;
 const size_t kMaxSymbolsPerFile = 128;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
 bool valid_project_id(const std::string &id)
 {
-	return ::webcool::ai::identifiers::valid_id(id);
+	return ::libai::ai::identifiers::valid_id(id);
 }
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool parse_number(const std::string &text, long long &value)
 {
-	return ::webcool::ai::record_codec::parse_nonnegative_number(
+	return ::libai::ai::record_codec::parse_nonnegative_number(
 	    text, value);
 }
 
@@ -133,7 +133,7 @@ bool ensure_directories(const std::string &user_root, std::string &err)
 	    ensure_one_directory(index_directory(user_root), err);
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool valid_entry(const agent_project_index_entry_t &entry)
 {
@@ -496,7 +496,7 @@ bool agent_project_index_store_t::remove(
 		err = "invalid agent project index id";
 		return ai_error("agent.project-index", "validate-remove", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_index_mutex);
 	const std::string path = index_path(user_root_, project_id);
 	if (!(::remove(path.c_str()) != 0 && errno != ENOENT))
 		return true;
@@ -512,7 +512,7 @@ bool agent_project_index_store_t::load(const agent_project_record_t &project,
 		err = "invalid agent project index owner";
 		return ai_error("agent.project-index", "validate-load", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_index_mutex);
 	if (load_snapshot(user_root_, project, snapshot, err))
 		return true;
 	return ai_error("agent.project-index", "load", err);
@@ -576,7 +576,7 @@ bool agent_project_index_store_t::refresh(const agent_project_record_t &project,
 		phase("index_load_previous");
 	agent_project_index_snapshot_t previous;
 	{
-		std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
+		std::lock_guard<libai::mutex> guard(g_project_index_mutex);
 		if (!load_snapshot(user_root_, project, previous, err)) {
 			return ai_error("agent.project-index",
 			    "load-for-incremental-refresh", err);
@@ -652,7 +652,7 @@ bool agent_project_index_store_t::refresh(const agent_project_record_t &project,
 	if (phase)
 		phase("index_load_latest");
 	{
-		std::lock_guard<webcool::mutex> guard(g_project_index_mutex);
+		std::lock_guard<libai::mutex> guard(g_project_index_mutex);
 		// Re-read under the write lock so two simultaneous refreshes receive
 		// distinct revisions and compare against the latest committed snapshot.
 		agent_project_index_snapshot_t latest;
@@ -748,4 +748,4 @@ std::string agent_project_index_store_t::prompt_summary(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

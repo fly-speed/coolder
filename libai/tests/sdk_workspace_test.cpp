@@ -43,13 +43,13 @@ int main(int argc, char **argv)
 {
 	assert(argc == 2);
 	const std::string root = argv[1];
-	assert(webcool::ai::file_ops::make_private_directory(root));
+	assert(libai::ai::file_ops::make_private_directory(root));
 	const std::string file = root + "/fixture.cpp";
 	std::remove(file.c_str());
 	const std::string create =
 	    R"({"path":"fixture.cpp","content":"int answer = 42;\n"})";
 	assert(invoke(root, "workspace.create", create).tool_error);
-	assert(!webcool::ai::file_ops::path_entry_exists(file));
+	assert(!libai::ai::file_ops::path_entry_exists(file));
 	assert(!invoke(root, "workspace.create", create, true).tool_error);
 	assert(invoke(root, "workspace.create", create, true).tool_error);
 	auto read = invoke(root, "workspace.read", R"({"path":"fixture.cpp"})");
@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 	acl::json result(read.text.c_str());
 	assert(result.finish());
 	const auto digest =
-	    webcool::ai::json_value::string_text(result["sha256"]);
+	    libai::ai::json_value::string_text(result["sha256"]);
 	assert(digest.size() == 64);
 	assert(!invoke(root, "workspace.list", R"({"path":""})").tool_error);
 	auto matches =

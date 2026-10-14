@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "project_plan_template.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -359,4 +359,4 @@ bool build_project_plan_proposal(const std::string &project_path,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

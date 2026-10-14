@@ -19,7 +19,7 @@
 #include <cstring>
 #include <fstream>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -567,4 +567,4 @@ unsigned long ai_tool_call_limit_for_mode(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

@@ -10,7 +10,7 @@ namespace libai
 class provider_model_t : public model_t {
 public:
 	// Retain provider configuration and the application-supplied credential.
-	provider_model_t(const webcool::ai::provider_config_t &config,
+	provider_model_t(const libai::ai::provider_config_t &config,
 	    const std::string &api_key)
 	        : config_(config)
 	        , api_key_(api_key)
@@ -18,7 +18,7 @@ public:
 	}
 
 	// Translate a portable request into the existing native HTTP request.
-	static webcool::ai::completion_request_t request(
+	static libai::ai::completion_request_t request(
 	    const model_request_t &source)
 	{
 		if (source.max_output_tokens >
@@ -26,7 +26,7 @@ public:
 		        std::numeric_limits<long long>::max()))
 			throw std::invalid_argument(
 			    "provider token limit is too large");
-		webcool::ai::completion_request_t target;
+		libai::ai::completion_request_t target;
 		target.system_prompt = source.instructions;
 		target.messages = source.messages;
 		// The native transport validates this legacy field even for typed transcripts.
@@ -51,7 +51,7 @@ public:
 			if (!names.insert(wire).second)
 				throw std::invalid_argument(
 				    "tool names collide on provider wire");
-			webcool::ai::agent_tool_t tool(spec.name,
+			libai::ai::agent_tool_t tool(spec.name,
 			    spec.description, false, true, false,
 			    "application");
 			tool.parameters_json = spec.parameters;
@@ -66,7 +66,7 @@ public:
 	{
 		// Forward cooperative stop requests and text to the native transport.
 		class observer_t
-		        : public webcool::ai::completion_stream_observer_t {
+		        : public libai::ai::completion_stream_observer_t {
 		public:
 			// Borrow request boundaries and the synchronous stream sink.
 			observer_t(const model_request_t &request,
@@ -99,11 +99,11 @@ public:
 		input.images = images_;
 		input.reasoning_effort = reasoning_effort_;
 		input.transport_session =
-		    webcool::ai::provider_client_t::create_transport_session();
-		webcool::ai::completion_result_t output;
+		    libai::ai::provider_client_t::create_transport_session();
+		libai::ai::completion_result_t output;
 		std::string error;
 		model_response_t result;
-		if (!webcool::ai::provider_client_t::complete(
+		if (!libai::ai::provider_client_t::complete(
 		        config_, api_key_, input, output, error, &observer)) {
 			result.error =
 			    error.empty() ? "provider request failed" : error;
@@ -137,13 +137,13 @@ public:
 		reasoning_effort_ = effort;
 	}
 
-	void set_images(const std::vector<webcool::ai::completion_image_t> &images)
+	void set_images(const std::vector<libai::ai::completion_image_t> &images)
 	{
 		images_ = images;
 	}
 
 	// Last native completion metadata for generic service usage accounting.
-	const webcool::ai::completion_result_t &last_completion() const
+	const libai::ai::completion_result_t &last_completion() const
 	{
 		return last_completion_;
 	}
@@ -163,12 +163,12 @@ private:
 		return name;
 	}
 	// Optional provider-native image attachments.
-	std::vector<webcool::ai::completion_image_t> images_;
+	std::vector<libai::ai::completion_image_t> images_;
 	std::string reasoning_effort_;
 	// Last response usage and timing; no credential is included.
-	webcool::ai::completion_result_t last_completion_;
+	libai::ai::completion_result_t last_completion_;
 	// Provider endpoint, protocol and model configuration.
-	webcool::ai::provider_config_t config_;
+	libai::ai::provider_config_t config_;
 	// Application credential kept in memory; never log or serialize it.
 	std::string api_key_;
 	// Generate unique IDs for protocols that omit native call identifiers.

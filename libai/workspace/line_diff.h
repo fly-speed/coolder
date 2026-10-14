@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -170,4 +170,4 @@ inline void build_line_diff(const std::vector<std::string> &old_lines,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

@@ -4,7 +4,7 @@
 #include <map>
 #include <vector>
 #include <stdexcept>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "agent_draft_store_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

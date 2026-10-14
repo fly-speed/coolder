@@ -31,7 +31,7 @@
 #include <sstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -41,7 +41,7 @@ namespace draft_store_detail
 // One budget spans recursive traversal; per-file budgets would never yield
 // when a large tree consists of many small files.
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 }
 using namespace draft_store_detail;
@@ -537,4 +537,4 @@ bool agent_draft_store_t::cleanup_stale(
 	return ok;
 }
 } // namespace ai
-} // namespace webcool
+} // namespace libai

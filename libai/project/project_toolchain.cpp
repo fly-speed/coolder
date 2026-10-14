@@ -22,7 +22,7 @@
 #include <windows.h>
 #endif
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -548,4 +548,4 @@ bool project_toolchain_catalog_t::discover(const std::string &project_path,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

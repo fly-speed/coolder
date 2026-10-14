@@ -4,8 +4,8 @@
 #include <cassert>
 #include <iostream>
 
-using namespace webcool::ai;
-using namespace webcool::ai::json_value;
+using namespace libai::ai;
+using namespace libai::ai::json_value;
 
 static std::size_t count(acl::json_node *array)
 {

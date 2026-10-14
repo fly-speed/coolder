@@ -41,8 +41,8 @@ std::string edit_rebase_error(const std::string &error, const std::string &path,
 	root.add_text("error", error.c_str());
 	root.add_text("path", path.c_str());
 	root.add_text("file_sha256",
-	    webcool::ai::agent_workspace_t::content_sha256(source).c_str());
-	const std::string page = webcool::ai::utf8_prefix(source, 8192);
+	    libai::ai::agent_workspace_t::content_sha256(source).c_str());
+	const std::string page = libai::ai::utf8_prefix(source, 8192);
 	root.add_text("content", page.c_str());
 	root.add_number("offset", 0);
 	root.add_number("next_offset", static_cast<long long>(page.size()));
@@ -193,7 +193,7 @@ bool is_parallel_read_tool(const std::string &name)
 }
 
 agent_tool_request_t completion_tool_request(
-    const webcool::ai::completion_tool_call_t &call)
+    const libai::ai::completion_tool_call_t &call)
 {
 	agent_tool_request_t request;
 	request.name = call.name;
@@ -207,7 +207,7 @@ agent_tool_request_t completion_tool_request(
 }
 
 agent_tool_request_t merge_completion_tool_calls(
-    const std::vector<webcool::ai::completion_tool_call_t> &calls)
+    const std::vector<libai::ai::completion_tool_call_t> &calls)
 {
 	if (calls.size() == 1)
 		return completion_tool_request(calls.front());
@@ -239,13 +239,13 @@ agent_tool_request_t merge_completion_tool_calls(
 }
 
 bool build_native_tool_outputs(
-    const std::vector<webcool::ai::completion_tool_call_t> &calls,
+    const std::vector<libai::ai::completion_tool_call_t> &calls,
     const std::string &combined_result,
-    std::vector<webcool::ai::completion_tool_output_t> &outputs)
+    std::vector<libai::ai::completion_tool_output_t> &outputs)
 {
 	outputs.clear();
 	if (calls.size() == 1) {
-		webcool::ai::completion_tool_output_t output;
+		libai::ai::completion_tool_output_t output;
 		output.call_id = calls.front().id.empty() ? "webcool_call_1" :
 		                                            calls.front().id;
 		output.output = combined_result;
@@ -264,7 +264,7 @@ bool build_native_tool_outputs(
 		// A rolled-back/failed batch still answers every native call. Omitting
 		// these outputs would replay the previous successful history unchanged.
 		for (size_t i = 0; i < calls.size(); ++i) {
-			webcool::ai::completion_tool_output_t output;
+			libai::ai::completion_tool_output_t output;
 			output.call_id = calls[i].id.empty() ?
 			    "webcool_call_" + std::to_string(i + 1) :
 			    calls[i].id;
@@ -285,7 +285,7 @@ bool build_native_tool_outputs(
 			outputs.clear();
 			return false;
 		}
-		webcool::ai::completion_tool_output_t output;
+		libai::ai::completion_tool_output_t output;
 		output.call_id = calls[i].id.empty() ?
 		    "webcool_call_" + std::to_string(i + 1) :
 		    calls[i].id;
@@ -297,7 +297,7 @@ bool build_native_tool_outputs(
 }
 
 bool completion_calls_have_ids(
-    const std::vector<webcool::ai::completion_tool_call_t> &calls)
+    const std::vector<libai::ai::completion_tool_call_t> &calls)
 {
 	if (calls.empty())
 		return false;

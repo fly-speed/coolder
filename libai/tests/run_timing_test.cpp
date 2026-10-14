@@ -1,7 +1,7 @@
 #include "../storage/run_timing.h"
 #include <cassert>
 int main() {
-    using webcool::ai::run_timing;
+    using libai::ai::run_timing;
     assert(run_timing(100,110,"completed",500).elapsed_ms==10000);
     assert(run_timing(100,110,"completed",900).elapsed_ms==10000);
     assert(run_timing(100,0,"running",107).elapsed_ms==7000);

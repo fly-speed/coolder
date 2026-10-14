@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "../common/record_json.h"
 #include "ai_provider_store_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

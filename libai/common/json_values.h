@@ -1,6 +1,6 @@
 #pragma once
 #include "json_value.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

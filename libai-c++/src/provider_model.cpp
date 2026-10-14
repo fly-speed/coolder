@@ -6,10 +6,10 @@ namespace libai
 namespace cpp
 {
 // Translate public endpoint options into the private storage/transport configuration.
-static webcool::ai::provider_config_t native_config(
+static libai::ai::provider_config_t native_config(
     const ProviderConfig &source)
 {
-	webcool::ai::provider_config_t target;
+	libai::ai::provider_config_t target;
 	target.id = source.id;
 	target.name = source.name;
 	target.protocol = source.protocol;

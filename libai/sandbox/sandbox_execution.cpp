@@ -32,7 +32,7 @@
 #include <sys/stat.h>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -42,7 +42,7 @@ namespace
 // Each user has one pending plan. pending.v1 is atomically renamed before use;
 // sandbox_runs.v1 stores only bounded start/finish metadata. A process mutex
 // protects read-modify-replace operations inside one WebCool service process.
-webcool::mutex g_execution_store_mutex;
+libai::mutex g_execution_store_mutex;
 const char *kPlanHeader = "WEBCOOL_SANDBOX_PLAN_V1";
 const char *kAuditHeader = "WEBCOOL_SANDBOX_AUDIT_V1";
 const long long kPlanLifetimeSeconds = 10 * 60;
@@ -50,19 +50,19 @@ const size_t kMaxArguments = 64;
 const size_t kMaxAuditRecords = 100;
 const size_t kMaxAuditBytes = 1024 * 1024;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
-using ::webcool::ai::file_ops::safe_directory;
+using ::libai::ai::file_ops::safe_directory;
 
 bool ensure_directory(const std::string &path)
 {
@@ -80,7 +80,7 @@ bool ensure_directory(const std::string &path)
 	return safe_directory(path);
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool move_file(const std::string &source, const std::string &target)
 {
@@ -338,7 +338,7 @@ bool parse_integer(const std::string &text, long long minimum,
 	return true;
 }
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool parse_audit_record(const std::string &line, long long &timestamp,
     std::string &event, sandbox_run_history_t &run)
@@ -437,7 +437,7 @@ bool sandbox_execution_store_t::create(const std::string &project_path,
 		err = "cannot initialize sandbox execution plan";
 		return ai_error("sandbox.plan", "generate-id", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_execution_store_mutex);
 	std::string directory;
 	if (!ensure_store_directory(user_root_, directory, err)) {
 		return ai_error("sandbox.plan", "prepare-private-store", err);
@@ -450,7 +450,7 @@ bool sandbox_execution_store_t::create(const std::string &project_path,
 bool sandbox_execution_store_t::consume(const std::string &plan_id,
     sandbox_execution_plan_t &plan, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_execution_store_mutex);
 	std::string directory;
 	if (!ensure_store_directory(user_root_, directory, err)) {
 		return ai_error("sandbox.plan", "prepare-consume-store", err);
@@ -497,7 +497,7 @@ bool sandbox_execution_store_t::consume(const std::string &plan_id,
 bool sandbox_execution_store_t::audit_started(
     const sandbox_execution_plan_t &plan, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_execution_store_mutex);
 	if (append_audit(user_root_, plan, "started", NULL, err))
 		return true;
 	return ai_error("sandbox.audit", "record-start", err);
@@ -507,7 +507,7 @@ bool sandbox_execution_store_t::audit_finished(
     const sandbox_execution_plan_t &plan, const sandbox_result_t &result,
     std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_execution_store_mutex);
 	if (append_audit(user_root_, plan, "finished", &result, err))
 		return true;
 	return ai_error("sandbox.audit", "record-finish", err);
@@ -521,7 +521,7 @@ bool sandbox_execution_store_t::list_history(size_t limit,
 		err = "sandbox history limit must be between 1 and 100";
 		return ai_error("sandbox.audit", "validate-history-limit", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_execution_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_execution_store_mutex);
 	const std::string path = join_path(
 	    join_path(user_root_, ".webcool_agent"), "sandbox_runs.v1");
 	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
@@ -599,4 +599,4 @@ long long sandbox_execution_store_t::lifetime_seconds()
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

@@ -24,7 +24,7 @@ std::string CodingService::call(
     const std::string &operation, const std::string &arguments) const
 {
 #ifdef LIBAI_CODING_FULL
-	return webcool::ai::coding_service_call(root_, operation, arguments);
+	return libai::ai::coding_service_call(root_, operation, arguments);
 #else
 	(void)operation;
 	(void)arguments;

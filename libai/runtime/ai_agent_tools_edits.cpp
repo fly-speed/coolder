@@ -50,7 +50,7 @@ std::string execute_workspace_patch_set(workspace_tool_context_t &context)
 			if (context.err.empty())
 				context.err =
 				    "cannot read complete file for patch_set";
-			webcool::ai::ai_log_error(
+			libai::ai::ai_log_error(
 			    "agent.runtime", "prepare-patch-set", context.err);
 			return tool_error_json(context.err);
 		}
@@ -132,7 +132,7 @@ std::string execute_workspace_patch_set(workspace_tool_context_t &context)
 	}
 	context.root.add_text("path", context.path.c_str());
 	append_edit_snapshot(context.json, context.root, current,
-	    webcool::ai::first_edit_offset(unmodified_source, current),
+	    libai::ai::first_edit_offset(unmodified_source, current),
 	    context.chinese);
 	context.root.add_number(
 	    "replacement_count", static_cast<long long>(replacement_count));
@@ -186,7 +186,7 @@ std::string execute_workspace_replace(workspace_tool_context_t &context)
 			if (context.err.empty())
 				context.err =
 				    "cannot read complete file for exact replacement";
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "prepare-exact-replacement", context.err);
 			return tool_error_json(context.err);
 		}

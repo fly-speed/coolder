@@ -7,20 +7,20 @@ namespace agent_detail
 {
 bool load_review_run_record(const std::string &user_root,
     const std::string &run_id, const std::string &session_id,
-    webcool::ai::agent_run_record_t &record, std::string &err)
+    libai::ai::agent_run_record_t &record, std::string &err)
 {
-	webcool::ai::agent_run_store_t runs(user_root);
+	libai::ai::agent_run_store_t runs(user_root);
 	if (runs.get(run_id, record, err))
 		return true;
 	if (err != "agent run not found" || session_id.empty())
 		return false;
-	webcool::ai::agent_session_store_t sessions(user_root);
-	webcool::ai::agent_session_record_t session;
+	libai::ai::agent_session_store_t sessions(user_root);
+	libai::ai::agent_session_record_t session;
 	if (!sessions.get(session_id, session, err))
 		return false;
-	webcool::ai::agent_result_store_t results(
+	libai::ai::agent_result_store_t results(
 	    user_root, session.project_path);
-	webcool::ai::agent_result_t saved;
+	libai::ai::agent_result_t saved;
 	bool found = false;
 	if (!results.load(run_id, saved, found, err))
 		return false;
@@ -28,7 +28,7 @@ bool load_review_run_record(const std::string &user_root,
 		err = "agent run not found";
 		return false;
 	}
-	record = webcool::ai::agent_run_record_t();
+	record = libai::ai::agent_run_record_t();
 	record.id = run_id;
 	record.agent_id = "coding";
 	record.status = "archived";
@@ -47,22 +47,22 @@ bool reviewable_agent_run_status(const std::string &status)
 
 std::string json_text(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::scalar_text(node);
+	return ::libai::ai::json_value::scalar_text(node);
 }
 
 long long json_number(acl::json_node *node, long long fallback)
 {
-	return ::webcool::ai::json_value::number(node, fallback);
+	return ::libai::ai::json_value::number(node, fallback);
 }
 
 bool json_bool(acl::json_node *node, bool fallback)
 {
-	return ::webcool::ai::json_value::text_boolean(node, fallback);
+	return ::libai::ai::json_value::text_boolean(node, fallback);
 }
 
 acl::json_node *json_array_node(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::array_value(node);
+	return ::libai::ai::json_value::array_value(node);
 }
 
 bool parse_string_array(

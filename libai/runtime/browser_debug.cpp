@@ -14,7 +14,7 @@
 #include <mutex>
 #include <memory>
 #include <set>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

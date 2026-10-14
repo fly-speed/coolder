@@ -7,13 +7,13 @@ namespace action
 namespace agent_detail
 {
 
-bool load_matching_coding_progress(webcool::ai::agent_progress_store_t &store,
-    const webcool::ai::provider_config_t &provider,
+bool load_matching_coding_progress(libai::ai::agent_progress_store_t &store,
+    const libai::ai::provider_config_t &provider,
     const std::string &project_path, const std::string &original_prompt,
     std::string &initial_prompt, std::string &recovered_reasoning,
     size_t &completed_tool_calls, bool &resumed, std::string &err)
 {
-	webcool::ai::agent_progress_t progress;
+	libai::ai::agent_progress_t progress;
 	bool found = false;
 	if (!store.load(progress, found, err))
 		return false;
@@ -36,17 +36,17 @@ bool load_matching_coding_progress(webcool::ai::agent_progress_store_t &store,
 	return true;
 }
 
-bool run_coding_tool_loop(const webcool::ai::provider_config_t &provider,
-    const std::string &api_key, webcool::ai::agent_workspace_t &workspace,
+bool run_coding_tool_loop(const libai::ai::provider_config_t &provider,
+    const std::string &api_key, libai::ai::agent_workspace_t &workspace,
     const std::string &project_path, const std::string &original_prompt,
     const std::string &initial_prompt, const std::string &recovered_reasoning,
-    const std::vector<webcool::ai::completion_image_t> &request_images,
+    const std::vector<libai::ai::completion_image_t> &request_images,
     size_t initial_completed_tool_calls, size_t max_tool_calls,
     long long max_output_tokens, size_t max_no_progress_tool_calls,
     size_t tool_context_compaction_bytes,
-    const webcool::ai::sandbox_limits_t &sandbox_limits,
+    const libai::ai::sandbox_limits_t &sandbox_limits,
     const std::string &thinking_mode, const std::string &reasoning_effort,
-    webcool::ai::completion_result_t &final_output,
+    libai::ai::completion_result_t &final_output,
     std::vector<agent_tool_trace_t> &traces,
     std::vector<agent_change_proposal_t> &changes, std::string &memory_summary,
     std::string &completion_summary, std::string &session_title,

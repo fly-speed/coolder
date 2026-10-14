@@ -17,11 +17,11 @@ class runtime_stream_observer_t;
 // Borrows caller-owned inputs and outputs for the synchronous loop invocation.
 struct coding_loop_arguments_t {
 	// Provider configuration selected for this task.
-	const webcool::ai::provider_config_t &provider;
+	const libai::ai::provider_config_t &provider;
 	// Provider credential; do not include it in logs or UI responses.
 	const std::string &api_key;
 	// Authorized workspace used by this operation.
-	webcool::ai::agent_workspace_t &workspace;
+	libai::ai::agent_workspace_t &workspace;
 	// Logical path identifying the selected project.
 	const std::string &project_path;
 	// Original user request, retained across recovery and compaction.
@@ -31,7 +31,7 @@ struct coding_loop_arguments_t {
 	// Reasoning restored from the interrupted run's checkpoint.
 	const std::string &recovered_reasoning;
 	// Images retained for the current task's provider requests.
-	const std::vector<webcool::ai::completion_image_t> &request_images;
+	const std::vector<libai::ai::completion_image_t> &request_images;
 	// Cumulative tool count restored before this invocation starts.
 	size_t initial_completed_tool_calls;
 	// Maximum number of tool calls allowed for this run.
@@ -43,13 +43,13 @@ struct coding_loop_arguments_t {
 	// Prompt size in bytes that triggers context compaction.
 	size_t tool_context_compaction_bytes;
 	// Resource limits applied to external command execution.
-	const webcool::ai::sandbox_limits_t &sandbox_limits;
+	const libai::ai::sandbox_limits_t &sandbox_limits;
 	// Vendor thinking toggle selected for the provider request.
 	const std::string &thinking_mode;
 	// Provider reasoning-effort setting selected for the request.
 	const std::string &reasoning_effort;
 	// Caller-owned result populated when the coding loop finishes.
-	webcool::ai::completion_result_t &final_output;
+	libai::ai::completion_result_t &final_output;
 	// Ordered metadata for tool calls executed during this run.
 	std::vector<agent_tool_trace_t> &traces;
 	// File proposals associated with this result or running task.
@@ -84,7 +84,7 @@ private:
 	// Number of relevant reports that triggers a browser-debug prompt.
 	unsigned long browser_debug_report_threshold;
 	// Tracks browser observations required before and after UI changes.
-	webcool::ai::browser_repair_evidence_t browser_evidence;
+	libai::ai::browser_repair_evidence_t browser_evidence;
 	// Update browser-repair requirements from the current conversation
 	// evidence.
 	void refresh_browser_evidence();
@@ -96,7 +96,7 @@ private:
 	// browser experiment.
 	// browser_verified_images: Screenshots retained after browser
 	// verification.
-	std::vector<webcool::ai::completion_image_t> browser_experiment_images,
+	std::vector<libai::ai::completion_image_t> browser_experiment_images,
 	    browser_verified_images;
 	// Check browser connectivity before attempting an evidence-dependent
 	// edit.
@@ -174,7 +174,7 @@ private:
 	// Populate loop state from a loaded checkpoint and verify its
 	// baseline.
 	bool restore_checkpoint_contents(
-	    const webcool::ai::agent_progress_t &restored,
+	    const libai::ai::agent_progress_t &restored,
 	    std::string &restore_err);
 	// Poll an existing background response without creating a duplicate
 	// request.
@@ -272,7 +272,7 @@ private:
 	// transcript: Working prompt transcript for the current invocation.
 	std::string persistent_transcript, transcript;
 	// Store used to persist and restore this run's checkpoint.
-	webcool::ai::agent_progress_store_t progress_store;
+	libai::ai::agent_progress_store_t progress_store;
 	// Input tokens accumulated across model requests.
 	long long total_input_tokens = 0;
 	// Cached input tokens accumulated across model requests.
@@ -288,15 +288,15 @@ private:
 	// Attempts used to recover incomplete native tool arguments.
 	size_t tool_argument_recovery_attempts = 0;
 	// Detects repeated or unproductive tool activity.
-	webcool::ai::agent_progress_supervisor_t progress_supervisor;
+	libai::ai::agent_progress_supervisor_t progress_supervisor;
 	// Draft identity associated with the last validation report.
 	std::string last_validated_fingerprint;
 	// Most recent serialized build and test evidence.
 	std::string last_validation_report;
 	// Tracks repeated and alternating failures across repair attempts.
-	webcool::ai::repair_failure_tracker_t repair_failures;
+	libai::ai::repair_failure_tracker_t repair_failures;
 	// Tracks repeated draft fingerprints to prevent repair oscillation.
-	webcool::ai::draft_cycle_tracker_t draft_cycles;
+	libai::ai::draft_cycle_tracker_t draft_cycles;
 	// Source versions that must be read before attempting the repair.
 	std::map<std::string, std::string> repair_required_reads;
 	// Source versions already supplied as repair context.
@@ -337,7 +337,7 @@ private:
 	// response.
 	std::string provider_response_id;
 	// Native tool results awaiting delivery to the provider.
-	std::vector<webcool::ai::completion_tool_output_t>
+	std::vector<libai::ai::completion_tool_output_t>
 	    provider_tool_outputs;
 	// Whether a background response still needs retrieval or consumption.
 	bool provider_response_pending = false;
@@ -347,7 +347,7 @@ private:
 	std::string provider_history_base;
 	// Bounded native assistant/tool exchanges retained for provider
 	// replay.
-	std::vector<webcool::ai::completion_tool_exchange_t>
+	std::vector<libai::ai::completion_tool_exchange_t>
 	    provider_tool_history;
 
 	// Reasoning collected across model turns in this run.
@@ -359,7 +359,7 @@ private:
 	// mode.
 	// proposal_tools: Restricted tool catalog used for proposal-delivery
 	// turns.
-	std::vector<webcool::ai::agent_tool_t> model_tools, proposal_tools;
+	std::vector<libai::ai::agent_tool_t> model_tools, proposal_tools;
 	// Whether the model must deliver proposals instead of more
 	// investigation.
 	bool proposal_only_turn = false;
@@ -367,19 +367,19 @@ private:
 	// state.
 	bool stateless_responses = false;
 	// Bounded complete tool exchanges retained for short-term context.
-	webcool::ai::agent_context_window_t recent_exchanges;
+	libai::ai::agent_context_window_t recent_exchanges;
 	// Tracks which source ranges the model has already received.
-	webcool::ai::agent_read_coverage_t read_coverage;
+	libai::ai::agent_read_coverage_t read_coverage;
 	// Versioned source pages retained for future model context.
-	webcool::ai::agent_read_context_t read_context;
+	libai::ai::agent_read_context_t read_context;
 	// Prompt byte count at which compaction should be considered.
 	size_t compaction_trigger_bytes;
 	// Bounded observations retained when older exchanges are compacted.
-	webcool::ai::agent_context_window_t recent_findings;
+	libai::ai::agent_context_window_t recent_findings;
 	// Serialized summary of available validation commands.
 	std::string validation_capabilities;
 	// Task-scoped reusable provider HTTP connection state.
-	std::shared_ptr<webcool::ai::provider_transport_session_t>
+	std::shared_ptr<libai::ai::provider_transport_session_t>
 	    transport_session;
 	// Count of malformed read-batch requests during this invocation.
 	size_t read_batch_argument_errors = 0;

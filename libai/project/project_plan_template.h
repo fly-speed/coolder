@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -29,4 +29,4 @@ bool build_project_plan_proposal(const std::string &project_path,
     std::vector<agent_project_task_t> &tasks, std::string &err);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

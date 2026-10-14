@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -29,4 +29,4 @@ bool build_agent_execution_profile(const std::string &mode,
     agent_execution_profile_t &profile, std::string &err);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

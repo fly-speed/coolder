@@ -73,7 +73,7 @@ void coding_tool_loop_t::refresh_browser_evidence()
 {
 	if (!browser_evidence.enabled)
 		return;
-	const auto id = webcool::ai::browser_debug_evidence_id(
+	const auto id = libai::ai::browser_debug_evidence_id(
 	    runtime_task->user_root, project_path, runtime_task->id);
 	if (id != browser_evidence.session_id()) {
 		browser_experiment_images.clear();
@@ -81,7 +81,7 @@ void coding_tool_loop_t::refresh_browser_evidence()
 		browser_experiment_selector.clear();
 	}
 	browser_evidence.bind(id);
-	acl::json status(webcool::ai::browser_debug_status(
+	acl::json status(libai::ai::browser_debug_status(
 	    runtime_task->user_root, project_path)
 	                     .c_str());
 	if (!status.finish() || !json_bool(status["images_allowed"], false)) {
@@ -94,7 +94,7 @@ std::string coding_tool_loop_t::probe_browser_experiment(const std::string &exec
 {
 	if (browser_experiment_selector.empty() || !provider.allow_file_content)
 		return "";
-	const auto observed = webcool::ai::browser_debug_tool(
+	const auto observed = libai::ai::browser_debug_tool(
 	    runtime_task->user_root, project_path, runtime_task->id,
 	    "browser.inspect", browser_experiment_selector, "",
 	    execution_key.empty() ? "" : execution_key + ".inspect");
@@ -107,19 +107,19 @@ std::string coding_tool_loop_t::probe_browser_experiment(const std::string &exec
 	    "", "", result.finish() && json_bool(result["ok"], false));
 	append_simple_operation_event(runtime_task, "browser_experiment_probe",
 	    "same_selector", browser_experiment_selector, executed_tool_calls);
-	acl::json status(webcool::ai::browser_debug_status(
+	acl::json status(libai::ai::browser_debug_status(
 	    runtime_task->user_root, project_path)
 	                     .c_str());
 	if (!(status.finish() && json_bool(status["images_allowed"], false)))
 		return observed;
-	const auto snapshot = webcool::ai::browser_debug_tool(
+	const auto snapshot = libai::ai::browser_debug_tool(
 	    runtime_task->user_root, project_path, runtime_task->id,
 	    "browser.snapshot", "", "{\"image\":true}",
 	    execution_key.empty() ? "" : execution_key + ".snapshot");
-	const auto bytes = webcool::ai::browser_debug_take_image(
+	const auto bytes = libai::ai::browser_debug_take_image(
 	    runtime_task->user_root, project_path, runtime_task->id);
 	if (!bytes.empty()) {
-		webcool::ai::completion_image_t image;
+		libai::ai::completion_image_t image;
 		image.name = browser_evidence.active_patch().empty() ?
 		    "baseline-or-restored.jpg" :
 		    "temporary-style.jpg";
@@ -148,12 +148,12 @@ bool coding_tool_loop_t::require_browser_connection()
 	bool confirmation;
 	unsigned long retries;
 	{
-		std::lock_guard<webcool::mutex> lock(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> lock(g_agent_runtime_mutex);
 		confirmation =
 		    runtime_task->browser_debug_confirmation_required;
 		retries = runtime_task->browser_debug_retry_count;
 	}
-	const auto id = webcool::ai::browser_debug_evidence_id(
+	const auto id = libai::ai::browser_debug_evidence_id(
 	    runtime_task->user_root, project_path, runtime_task->id);
 	if (!confirmation)
 		refresh_browser_evidence();
@@ -230,7 +230,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 {
 	refresh_browser_evidence();
 	if (!browser_evidence.enabled &&
-	    !webcool::ai::browser_repair_evidence_t::requests_debug(
+	    !libai::ai::browser_repair_evidence_t::requests_debug(
 	        original_prompt) &&
 	    turn.message.tool.name.compare(0, 8, "browser.") == 0) {
 		next_tool_guidance =
@@ -383,7 +383,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 		        runtime_task, project_path, original_prompt,
 		        persistent_transcript, accumulated_reasoning, err,
 		        turn.call, save_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "save-tool-limit-progress", save_err);
 			err +=
 			    " (additionally failed to save recovery progress: " +
@@ -394,7 +394,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 			err += " Recovery progress was saved at " +
 			    progress_store.relative_path() + ".";
 		}
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "tool-call-limit", err);
 		return step_t::failed;
 	}
@@ -415,7 +415,7 @@ bool coding_tool_loop_t::prepare_browser_experiment(coding_turn_t &turn)
 	// Each hypothesis needs its own baseline. Models sometimes stack a
 	// hide-frame probe and a color-scheme probe, masking the latter.
 	if (!browser_evidence.active_patch().empty()) {
-		const auto restored = webcool::ai::browser_debug_tool(
+		const auto restored = libai::ai::browser_debug_tool(
 		    runtime_task->user_root, project_path, runtime_task->id,
 		    "browser.patch_style", "", "{\"undo\":\"all\"}",
 		    turn.effect_key.empty() ? "" : turn.effect_key + ".undo-previous");
@@ -455,9 +455,9 @@ bool coding_tool_loop_t::begin_tool_effect(coding_turn_t &turn)
     arguments.add_text("query",tool.query.c_str());arguments.add_text("old_text",tool.old_text.c_str());
     arguments.add_text("target_path",tool.target_path.c_str());arguments.add_text("content",tool.content.c_str());
     arguments.add_bool("content_present",tool.content_present);
-    webcool::ai::agent_tool_effect_t effect;
+    libai::ai::agent_tool_effect_t effect;
     effect.name=tool.name;
-    effect.arguments_sha256=webcool::ai::agent_workspace_t::content_sha256(serialize_json(arguments));
+    effect.arguments_sha256=libai::ai::agent_workspace_t::content_sha256(serialize_json(arguments));
     effect.state="running";effect.completed_before=turn.call;
     effect.tool_call_count=turn.provider_tool_call_count;
     if(turn.output.native_tool_call && completion_calls_have_ids(turn.output.tool_calls)) {
@@ -466,7 +466,7 @@ bool coding_tool_loop_t::begin_tool_effect(coding_turn_t &turn)
             effect.response_id=turn.output.response_id;
     }
     {
-        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
         if(runtime_task->tool_effects.size()>=256) {err="tool effect ledger limit reached";return false;}
         if(!runtime_task->tool_effects.empty()&&runtime_task->tool_effects.back().state=="running") {
             err="unconfirmed tool effect requires host reconciliation";return false;
@@ -488,10 +488,10 @@ coding_tool_loop_t::step_t coding_tool_loop_t::settle_tool_effect(coding_turn_t 
         return step_t::failed;
     }
     {
-        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
         auto &effect=runtime_task->tool_effects.back();
         if(effect.key!=turn.effect_key){err="tool effect identity changed";return step_t::failed;}
-        effect.output_sha256=webcool::ai::agent_workspace_t::content_sha256(turn.tool_result);
+        effect.output_sha256=libai::ai::agent_workspace_t::content_sha256(turn.tool_result);
     }
     const auto context=persistent_transcript+"\n<committed_tool_result name=\""+turn.message.tool.name+"\">\n"+turn.tool_result+"\n</committed_tool_result>\n";
     if(!save_coding_progress(progress_store,provider,runtime_task,project_path,original_prompt,
@@ -542,7 +542,7 @@ bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
 	// private draft version. Keep the read gate if anything changed meanwhile.
 	if (!repair_supplied_versions.empty() &&
 	    !repair_review_read_only(turn.message.tool)) {
-		webcool::ai::agent_workspace_t review_draft(
+		libai::ai::agent_workspace_t review_draft(
 		    persistent_draft_root(runtime_task->user_root, project_path,
 		        runtime_task->id));
 		for (const auto &entry : repair_supplied_versions) {
@@ -553,13 +553,13 @@ bool coding_tool_loop_t::execute_tool(coding_turn_t &turn)
 			        !review_draft.read(
 			            relative, content, truncated, read_err) ||
 			        truncated ||
-			        webcool::ai::agent_workspace_t::content_sha256(
+			        libai::ai::agent_workspace_t::content_sha256(
 			            content) != entry.second))
 				continue;
 			repair_required_reads[entry.first] =
 			    truncated || !read_err.empty() ?
 			    entry.second :
-			    webcool::ai::agent_workspace_t::content_sha256(
+			    libai::ai::agent_workspace_t::content_sha256(
 			        content);
 		}
 		repair_supplied_versions.clear();
@@ -737,14 +737,14 @@ void coding_tool_loop_t::record_tool_outputs(coding_turn_t &turn)
 	    turn.have_native_outputs) {
 		provider_response_id = turn.output.response_id;
 		provider_tool_outputs = turn.current_tool_outputs;
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		runtime_task->provider_response_id = provider_response_id;
 		runtime_task->provider_response_pending = false;
 		runtime_task->provider_tool_outputs = provider_tool_outputs;
 	} else if ((provider.protocol != "openai_responses" ||
 	               stateless_responses) &&
 	    turn.have_native_outputs) {
-		webcool::ai::completion_tool_exchange_t exchange;
+		libai::ai::completion_tool_exchange_t exchange;
 		exchange.preceding_instructions = turn.input.turn_instructions;
 		exchange.assistant_text = turn.output.text;
 		exchange.reasoning_content = turn.output.reasoning;
@@ -815,7 +815,7 @@ void coding_tool_loop_t::materialize_tool_changes(coding_turn_t &turn)
 		// Use the pre-review snapshot as the generation baseline. Although a
 		// resolved proposal is no longer part of the active overlay, a later edit
 		// of that path must advance its generation and become pending again.
-		webcool::ai::assign_agent_review_generations(
+		libai::ai::assign_agent_review_generations(
 		    turn.review_generation_baseline, changes);
 		// The durable worktree is the authoritative draft filesystem. Rebuild it
 		// from the formal baseline plus the complete accumulated proposal after
@@ -832,7 +832,7 @@ void coding_tool_loop_t::materialize_tool_changes(coding_turn_t &turn)
 			turn.trace.ok = false;
 			traces.back().ok = false;
 			turn.tool_result = tool_error_json(draft_err);
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "materialize-incremental-draft", draft_err);
 		}
 	}
@@ -855,7 +855,7 @@ void coding_tool_loop_t::observe_tool_progress(coding_turn_t &turn)
 	    turn.message.tool.path + "\n" + turn.message.tool.query + "\n" +
 	    turn.message.tool.old_text + "\n" + turn.message.tool.target_path +
 	    "\n" +
-	    webcool::ai::agent_workspace_t::content_sha256(
+	    libai::ai::agent_workspace_t::content_sha256(
 	        turn.message.tool.content);
 	if (turn.trace.ok && repair_review_read_only(turn.message.tool) &&
 	    read_result_is_retained(
@@ -930,9 +930,9 @@ void coding_tool_loop_t::observe_tool_progress(coding_turn_t &turn)
 	    progress_supervisor.observe_proposal_failures(
 	        turn.proposal_failures, turn.staged_progress);
 	if (turn.repeated_proposal_failure)
-		turn.progress_decision = webcool::ai::agent_progress_stop;
+		turn.progress_decision = libai::ai::agent_progress_stop;
 	else if (!turn.proposal_failures.empty())
-		turn.progress_decision = webcool::ai::agent_progress_replan;
+		turn.progress_decision = libai::ai::agent_progress_replan;
 	acl::json progress_json;
 	acl::json_node &progress_event = progress_json.create_node();
 	progress_event.add_text("event", "progress_guard_observed");
@@ -941,7 +941,7 @@ void coding_tool_loop_t::observe_tool_progress(coding_turn_t &turn)
 		progress_event.add_text("path", turn.trace.path.c_str());
 	}
 	progress_event.add_text("tool_signature_sha256",
-	    webcool::ai::agent_workspace_t::content_sha256(tool_signature)
+	    libai::ai::agent_workspace_t::content_sha256(tool_signature)
 	        .c_str());
 	progress_event.add_number("calls_without_revision",
 	    progress_supervisor.investigation_calls());
@@ -953,7 +953,7 @@ void coding_tool_loop_t::observe_tool_progress(coding_turn_t &turn)
 	progress_event.add_number(
 	    "individual_observations", observations.size());
 	progress_event.add_text("evidence_sha256",
-	    webcool::ai::agent_workspace_t::content_sha256(turn.tool_result)
+	    libai::ai::agent_workspace_t::content_sha256(turn.tool_result)
 	        .c_str());
 	progress_event.add_number(
 	    "pending_change_count", static_cast<long long>(changes.size()));
@@ -961,9 +961,9 @@ void coding_tool_loop_t::observe_tool_progress(coding_turn_t &turn)
 	    static_cast<long long>(
 	        progress_supervisor.consecutive_no_progress()));
 	progress_event.add_text("decision",
-	    turn.progress_decision == webcool::ai::agent_progress_replan ?
+	    turn.progress_decision == libai::ai::agent_progress_replan ?
 	        "replan" :
-	        turn.progress_decision == webcool::ai::agent_progress_stop ?
+	        turn.progress_decision == libai::ai::agent_progress_stop ?
 	        "stop" :
 	        "continue");
 	append_runtime_operation_event(runtime_task, progress_event);

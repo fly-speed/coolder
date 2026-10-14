@@ -9,7 +9,7 @@
 #include <functional>
 #include <memory>
 namespace libai {class execution_store_t;}
-namespace webcool
+namespace libai
 {
 namespace ai
 {

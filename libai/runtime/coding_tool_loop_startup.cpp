@@ -17,7 +17,7 @@ bool coding_tool_loop_t::prepare_execution_revision()
     if(runtime_task->text_preview || runtime_task->assistant_chat)return true;
     acl::json context,input,policy;auto &root=context.create_node();
     auto &arguments=input.create_node();auto &settings=policy.create_node();
-    if(!webcool::ai::coding_detail::runtime("runtime.policy.get",arguments,settings,err))return false;
+    if(!libai::ai::coding_detail::runtime("runtime.policy.get",arguments,settings,err))return false;
     root.add_text("implementation","libai-coding-execution-v12-browser-child-receipts")
         .add_text("policy_json",serialize_json(settings).c_str())
         .add_text("provider_protocol",provider.protocol.c_str()).add_text("provider_url",provider.base_url.c_str())
@@ -35,7 +35,7 @@ bool coding_tool_loop_t::prepare_execution_revision()
         .add_number("open_files",static_cast<long long>(sandbox_limits.open_files))
         .add_number("file_size_bytes",static_cast<long long>(sandbox_limits.file_size_bytes))
         .add_number("output_bytes",static_cast<long long>(sandbox_limits.output_bytes));
-    const auto *definition=webcool::ai::agent_registry_t::instance().find("coding");
+    const auto *definition=libai::ai::agent_registry_t::instance().find("coding");
     if(!definition){err="coding agent definition unavailable";return false;}
     root.add_text("agent_version",definition->version.c_str());
     auto &catalog=context.create_array();root.add_child("tools",catalog);
@@ -48,8 +48,8 @@ bool coding_tool_loop_t::prepare_execution_revision()
         for(const auto &parameter:tool.parameters){auto &entry=parameters.add_child(false,true);
             entry.add_text("name",parameter.name.c_str()).add_bool("required",parameter.required);}
     }
-    const auto revision=webcool::ai::agent_workspace_t::content_sha256(serialize_json(root));
-    std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+    const auto revision=libai::ai::agent_workspace_t::content_sha256(serialize_json(root));
+    std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
     if(!runtime_task->coding_execution_revision.empty() && runtime_task->coding_execution_revision!=revision){
         err="coding execution configuration changed during the run";return false;
     }
@@ -91,13 +91,13 @@ void coding_tool_loop_t::initialize_transcript()
 // Reconcile durable review decisions before restoring provider continuation
 // and draft state, so an accepted generation is not proposed again on resume.
 bool coding_tool_loop_t::restore_checkpoint_contents(
-    const webcool::ai::agent_progress_t &restored, std::string &restore_err)
+    const libai::ai::agent_progress_t &restored, std::string &restore_err)
 {
     for(const auto &effect:restored.tool_effects)if(effect.state=="running") {
         err="unconfirmed tool effect requires host reconciliation: "+effect.key;return false;
     }
     {
-        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
         runtime_task->tool_effects=restored.tool_effects;
         runtime_task->validation_receipt=restored.validation_receipt;
     }
@@ -105,9 +105,9 @@ bool coding_tool_loop_t::restore_checkpoint_contents(
 	// Reconcile each immutable generation with its durable review ledger.
 	// A mixed checkpoint can contain accepted, rejected and pending files.
 	if (!restored.source_run_id.empty()) {
-		webcool::ai::agent_result_store_t ledger(
+		libai::ai::agent_result_store_t ledger(
 		    runtime_task->user_root, project_path);
-		webcool::ai::agent_result_t reviewed;
+		libai::ai::agent_result_t reviewed;
 		bool ledger_found = false;
 		if (!ledger.load(restored.source_run_id, reviewed, ledger_found,
 		        restore_err)) {
@@ -117,18 +117,18 @@ bool coding_tool_loop_t::restore_checkpoint_contents(
 		if (ledger_found &&
 		    reviewed.session_id == runtime_task->session_id) {
 			recovered_checkpoint_reconciled =
-			    webcool::ai::remove_resolved_agent_review_changes(
+			    libai::ai::remove_resolved_agent_review_changes(
 			        reviewed.changes, changes) > 0;
 		}
 	}
 	const std::vector<agent_change_proposal_t> checkpoint_reviews = changes;
-	if (webcool::ai::remove_resolved_agent_review_changes(
+	if (libai::ai::remove_resolved_agent_review_changes(
 	        checkpoint_reviews, changes) > 0)
 		recovered_checkpoint_reconciled = true;
 	// Old checkpoints lack a ledger ID: only a complete file/operation
 	// match is sufficient to retire a proposal. Never infer from a fragment.
 	for (size_t i = 0; i < changes.size();) {
-		webcool::ai::agent_result_t single;
+		libai::ai::agent_result_t single;
 		single.changes.push_back(changes[i]);
 		std::string match_err;
 		if (verify_result_changes_applied(
@@ -146,7 +146,7 @@ bool coding_tool_loop_t::restore_checkpoint_contents(
 			if (!workspace.read(changes[i].path, current, truncated,
 			        restore_err) ||
 			    truncated ||
-			    webcool::ai::agent_workspace_t::content_sha256(
+			    libai::ai::agent_workspace_t::content_sha256(
 			        current) != changes[i].base_hash) {
 				err = "恢复修订存在版本冲突，请先审查该文件：" +
 				    changes[i].path;
@@ -160,13 +160,13 @@ bool coding_tool_loop_t::restore_checkpoint_contents(
 		provider_response_pending = restored.provider_response_pending;
 		for (size_t i = 0; i < restored.provider_tool_outputs.size();
 		     ++i) {
-			webcool::ai::completion_tool_output_t item;
+			libai::ai::completion_tool_output_t item;
 			item.call_id =
 			    restored.provider_tool_outputs[i].call_id;
 			item.output = restored.provider_tool_outputs[i].output;
 			provider_tool_outputs.push_back(item);
 		}
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		runtime_task->provider_response_id = provider_response_id;
 		runtime_task->provider_response_pending =
 		    provider_response_pending;
@@ -179,7 +179,7 @@ bool coding_tool_loop_t::restore_checkpoint_contents(
 		if (!materialize_staged_worktree(runtime_task->user_root,
 		        project_path, runtime_task->id, changes, skipped_files,
 		        restore_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "restore-draft-worktree", restore_err);
 			err = restore_err;
 			return false;
@@ -194,11 +194,11 @@ bool coding_tool_loop_t::restore_checkpoint()
 	changes.clear();
 	if (initial_completed_tool_calls > 0 ||
 	    runtime_task->resumed_from_progress) {
-		webcool::ai::agent_progress_t restored;
+		libai::ai::agent_progress_t restored;
 		bool found = false;
 		std::string restore_err;
 		if (!progress_store.load(restored, found, restore_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "restore-staged-progress", restore_err);
 			err = restore_err;
 			return false;
@@ -365,16 +365,16 @@ bool coding_tool_loop_t::validate_recovered_draft()
 bool coding_tool_loop_t::prepare_model_tools()
 {
 	initial_model_tool_calls=executed_tool_calls;
-	const webcool::ai::agent_definition_t *coding_agent =
-	    webcool::ai::agent_registry_t::instance().find("coding");
+	const libai::ai::agent_definition_t *coding_agent =
+	    libai::ai::agent_registry_t::instance().find("coding");
 	if (coding_agent == NULL) {
 		err = "coding agent definition is unavailable";
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "load-tool-registry", err);
 		return false;
 	}
 	for (size_t i = 0; i < coding_agent->tools.size(); ++i) {
-		const webcool::ai::agent_tool_t &tool = coding_agent->tools[i];
+		const libai::ai::agent_tool_t &tool = coding_agent->tools[i];
 		if (!tool.model_enabled)
 			continue;
 		if (tool.name == "workspace.create" ||
@@ -390,7 +390,7 @@ bool coding_tool_loop_t::prepare_model_tools()
 	}
 	proposal_only_turn = recovery_repair_only;
 	stateless_responses =
-	    webcool::ai::provider_client_t::responses_are_stateless(provider);
+	    libai::ai::provider_client_t::responses_are_stateless(provider);
 	if (stateless_responses) {
 		// A stale checkpoint from the earlier stateful implementation can contain
 		// an ID/output pair which the stateless provider can never resolve. The durable text
@@ -399,7 +399,7 @@ bool coding_tool_loop_t::prepare_model_tools()
 		provider_response_id.clear();
 		provider_response_pending = false;
 		provider_tool_outputs.clear();
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		runtime_task->provider_response_id.clear();
 		runtime_task->provider_response_pending = false;
 		runtime_task->provider_tool_outputs.clear();
@@ -422,7 +422,7 @@ void coding_tool_loop_t::restore_context()
 		if (!(!workspace.read(
 		          file.first, current, truncated, read_err) ||
 		        truncated ||
-		        webcool::ai::agent_workspace_t::content_sha256(
+		        libai::ai::agent_workspace_t::content_sha256(
 		            current) != file.second))
 			continue;
 		read_context.erase(file.first);
@@ -452,7 +452,7 @@ void coding_tool_loop_t::restore_context()
 }
 
 static void append_validation_commands(
-    acl::json_node &commands, const webcool::ai::project_toolchain_t &available)
+    acl::json_node &commands, const libai::ai::project_toolchain_t &available)
 {
 	for (const auto &command : available.commands) {
 		if (!(command.id.compare(0, 4, "git.") != 0))
@@ -464,9 +464,9 @@ static void append_validation_commands(
 void coding_tool_loop_t::discover_validation_capabilities()
 {
 	if (!runtime_task->text_preview && !runtime_task->assistant_chat) {
-		webcool::ai::project_toolchain_t available;
+		libai::ai::project_toolchain_t available;
 		std::string discovery_error;
-		webcool::ai::project_toolchain_catalog_t catalog(
+		libai::ai::project_toolchain_catalog_t catalog(
 		    runtime_task->user_root);
 		acl::json capability_json;
 		acl::json_node &capability = capability_json.create_node();
@@ -474,7 +474,7 @@ void coding_tool_loop_t::discover_validation_capabilities()
 		    catalog.discover(project_path, available, discovery_error);
 		capability.add_bool("discovery_ok", discovered);
 		capability.add_bool("build_network_enabled",
-		    webcool::ai::ai_runtime_policy_get().allow_build_network);
+		    libai::ai::ai_runtime_policy_get().allow_build_network);
 		if (discovered) {
 			capability.add_bool("node_acceptance_policy_enabled",
 			    available.functional_acceptance_enabled);
@@ -493,7 +493,7 @@ void coding_tool_loop_t::discover_validation_capabilities()
 		        chinese, capability.to_string().c_str());
 	}
 	transport_session =
-	    webcool::ai::provider_client_t::create_transport_session();
+	    libai::ai::provider_client_t::create_transport_session();
 	read_batch_argument_errors =
 	    persistent_transcript.find(
 	        "read_batch content must be a JSON array") !=

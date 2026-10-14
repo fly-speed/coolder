@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "agent_workspace_internal.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

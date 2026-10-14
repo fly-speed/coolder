@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "agent_draft_store_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -8,7 +8,7 @@ namespace draft_store_detail
 {
 bool valid_run_id(const std::string &value)
 {
-	return ::webcool::ai::identifiers::valid_id(value);
+	return ::libai::ai::identifiers::valid_id(value);
 }
 
 bool create_private_directory(const std::string &path, std::string &err)

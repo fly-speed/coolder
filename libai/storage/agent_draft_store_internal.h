@@ -31,7 +31,7 @@
 #include <sstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -143,7 +143,7 @@ public:
 	}
 };
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 // Validate the expected run identifier syntax.
 bool valid_run_id(const std::string &value);

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -41,4 +41,4 @@ inline bool project_language_supports_platform(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

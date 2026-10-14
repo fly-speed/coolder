@@ -36,13 +36,13 @@ void coding_tool_loop_t::track_repair_edits(coding_turn_t &turn)
 			        before.operation == "write"))
 				continue;
 
-			const size_t at = webcool::ai::first_edit_offset(
+			const size_t at = libai::ai::first_edit_offset(
 			    before.content, change.content);
 			pending_repair_edits[change.path] = {
-				webcool::ai::edit_excerpt(
+				libai::ai::edit_excerpt(
 				    before.content, at, 768)
 				    .content,
-				webcool::ai::edit_excerpt(
+				libai::ai::edit_excerpt(
 				    change.content, at, 768)
 				    .content
 			};
@@ -70,7 +70,7 @@ void coding_tool_loop_t::build_repair_focus(coding_turn_t &turn)
 			        json_text((*command)["command_id"]) == failed))
 				continue;
 			focus.add_text("observed_failure_excerpt",
-			    webcool::ai::failure_examples(
+			    libai::ai::failure_examples(
 			        json_text((*command)["diagnostic"]))
 			        .c_str());
 		}
@@ -181,9 +181,9 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 	}
 	auto selected = related_complete ?
 	    related_files :
-	    webcool::ai::repair_test_sources(diagnostic, tests);
+	    libai::ai::repair_test_sources(diagnostic, tests);
 	selected.insert(related_files.begin(), related_files.end());
-	webcool::ai::agent_workspace_t review_workspace(persistent_draft_root(
+	libai::ai::agent_workspace_t review_workspace(persistent_draft_root(
 	    runtime_task->user_root, project_path, runtime_task->id));
 	for (const auto &file : related_files) {
 		std::string relative, content, read_err;
@@ -195,7 +195,7 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 		        !truncated))
 			continue;
 		repair_required_reads[file] =
-		    webcool::ai::agent_workspace_t::content_sha256(content);
+		    libai::ai::agent_workspace_t::content_sha256(content);
 	}
 	for (const auto &change : changes) {
 		if (!(change.operation == "write" &&
@@ -212,7 +212,7 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 		                        project_path + "/CMakeLists.txt")))))
 			continue;
 		repair_required_reads[change.path] =
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        change.content);
 	}
 }
@@ -239,7 +239,7 @@ void coding_tool_loop_t::track_repair_failures(coding_turn_t &turn)
 		evidence.add_text("event", "validation_completed");
 		evidence.add_text("report", turn.tool_result.c_str());
 		evidence.add_text("draft_sha256",
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        turn.staged_fingerprint_after)
 		        .c_str());
 		append_runtime_operation_event(runtime_task, evidence);
@@ -263,7 +263,7 @@ void coding_tool_loop_t::persist_staged_result(coding_turn_t &turn)
 		// Persist every incremental snapshot under the project's private agent
 		// directory. A browser refresh cannot lose already generated code, and no
 		// formal source path is touched before review acceptance.
-		webcool::ai::agent_result_t staged_result;
+		libai::ai::agent_result_t staged_result;
 		staged_result.run_id = runtime_task->id;
 		staged_result.project_path = project_path;
 		staged_result.session_id = runtime_task->session_id;
@@ -273,18 +273,18 @@ void coding_tool_loop_t::persist_staged_result(coding_turn_t &turn)
 		staged_result.changes = changes;
 		staged_result.decision = "pending";
 		staged_result.saved_at = static_cast<long long>(time(NULL));
-		webcool::ai::agent_result_store_t staged_store(
+		libai::ai::agent_result_store_t staged_store(
 		    runtime_task->user_root, project_path);
 		std::string staged_save_err;
 		if (!staged_store.save(staged_result, staged_save_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "persist-incremental-proposal", staged_save_err);
 		} else {
 			// A user may accept an earlier generation while the model is still
 			// running. Reload the atomically merged artifact before publishing it,
 			// otherwise this worker's stale in-memory "pending" value could make the
 			// accepted badge reappear until the next refresh.
-			webcool::ai::agent_result_t merged_staged_result;
+			libai::ai::agent_result_t merged_staged_result;
 			bool merged_found = false;
 			std::string merged_load_err;
 			if (staged_store.load(runtime_task->id,
@@ -294,7 +294,7 @@ void coding_tool_loop_t::persist_staged_result(coding_turn_t &turn)
 				changes = merged_staged_result.changes;
 				staged_result = merged_staged_result;
 			} else if (!merged_load_err.empty()) {
-				webcool::ai::ai_log_error("agent.runtime",
+				libai::ai::ai_log_error("agent.runtime",
 				    "reload-incremental-review-state",
 				    merged_load_err);
 			}
@@ -370,7 +370,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	if (!verified_batch && turn.trace.ok && turn.staged_progress &&
 	    !changes.empty()) {
 		const bool focused =
-		    webcool::ai::focused_compile_repair(original_prompt);
+		    libai::ai::focused_compile_repair(original_prompt);
 		agent_tool_trace_t validation_trace{};
 		validation_trace.name = "workspace.validate";
 		validation_trace.path = project_path;
@@ -413,7 +413,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		turn.automatic_build_feedback = build_feedback;
 	}
 	const bool compile_completed =
-	    webcool::ai::focused_compile_repair(original_prompt) &&
+	    libai::ai::focused_compile_repair(original_prompt) &&
 	    completion_validation.find("\"compile_repair_completed\":true") !=
 	        std::string::npos;
 	const bool validation_passed =
@@ -421,7 +421,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	        verified_batch) &&
 	    turn.trace.ok &&
 	    (!changes.empty() ||
-	        webcool::ai::verification_only_task(original_prompt)) &&
+	        libai::ai::verification_only_task(original_prompt)) &&
 	    completion_validation.find("\"validation_passed\":true") !=
 	        std::string::npos;
 	if (!(validation_passed ||
@@ -430,7 +430,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	                turn.message.tool.name == "workspace.validate"))))
 		return step_t::proceed;
 	if (!compile_completed &&
-	    !webcool::ai::verification_only_task(original_prompt) &&
+	    !libai::ai::verification_only_task(original_prompt) &&
 	    !acceptance_review_requested &&
 	    executed_tool_calls < effective_tool_call_limit) {
 		acceptance_review_requested = true;

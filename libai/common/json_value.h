@@ -2,7 +2,7 @@
 #include "acl_cpp/lib_acl.hpp"
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

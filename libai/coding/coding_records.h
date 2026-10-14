@@ -4,7 +4,7 @@
 #include "../storage/agent_session_store.h"
 #include "../storage/agent_run_store.h"
 #include "../sandbox/sandbox_execution.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

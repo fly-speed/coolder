@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -56,4 +56,4 @@ private:
 };
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

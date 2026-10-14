@@ -3,7 +3,7 @@
 #ifdef _WIN32
 #include "platform_compat.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

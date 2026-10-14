@@ -2,7 +2,7 @@
 #include "ai_provider_client_internal.h"
 #include "../common/ai_error_log.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -551,4 +551,4 @@ bool provider_client_t::parse_completion_response(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

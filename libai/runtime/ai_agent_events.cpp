@@ -57,7 +57,7 @@ std::string sanitize_operation_detail(const std::string &input)
 		output += "[redacted]";
 		i = token_end;
 	}
-	return webcool::ai::utf8_prefix(output, 2048);
+	return libai::ai::utf8_prefix(output, 2048);
 }
 
 void append_runtime_operation_events(
@@ -80,16 +80,16 @@ void append_runtime_operation_events(
 		line += serialize_json(*event) + "\n";
 	}
 
-	std::lock_guard<webcool::mutex> guard(task->operation_log_mutex);
+	std::lock_guard<libai::mutex> guard(task->operation_log_mutex);
 	if (!task->operation_log_initialized) {
 		task->operation_log_initialized = true;
 		if (task->resumed_after_restart) {
-			webcool::ai::agent_workspace_t workspace(
+			libai::ai::agent_workspace_t workspace(
 			    task->user_root);
 			std::string existing;
 			bool truncated = false;
 			std::string load_err;
-			webcool::ai::agent_request_store_t log_store(
+			libai::ai::agent_request_store_t log_store(
 			    task->user_root, task->project_path, task->id);
 			bool loaded =
 			    log_store.operation_log(existing, false, load_err);
@@ -107,7 +107,7 @@ void append_runtime_operation_events(
 			} else if (!load_err.empty() &&
 			    load_err.find("does not exist") ==
 			        std::string::npos) {
-				webcool::ai::ai_log_error("agent.operation-log",
+				libai::ai::ai_log_error("agent.operation-log",
 				    "load-before-recovery", load_err);
 			}
 		}
@@ -128,18 +128,18 @@ void append_runtime_operation_events(
 	}
 	task->operation_log += line;
 
-	webcool::ai::agent_request_store_t log_store(
+	libai::ai::agent_request_store_t log_store(
 	    task->user_root, task->project_path, task->id);
 	std::string err;
 	const std::string relative_path = operation_log_path(task);
 	if (!log_store.operation_log(task->operation_log, true, err)) {
 		// Do not recursively add a failed-log-write event to the same file.
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.operation-log", "persist", err);
 	} else if (creates_log_file) {
 		// Publish only the creation as a tree mutation. Subsequent appends need not
 		// force a full project-tree refresh for every model delta/tool boundary.
-		std::lock_guard<webcool::mutex> runtime_guard(
+		std::lock_guard<libai::mutex> runtime_guard(
 		    g_agent_runtime_mutex);
 		++task->workspace_mutation_version;
 		task->last_workspace_mutation_path = relative_path;
@@ -172,15 +172,15 @@ void append_simple_operation_event(
 
 void append_model_operation_event(
     const std::shared_ptr<agent_runtime_task_t> &task, const char *name,
-    const webcool::ai::completion_result_t &output, const std::string &error,
+    const libai::ai::completion_result_t &output, const std::string &error,
     long long effective_max_output_tokens,
-    const webcool::ai::completion_result_t *attempt_usage)
+    const libai::ai::completion_result_t *attempt_usage)
 {
 	acl::json json;
 	acl::json_node &event = json.create_node();
 	event.add_text("event", name);
-	webcool::ai::agent_protocol_message_t message;
-	const bool parsed = webcool::ai::parse_agent_protocol_message(
+	libai::ai::agent_protocol_message_t message;
+	const bool parsed = libai::ai::parse_agent_protocol_message(
 	    output.text, message);
 	const bool protocol = parsed || message.final_message;
 	const std::string reply = protocol ? message.final_text : output.text;
@@ -193,7 +193,7 @@ void append_model_operation_event(
 		if (!message.requirement_progress_json.empty())
 			event.add_text("requirement_overview",
 			    sanitize_operation_detail(
-			        webcool::ai::requirement_progress_summary(
+			        libai::ai::requirement_progress_summary(
 			            message.requirement_progress_json,
 			            task->ui_language != "en")).c_str());
 	}
@@ -230,7 +230,7 @@ void append_model_operation_event(
 	event.add_number("tool_call_count",
 	    static_cast<long long>(output.tool_calls.size()));
 	event.add_text("provider_error_category",
-	    webcool::ai::provider_client_t::error_category_name(
+	    libai::ai::provider_client_t::error_category_name(
 	        output.error_category));
 	event.add_bool("retryable", output.retryable_error);
 	event.add_bool(

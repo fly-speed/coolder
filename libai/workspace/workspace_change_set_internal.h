@@ -30,7 +30,7 @@
 #include <sstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -38,7 +38,7 @@ namespace change_set_detail
 {
 
 // Serializes change-set persistence, application and recovery.
-extern webcool::mutex g_change_set_mutex;
+extern libai::mutex g_change_set_mutex;
 // Record-format marker used to validate header v1.
 extern const char *kHeaderV1;
 // Record-format marker used to validate header v2.
@@ -90,24 +90,24 @@ struct stored_set_t {
 	std::vector<stored_change_t> changes;
 };
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
-using ::webcool::ai::file_ops::safe_directory;
+using ::libai::ai::file_ops::safe_directory;
 
 // Ensure that the required storage directory exists.
 bool ensure_directory(const std::string &path);
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 // Resolve and validate the user's private change-set storage directory.
 bool prepare_directory(

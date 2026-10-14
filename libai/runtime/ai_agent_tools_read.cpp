@@ -11,7 +11,7 @@ namespace workspace_tool_detail
 
 static void overlay_workspace_entries(workspace_tool_context_t &context,
     size_t i, const std::string &prefix,
-    std::vector<webcool::ai::workspace_entry_t> &entries)
+    std::vector<libai::ai::workspace_entry_t> &entries)
 {
 	const agent_change_proposal_t &change = (*context.staged_changes)[i];
 	std::vector<std::string> remove_paths;
@@ -34,7 +34,7 @@ static void overlay_workspace_entries(workspace_tool_context_t &context,
 		if (remainder.empty() ||
 		    remainder.find('/') != std::string::npos)
 			continue;
-		for (std::vector<webcool::ai::workspace_entry_t>::iterator it =
+		for (std::vector<libai::ai::workspace_entry_t>::iterator it =
 		         entries.begin();
 		     it != entries.end();) {
 			if (it->path == remove_paths[j])
@@ -63,7 +63,7 @@ static void overlay_workspace_entries(workspace_tool_context_t &context,
 		}
 		if (known)
 			continue;
-		webcool::ai::workspace_entry_t entry;
+		libai::ai::workspace_entry_t entry;
 		entry.path = child;
 		entry.directory =
 		    slash != std::string::npos || add_paths[j].second;
@@ -77,7 +77,7 @@ static void overlay_workspace_entries(workspace_tool_context_t &context,
 
 std::string execute_workspace_list(workspace_tool_context_t &context)
 {
-	std::vector<webcool::ai::workspace_entry_t> entries;
+	std::vector<libai::ai::workspace_entry_t> entries;
 	if (!context.read_workspace.list(
 	        context.draft_path, entries, context.err)) {
 		return workspace_inspection_error(
@@ -186,8 +186,8 @@ std::string execute_workspace_read_batch(workspace_tool_context_t &context)
 			return tool_error_json(
 			    "text file exceeds configured read file limit: " +
 			    request.first);
-		webcool::ai::text_read_page_t page;
-		if (!webcool::ai::read_text_page(content, request.second, page,
+		libai::ai::text_read_page_t page;
+		if (!libai::ai::read_text_page(content, request.second, page,
 		        context.err,
 		        std::min(context.read_chunk_bytes,
 		            context.read_batch_bytes - total),
@@ -197,7 +197,7 @@ std::string execute_workspace_read_batch(workspace_tool_context_t &context)
 		auto &file = files.add_child(false, true);
 		file.add_text("path", request.first.c_str());
 		file.add_text("file_sha256",
-		    webcool::ai::agent_workspace_t::content_sha256(content)
+		    libai::ai::agent_workspace_t::content_sha256(content)
 		        .c_str());
 		file.add_text("content", page.content.c_str());
 		file.add_number("offset", page.offset);
@@ -245,9 +245,9 @@ std::string execute_workspace_read(workspace_tool_context_t &context)
 		return tool_error_json(
 		    "text file exceeds 1 MiB; select a smaller file");
 	context.root.add_text("file_sha256",
-	    webcool::ai::agent_workspace_t::content_sha256(content).c_str());
-	webcool::ai::text_read_page_t page;
-	if (!webcool::ai::read_text_page(content, context.request.query, page,
+	    libai::ai::agent_workspace_t::content_sha256(content).c_str());
+	libai::ai::text_read_page_t page;
+	if (!libai::ai::read_text_page(content, context.request.query, page,
 	        context.err, context.read_chunk_bytes,
 	        context.read_file_limit_bytes, true))
 		return workspace_inspection_error(

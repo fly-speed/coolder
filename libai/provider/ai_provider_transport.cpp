@@ -19,7 +19,7 @@
 #include <cstdio>
 #include <memory>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -411,4 +411,4 @@ provider_client_t::create_transport_session()
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

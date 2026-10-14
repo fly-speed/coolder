@@ -3,7 +3,7 @@
 #include <initializer_list>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

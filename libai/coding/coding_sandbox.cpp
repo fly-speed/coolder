@@ -7,7 +7,7 @@
 #include <map>
 #include <mutex>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

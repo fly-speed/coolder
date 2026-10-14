@@ -10,7 +10,7 @@
 #include <chrono>
 #include <memory>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -408,4 +408,4 @@ bool provider_client_t::compact_response(const provider_config_t &provider,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

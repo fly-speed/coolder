@@ -6,7 +6,7 @@
 // Its public fiber-self query reads the key without initializing it first.
 extern "C" void fiber_save_errno(int error);
 
-namespace webcool
+namespace libai
 {
 void initialize_native_runtime()
 {

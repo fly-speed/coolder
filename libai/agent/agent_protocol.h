@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -114,4 +114,4 @@ bool parse_agent_protocol_message(
 std::string validate_agent_final_message(const std::string &raw);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

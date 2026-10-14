@@ -22,7 +22,7 @@ static_assert(!std::is_same<libai::cpp::ExecutionSnapshot, libai::execution_snap
 #include <coding_host.h>
 #include <libai/provider/ai_provider_client.h>
 static_assert(!std::is_same<libai::cpp::ProviderConfig,
-                  webcool::ai::provider_config_t>::value,
+                  libai::ai::provider_config_t>::value,
     "Provider config must be independent");
 #endif
 int main()

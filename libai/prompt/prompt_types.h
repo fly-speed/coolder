@@ -1,5 +1,5 @@
 #pragma once
-namespace webcool
+namespace libai
 {
 namespace ai
 {

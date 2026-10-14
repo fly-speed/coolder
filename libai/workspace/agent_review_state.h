@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -37,4 +37,4 @@ size_t remove_resolved_agent_review_changes(
     std::vector<agent_change_proposal_t> &active_changes);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

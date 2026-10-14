@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace webcool { namespace ai { namespace storage_detail {
+namespace libai { namespace ai { namespace storage_detail {
 struct record_fd_t {
     int fd;
     explicit record_fd_t(int value):fd(value){}

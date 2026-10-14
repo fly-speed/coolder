@@ -23,7 +23,7 @@ bool local_project_location(const std::string &input, std::string &logical,
 		return false;
 	}
 	std::string normalized;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::ai::agent_workspace_t::normalize_path(
 	        input, normalized, false, err))
 		return false;
 	logical = std::string("本地磁盘/") + normalized;
@@ -110,7 +110,7 @@ std::string attachment_mime_type(const std::string &name)
 
 bool load_temporary_attachments(acl::json_node *attachment_node,
     const std::string &draft, const std::string &user_root,
-    std::vector<webcool::ai::completion_image_t> &images,
+    std::vector<libai::ai::completion_image_t> &images,
     std::string &text_context, std::string &err)
 {
 	images.clear();
@@ -165,7 +165,7 @@ bool load_temporary_attachments(acl::json_node *attachment_node,
 		const std::string name = relative.substr(path_prefix.size());
 		const std::string mime = attachment_mime_type(name);
 		if (!mime.empty()) {
-			webcool::ai::completion_image_t image;
+			libai::ai::completion_image_t image;
 			image.name = name;
 			image.mime_type = mime;
 			image.data.swap(data);
@@ -209,12 +209,12 @@ void remove_temporary_attachment_draft(
 			continue;
 		if (!(unlink(child.c_str()) != 0))
 			continue;
-		webcool::ai::ai_log_error("agent.attachment", "remove-file",
+		libai::ai::ai_log_error("agent.attachment", "remove-file",
 		    "cannot remove a temporary attachment file");
 	}
 	closedir(directory);
 	if (rmdir(absolute.c_str()) != 0) {
-		webcool::ai::ai_log_error("agent.attachment",
+		libai::ai::ai_log_error("agent.attachment",
 		    "remove-directory",
 		    "cannot remove a temporary attachment draft");
 	}
@@ -222,11 +222,11 @@ void remove_temporary_attachment_draft(
 
 std::string new_run_id()
 {
-	return ::webcool::ai::identifiers::new_id();
+	return ::libai::ai::identifiers::new_id();
 }
 
-const webcool::ai::provider_config_t *select_provider(
-    const std::vector<webcool::ai::provider_config_t> &providers,
+const libai::ai::provider_config_t *select_provider(
+    const std::vector<libai::ai::provider_config_t> &providers,
     const std::string &requested)
 {
 	if (!requested.empty()) {
@@ -255,7 +255,7 @@ const webcool::ai::provider_config_t *select_provider(
 }
 
 bool provider_identity_contains(
-    const webcool::ai::provider_config_t &provider, const std::string &needle)
+    const libai::ai::provider_config_t &provider, const std::string &needle)
 {
 	std::string identity =
 	    provider.name + " " + provider.model + " " + provider.base_url;
@@ -267,19 +267,19 @@ bool provider_identity_contains(
 	return identity.find(needle) != std::string::npos;
 }
 
-bool provider_is_deepseek(const webcool::ai::provider_config_t &provider)
+bool provider_is_deepseek(const libai::ai::provider_config_t &provider)
 {
 	return provider_identity_contains(provider, "deepseek");
 }
 
-bool provider_is_kimi(const webcool::ai::provider_config_t &provider)
+bool provider_is_kimi(const libai::ai::provider_config_t &provider)
 {
 	return provider_identity_contains(provider, "kimi") ||
 	    provider_identity_contains(provider, "moonshot");
 }
 
 bool provider_supports_thinking_disable(
-    const webcool::ai::provider_config_t &provider)
+    const libai::ai::provider_config_t &provider)
 {
 	if (provider_is_deepseek(provider))
 		return true;
@@ -298,7 +298,7 @@ bool provider_supports_thinking_disable(
 }
 
 bool provider_requires_extended_reasoning_budget(
-    const webcool::ai::provider_config_t &provider)
+    const libai::ai::provider_config_t &provider)
 {
 	if (!provider_is_kimi(provider))
 		return false;
@@ -320,11 +320,11 @@ std::string join_relative(const std::string &dir, const std::string &name)
 	return dir.empty() ? name : dir + "/" + name;
 }
 
-void append_project_context(webcool::ai::agent_workspace_t &workspace,
+void append_project_context(libai::ai::agent_workspace_t &workspace,
     const std::string &project_path, bool allow_file_content,
     std::string &context, std::string &err, bool chinese)
 {
-	std::vector<webcool::ai::workspace_entry_t> entries;
+	std::vector<libai::ai::workspace_entry_t> entries;
 	if (!workspace.list(project_path, entries, err))
 		return;
 	std::ostringstream out;
@@ -366,7 +366,7 @@ void append_project_context(webcool::ai::agent_workspace_t &workspace,
 		    join_relative(project_path, candidates[i]);
 		// These names are optional context, not failed user read requests.
 		const auto entry = std::find_if(entries.begin(), entries.end(),
-		    [&path](const webcool::ai::workspace_entry_t &item) {
+		    [&path](const libai::ai::workspace_entry_t &item) {
 			return item.path == path && !item.directory;
 		});
 		if (entry == entries.end())
@@ -386,8 +386,8 @@ void append_project_context(webcool::ai::agent_workspace_t &workspace,
 	}
 }
 
-void append_project_plan_context(webcool::ai::agent_workspace_t &workspace,
-    const webcool::ai::agent_project_record_t *project, std::string &context,
+void append_project_plan_context(libai::ai::agent_workspace_t &workspace,
+    const libai::ai::agent_project_record_t *project, std::string &context,
     bool chinese)
 {
 	if (project == NULL)
@@ -402,7 +402,7 @@ void append_project_plan_context(webcool::ai::agent_workspace_t &workspace,
 	    << prompt_text(prompt_id::project_goal, chinese) << project->goal
 	    << prompt_text(prompt_id::project_modules, chinese);
 	for (size_t i = 0; i < project->modules.size(); ++i) {
-		const webcool::ai::agent_project_module_t &module =
+		const libai::ai::agent_project_module_t &module =
 		    project->modules[i];
 		out << "- " << module.id << " | " << module.name
 		    << " | layer=" << module.layer << " | path=" << module.path;
@@ -410,7 +410,7 @@ void append_project_plan_context(webcool::ai::agent_workspace_t &workspace,
 		// probes; only an explicit missing-path result is evidence of absence.
 		std::string disk_state = "unknown";
 		if (i < 32 && !module.path.empty()) {
-			std::vector<webcool::ai::workspace_entry_t> children;
+			std::vector<libai::ai::workspace_entry_t> children;
 			std::string probe_error;
 			if (workspace.list(
 			        module.path, children, probe_error, false))
@@ -432,11 +432,11 @@ void append_project_plan_context(webcool::ai::agent_workspace_t &workspace,
 	}
 	out << prompt_text(prompt_id::project_tasks, chinese);
 	for (size_t i = 0; i < project->tasks.size(); ++i) {
-		const webcool::ai::agent_project_task_t &task =
+		const libai::ai::agent_project_task_t &task =
 		    project->tasks[i];
 		out << "- " << task.id << " | status=" << task.status
 		    << " | module=" << task.module_id << " | " << task.title;
-		if (webcool::ai::agent_project_store_t::task_ready(
+		if (libai::ai::agent_project_store_t::task_ready(
 		        *project, task)) {
 			out << " | ready=true";
 		}
@@ -468,12 +468,12 @@ void append_project_memory_context(const std::string &user_root,
 	// memory answers “what durable decisions were made elsewhere in this same
 	// project”. Build the latter from already bounded, user-private summaries so
 	// no source code or tool output is copied into a second database.
-	webcool::ai::agent_session_store_t store(user_root);
-	std::vector<webcool::ai::agent_session_record_t> sessions;
+	libai::ai::agent_session_store_t store(user_root);
+	std::vector<libai::ai::agent_session_record_t> sessions;
 	std::string err;
 	if (!store.list_for_project(
 	        project_path, current_session_id, 6, sessions, err)) {
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "load-project-memory", err);
 		return;
 	}
@@ -498,46 +498,46 @@ void append_project_memory_context(const std::string &user_root,
 }
 
 void append_project_index_context(const std::string &user_root,
-    const webcool::ai::agent_project_record_t *project, std::string &context,
+    const libai::ai::agent_project_record_t *project, std::string &context,
     bool chinese)
 {
 	if (project == NULL)
 		return;
-	webcool::ai::agent_project_index_store_t index_store(user_root);
-	webcool::ai::agent_project_index_snapshot_t snapshot;
+	libai::ai::agent_project_index_store_t index_store(user_root);
+	libai::ai::agent_project_index_snapshot_t snapshot;
 	std::string err;
 	// A navigation hint, never evidence that a file still exists or is unchanged.
 	// Explicit semantic queries refresh; initial submission must not walk a
 	// potentially large dependency tree just to emit a bounded index summary.
 	if (!index_store.load(*project, snapshot, err)) {
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "load-project-index", err);
 		return;
 	}
 	if (snapshot.revision == 0)
 		return;
 	context += prompt_text(prompt_id::project_index_cached, chinese);
-	context += webcool::ai::agent_project_index_store_t::prompt_summary(
+	context += libai::ai::agent_project_index_store_t::prompt_summary(
 	    snapshot, 24 * 1024, chinese);
 }
 
-bool compose_initial_prompt(webcool::ai::agent_workspace_t &workspace,
-    const webcool::ai::provider_config_t &provider,
+bool compose_initial_prompt(libai::ai::agent_workspace_t &workspace,
+    const libai::ai::provider_config_t &provider,
     const std::string &user_root, const std::string &project_path,
     const std::string &prompt, const std::string &current_session_id,
     const std::string &execution_mode, const std::string &previous_summary,
     std::string &initial_prompt, std::string &err, bool chinese,
-    const webcool::ai::agent_project_record_t *selected_project,
+    const libai::ai::agent_project_record_t *selected_project,
     operation_trace_t *trace)
 {
-	std::vector<webcool::ai::agent_project_record_t> projects;
+	std::vector<libai::ai::agent_project_record_t> projects;
 	if (trace)
 		trace->phase("context_project_record");
 	if (selected_project == NULL) {
-		webcool::ai::agent_project_store_t store(user_root);
+		libai::ai::agent_project_store_t store(user_root);
 		std::string load_err;
 		if (!store.list(0, projects, load_err))
-			webcool::ai::ai_log_error(
+			libai::ai::ai_log_error(
 			    "agent.runtime", "load-context-project", load_err);
 		for (const auto &project : projects) {
 			if (!(project.project_path == project_path))
@@ -711,7 +711,7 @@ std::string completion_summary_for_run(const std::string &provided,
 	// Patch mechanism labels and session memory are not descriptions of the work.
 	std::ostringstream out;
 	std::string task =
-	    webcool::ai::agent_session_task_title(original_prompt);
+	    libai::ai::agent_session_task_title(original_prompt);
 	if (!task.empty())
 		out << "- 本轮需求：" << task;
 	const char *generic[] = { "AI 多块原子补丁产生的待审查修改",

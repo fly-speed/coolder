@@ -9,7 +9,7 @@
 #include <set>
 #include <sstream>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -267,4 +267,4 @@ void parse_project_diagnostics(const std::string &source,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

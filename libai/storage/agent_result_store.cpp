@@ -24,14 +24,14 @@
 #include <ctime>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_result_mutex;
+libai::mutex g_result_mutex;
 // JSON escaping can make source text larger than its in-memory form. Keep the
 // individual fields tightly bounded below while leaving enough envelope space
 // to guarantee that an otherwise valid completed result can be persisted.
@@ -44,22 +44,22 @@ const size_t kMaxDiffBytes = 2 * 1024 * 1024;
 const size_t kMaxTotalDiffBytes = 4 * 1024 * 1024;
 const size_t kMaxTotalOriginalBytes = 2 * 1024 * 1024;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 bool valid_hex_id(const std::string &id, bool allow_empty)
 {
 	return id.empty() ? allow_empty :
-	                    ::webcool::ai::identifiers::valid_id(id);
+	                    ::libai::ai::identifiers::valid_id(id);
 }
 
 bool normal_directory(const std::string &path)
 {
-	return ::webcool::ai::file_ops::safe_directory(path);
+	return ::libai::ai::file_ops::safe_directory(path);
 }
 
 bool make_directory(const std::string &path)
 {
-	return ::webcool::ai::file_ops::make_private_directory(path);
+	return ::libai::ai::file_ops::make_private_directory(path);
 }
 
 bool resolve_project(const std::string &user_root,
@@ -98,7 +98,7 @@ std::unique_ptr<libai::file_execution_store_t> result_update_lease(const std::st
 }
 #endif
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 std::string result_name(const std::string &run_id)
 {
@@ -107,27 +107,27 @@ std::string result_name(const std::string &run_id)
 
 std::string node_text(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::nullable_text(node);
+	return ::libai::ai::json_value::nullable_text(node);
 }
 
 long long node_number(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::number(node);
+	return ::libai::ai::json_value::number(node);
 }
 
 bool node_bool(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::text_boolean(node);
+	return ::libai::ai::json_value::text_boolean(node);
 }
 
 acl::json_node *object_child(acl::json_node *node, const char *name)
 {
-	return ::webcool::ai::json_value::object_child(node, name);
+	return ::libai::ai::json_value::object_child(node, name);
 }
 
 acl::json_node *array_value(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::array_value(node);
+	return ::libai::ai::json_value::array_value(node);
 }
 
 bool safe_result(const agent_result_t &result)
@@ -607,7 +607,7 @@ bool agent_result_store_t::save(
 	if (!resolve_project(user_root_, project_path_, project, err)) {
 		return ai_error("agent.result", "resolve-project", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_result_mutex);
+	std::lock_guard<libai::mutex> guard(g_result_mutex);
 	std::string directory;
 	agent_result_t durable = result;
 	if (!prepare_directory(project, directory, err)) {
@@ -650,7 +650,7 @@ bool agent_result_store_t::load(const std::string &run_id,
 	    result_name(run_id));
 	std::string content;
 	{
-		std::lock_guard<webcool::mutex> guard(g_result_mutex);
+		std::lock_guard<libai::mutex> guard(g_result_mutex);
 		if (!read_result_file(path, content))
 			return true;
 	}
@@ -663,7 +663,7 @@ bool agent_result_store_t::load(const std::string &run_id,
 		return ai_error("agent.result", "parse-load", err);
 	}
 	{
-		std::lock_guard<webcool::mutex> guard(g_result_mutex);
+		std::lock_guard<libai::mutex> guard(g_result_mutex);
 		mark_superseded_reviews(
 		    join_path(join_path(project, ".webcool_agent"), "results"),
 		    result);
@@ -732,7 +732,7 @@ bool agent_result_store_t::update(const std::string &run_id,agent_result_t &resu
     if(!valid_hex_id(run_id,false)){err="invalid coding-agent result id";return false;}
     std::string project,directory;
     if(!resolve_project(user_root_,project_path_,project,err))return false;
-    std::lock_guard<webcool::mutex> guard(g_result_mutex);
+    std::lock_guard<libai::mutex> guard(g_result_mutex);
     if(!prepare_directory(project,directory,err))return false;
 #if defined(__unix__) || defined(__APPLE__)
     std::unique_ptr<libai::file_execution_store_t> lease;
@@ -868,4 +868,4 @@ bool agent_result_store_t::set_change_reviews(const std::string &run_id,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

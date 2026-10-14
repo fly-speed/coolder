@@ -2,7 +2,7 @@
 #include "../stdafx.h"
 #include "../common/platform_compat.h"
 #include <string>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

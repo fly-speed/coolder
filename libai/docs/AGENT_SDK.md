@@ -45,7 +45,7 @@ cmake --build example-build
 #include <libai/sdk/provider_model.h>
 #include <libai/sdk/workspace_tools.h>
 
-webcool::ai::provider_config_t config;
+libai::ai::provider_config_t config;
 config.protocol = "openai_chat"; // 也支持已有 Responses、Anthropic、Gemini、Ollama 适配器
 config.base_url = endpoint_from_application;
 config.model = model_from_application;

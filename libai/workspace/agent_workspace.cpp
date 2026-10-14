@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "agent_workspace_internal.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -51,7 +51,7 @@ bool has_suffix(const std::string &value, const char *suffix)
 	    value.compare(value.size() - length, length, suffix) == 0;
 }
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 bool path_is_within(const std::string &root, const std::string &candidate)
 {

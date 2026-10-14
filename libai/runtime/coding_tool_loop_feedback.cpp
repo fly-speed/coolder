@@ -19,7 +19,7 @@ void coding_tool_loop_t::supply_repair_review_sources(coding_turn_t &turn)
 	acl::json_node &sources = source_json.create_array();
 	size_t source_bytes = 0, reused_source_files = 0,
 	       reviewed_source_bytes = 0;
-	webcool::ai::agent_workspace_t review_draft(persistent_draft_root(
+	libai::ai::agent_workspace_t review_draft(persistent_draft_root(
 	    runtime_task->user_root, project_path, runtime_task->id));
 	for (auto it = repair_required_reads.begin();
 	     it != repair_required_reads.end();) {
@@ -30,7 +30,7 @@ void coding_tool_loop_t::supply_repair_review_sources(coding_turn_t &turn)
 		    !review_draft.read(
 		        relative, content, truncated, read_err) ||
 		    truncated ||
-		    webcool::ai::agent_workspace_t::content_sha256(content) !=
+		    libai::ai::agent_workspace_t::content_sha256(content) !=
 		        it->second) {
 			++it;
 			continue;
@@ -46,9 +46,9 @@ void coding_tool_loop_t::supply_repair_review_sources(coding_turn_t &turn)
 			continue;
 		}
 		reviewed_source_bytes += encoded.size();
-		if (webcool::ai::request_has_source(
+		if (libai::ai::request_has_source(
 		        turn.input, it->first, content) ||
-		    webcool::ai::request_has_source(
+		    libai::ai::request_has_source(
 		        turn.input, relative, content)) {
 			++reused_source_files;
 			repair_supplied_versions.insert(*it);
@@ -113,7 +113,7 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 		call_root.add_number("content_bytes",
 		    static_cast<long long>(turn.message.tool.content.size()));
 		call_root.add_text("content_sha256",
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        turn.message.tool.content)
 		        .c_str());
 	}
@@ -133,7 +133,7 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 		// Keep model rationale separately labelled, never promote it to a user requirement.
 		const std::string rationale =
 		    "\n<assistant_repair_rationale>\n" +
-		    webcool::ai::utf8_prefix(turn.output.text, 1536) +
+		    libai::ai::utf8_prefix(turn.output.text, 1536) +
 		    "\n</assistant_repair_rationale>\n";
 		// Preserve the initial resolution and the latest explanation, with
 		// complete wrappers and a fixed bound; small cleanup notes cannot erase it.
@@ -146,13 +146,13 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 	}
 	if (!turn.output.text.empty())
 		recent_findings.append("\n<assistant_findings>\n" +
-		    webcool::ai::utf8_prefix(turn.output.text, 8192) +
+		    libai::ai::utf8_prefix(turn.output.text, 8192) +
 		    "\n</assistant_findings>\n");
 	turn.addition = "\n\n<assistant_tool_call>\n" + call_summary +
 	    "\n</assistant_tool_call>\n<tool_result>\n" + turn.tool_result +
 	    prompt_text(prompt_id::tool_result_continue, chinese) +
 	    turn.automatic_build_feedback;
-	if (turn.progress_decision == webcool::ai::agent_progress_replan) {
+	if (turn.progress_decision == libai::ai::agent_progress_replan) {
 		next_tool_guidance =
 		    prompt_text(prompt_id::progress_replan, chinese);
 		turn.addition += next_tool_guidance;
@@ -165,7 +165,7 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 		}
 		next_tool_guidance +=
 		    prompt_text(prompt_id::validation_next_step, chinese);
-		webcool::ai::completion_request_t repair_evidence = turn.input;
+		libai::ai::completion_request_t repair_evidence = turn.input;
 		repair_evidence.turn_instructions += next_tool_guidance;
 		std::vector<agent_change_proposal_t> repair_changes;
 		for (const auto &change : changes) {
@@ -199,7 +199,7 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 coding_tool_loop_t::step_t coding_tool_loop_t::check_progress_limit(
     coding_turn_t &turn)
 {
-	if (!(turn.progress_decision == webcool::ai::agent_progress_stop))
+	if (!(turn.progress_decision == libai::ai::agent_progress_stop))
 		return step_t::proceed;
 	if (turn.repeated_proposal_failure) {
 		err =
@@ -220,7 +220,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_progress_limit(
 		        persistent_transcript + turn.addition,
 		        accumulated_reasoning, err, executed_tool_calls,
 		        save_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "save-proposal-failure-checkpoint", save_err);
 			err += "\n" + save_err;
 			return step_t::failed;
@@ -255,7 +255,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_progress_limit(
 	if (!save_coding_progress(progress_store, provider, runtime_task,
 	        project_path, original_prompt, stopped_transcript,
 	        accumulated_reasoning, err, executed_tool_calls, save_err)) {
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "save-no-progress-checkpoint", save_err);
 		err += " 恢复记录保存失败：" + save_err;
 	} else {
@@ -263,7 +263,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_progress_limit(
 		    runtime_task, progress_store.relative_path());
 		err += " 诊断与恢复进度已保存。";
 	}
-	webcool::ai::ai_log_error("agent.runtime", "no-progress-guard", err);
+	libai::ai::ai_log_error("agent.runtime", "no-progress-guard", err);
 	return step_t::failed;
 }
 
@@ -276,7 +276,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 	const std::string findings = turn.output.text.empty() ?
 	    "" :
 	    "\n<assistant_findings>\n" +
-	        webcool::ai::utf8_prefix(turn.output.text, 8192) +
+	        libai::ai::utf8_prefix(turn.output.text, 8192) +
 	        "\n</assistant_findings>\n";
 	const size_t uncompressed_bytes =
 	    transcript.size() + findings.size() + turn.addition.size();
@@ -288,14 +288,14 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 	std::string pending_payload;
 	const bool measure_native = stateless_responses &&
 	    !provider_tool_history.empty() &&
-	    webcool::ai::provider_client_t::serialize_completion_request(
+	    libai::ai::provider_client_t::serialize_completion_request(
 	        provider, pending_request, true, pending_payload);
 	const size_t request_bytes =
 	    measure_native ? pending_payload.size() : uncompressed_bytes;
 	std::string compacted;
 	size_t compacted_request_bytes = 0;
 	bool compact_now =
-	    webcool::ai::agent_context_window_t::needs_compaction(
+	    libai::ai::agent_context_window_t::needs_compaction(
 	        request_bytes, 0, compaction_trigger_bytes) ||
 	    uncompressed_bytes >= kMaxToolTranscriptBytes ||
 	    request_bytes >= kMaxToolTranscriptBytes;
@@ -306,7 +306,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 		            prompt_text(prompt_id::read_working_set, chinese) +
 		            read_context.records() + "</read_working_set>\n" +
 		            (turn.progress_decision ==
-		                        webcool::ai::agent_progress_replan ?
+		                        libai::ai::agent_progress_replan ?
 		                    prompt_text(
 		                        prompt_id::repeated_reads, chinese) :
 		                    ""),
@@ -317,7 +317,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 			pending_request.user_prompt =
 			    validation_capabilities + compacted;
 			std::string compacted_payload;
-			if (webcool::ai::provider_client_t::
+			if (libai::ai::provider_client_t::
 			        serialize_completion_request(provider,
 			            pending_request, true, compacted_payload))
 				compacted_request_bytes =
@@ -325,11 +325,11 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 		}
 		compact_now = uncompressed_bytes >= kMaxToolTranscriptBytes ||
 		    request_bytes >= kMaxToolTranscriptBytes ||
-		    webcool::ai::agent_context_window_t::
+		    libai::ai::agent_context_window_t::
 		        compaction_saves_enough(
 		            request_bytes, compacted_request_bytes);
 		if (!compact_now)
-			compaction_trigger_bytes = webcool::ai::
+			compaction_trigger_bytes = libai::ai::
 			    agent_context_window_t::next_compaction_limit(
 			        request_bytes, tool_context_compaction_bytes,
 			        turn.addition.size(), kMaxToolTranscriptBytes);
@@ -349,7 +349,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 		// Leave headroom above the retained working set, otherwise a compacted
 		// prompt larger than the configured trigger compacts again every turn.
 		compaction_trigger_bytes =
-		    webcool::ai::agent_context_window_t::next_compaction_limit(
+		    libai::ai::agent_context_window_t::next_compaction_limit(
 		        compacted_request_bytes, tool_context_compaction_bytes,
 		        turn.addition.size(), kMaxToolTranscriptBytes);
 		provider_tool_history.clear();
@@ -463,7 +463,7 @@ bool coding_tool_loop_t::finish_budget_boundary()
 	        project_path, original_prompt, persistent_transcript,
 	        accumulated_reasoning, err, effective_tool_call_limit,
 	        save_err)) {
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "save-terminal-tool-boundary", save_err);
 		err += " (additionally failed to save recovery progress: " +
 		    save_err + ")";
@@ -473,7 +473,7 @@ bool coding_tool_loop_t::finish_budget_boundary()
 		err += " Recovery progress was saved at " +
 		    progress_store.relative_path() + ".";
 	}
-	webcool::ai::ai_log_error(
+	libai::ai::ai_log_error(
 	    "agent.runtime", "tool-loop-budget-boundary", err);
 	return false;
 }

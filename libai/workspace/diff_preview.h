@@ -2,7 +2,7 @@
 #include "line_diff.h"
 #include <sstream>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

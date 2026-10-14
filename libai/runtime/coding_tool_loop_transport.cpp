@@ -10,7 +10,7 @@ namespace agent_detail
 using coding_loop_detail::save_coding_progress;
 
 class runtime_stream_observer_t
-        : public webcool::ai::completion_stream_observer_t {
+        : public libai::ai::completion_stream_observer_t {
 public:
 	explicit runtime_stream_observer_t(
 	    const std::shared_ptr<agent_runtime_task_t> &task,
@@ -28,7 +28,7 @@ public:
 			return true;
 		// The store already records the detailed ACL error. Add runtime context
 		// without logging the payload, prompts, source code or image data.
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "archive-provider-request", err);
 		return false;
 	}
@@ -37,10 +37,10 @@ public:
 		return runtime_cancel_requested(task_);
 	}
 	void on_stream_progress(
-	    const webcool::ai::provider_stream_progress_t &progress)
+	    const libai::ai::provider_stream_progress_t &progress)
 	{
 		{
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_agent_runtime_mutex);
 			task_->stream_progress = progress;
 			++task_->event_version;
@@ -84,7 +84,7 @@ public:
 		last_response_id_ = response_id;
 		last_status_ = status;
 		{
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_agent_runtime_mutex);
 			if (task_->done || task_->cancel_requested)
 				return false;
@@ -109,7 +109,7 @@ public:
 		// The checkpoint already exists before the request begins. Updating only
 		// its opaque provider state here closes the crash window between OpenAI
 		// accepting a background response and the tool loop consuming its result.
-		webcool::ai::agent_progress_t progress;
+		libai::ai::agent_progress_t progress;
 		bool found = false;
 		std::string checkpoint_err;
 		if (progress_store_.load(progress, found, checkpoint_err) &&
@@ -122,12 +122,12 @@ public:
 			progress.updated_at =
 			    static_cast<long long>(time(NULL));
 			if (!progress_store_.save(progress, checkpoint_err)) {
-				webcool::ai::ai_log_error("agent.runtime",
+				libai::ai::ai_log_error("agent.runtime",
 				    "checkpoint-background-response",
 				    checkpoint_err);
 			}
 		} else if (!checkpoint_err.empty()) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "load-background-checkpoint", checkpoint_err);
 		}
 		return true;
@@ -135,8 +135,8 @@ public:
 
 private:
 	std::shared_ptr<agent_runtime_task_t> task_;
-	webcool::ai::agent_request_store_t request_store_;
-	webcool::ai::agent_progress_store_t progress_store_;
+	libai::ai::agent_request_store_t request_store_;
+	libai::ai::agent_progress_store_t progress_store_;
 	std::string last_response_id_;
 	std::string last_status_;
 };
@@ -153,15 +153,15 @@ bool coding_tool_loop_t::retrieve_pending_model(coding_turn_t &turn,
 	           std::chrono::steady_clock::now() - poll_started)
 	           .count() < 30) {
 		if (!wait_while_runtime_paused(runtime_task)) {
-			webcool::ai::completion_result_t cancelled;
+			libai::ai::completion_result_t cancelled;
 			std::string cancel_err;
-			webcool::ai::provider_client_t::cancel_response(
+			libai::ai::provider_client_t::cancel_response(
 			    provider, api_key, provider_response_id, cancelled,
 			    cancel_err);
 			err = "agent run cancelled";
 			return false;
 		}
-		if (!webcool::ai::provider_client_t::retrieve_response(provider,
+		if (!libai::ai::provider_client_t::retrieve_response(provider,
 		        api_key, provider_response_id, turn.output, err)) {
 			if (!turn.output.response_status.empty()) {
 				observer.on_response_state(provider_response_id,
@@ -169,7 +169,7 @@ bool coding_tool_loop_t::retrieve_pending_model(coding_turn_t &turn,
 			}
 			if ((turn.output.retryable_error ||
 			        turn.output.error_category ==
-			            webcool::ai::provider_error_network) &&
+			            libai::ai::provider_error_network) &&
 			    consecutive_poll_errors++ < 5) {
 				acl::fiber::delay(1000);
 				continue;
@@ -198,7 +198,7 @@ bool coding_tool_loop_t::retrieve_pending_model(coding_turn_t &turn,
 	if (!model_call_completed && err.empty()) {
 		err = "OpenAI background response polling timed out";
 		turn.output.error_category =
-		    webcool::ai::provider_error_timeout;
+		    libai::ai::provider_error_timeout;
 		// The provider is still running this response. Leave the persisted ID
 		// pending for an explicit resume; never create a duplicate request.
 		turn.output.retryable_error = false;
@@ -217,7 +217,7 @@ bool coding_tool_loop_t::request_or_retrieve_model(coding_turn_t &turn,
 		return retrieve_pending_model(
 		    turn, observer, model_call_completed);
 	} else {
-		model_call_completed = webcool::ai::provider_client_t::complete(
+		model_call_completed = libai::ai::provider_client_t::complete(
 		    provider, api_key, turn.input, turn.output, err, &observer);
 	}
 	return true;
@@ -235,7 +235,7 @@ bool coding_tool_loop_t::retry_interrupted_stream(
 	// connection may drop an established SSE stream. Save the exact tool-loop
 	// checkpoint before one automatic retry so either failure resumes from the
 	// latest completed workspace action instead of restarting the task.
-	const webcool::ai::completion_result_t interrupted_output = turn.output;
+	const libai::ai::completion_result_t interrupted_output = turn.output;
 	const std::string interrupted_err = err;
 	std::string interrupted_reasoning =
 	    runtime_reasoning_snapshot(runtime_task);
@@ -250,11 +250,11 @@ bool coding_tool_loop_t::retry_interrupted_stream(
 	        project_path, original_prompt, persistent_transcript,
 	        interrupted_reasoning, interrupted_err, turn.call,
 	        retry_save_err)) {
-		webcool::ai::ai_log_error("agent.runtime",
+		libai::ai::ai_log_error("agent.runtime",
 		    "save-stream-retry-progress", retry_save_err);
 	}
 	accumulated_reasoning = interrupted_reasoning;
-	webcool::ai::ai_log_error(
+	libai::ai::ai_log_error(
 	    "agent.runtime", "retry-interrupted-model-stream", interrupted_err);
 
 	// The transcript already contains every completed workspace tool call.
@@ -267,7 +267,7 @@ bool coding_tool_loop_t::retry_interrupted_stream(
 		const std::string checkpoint_suffix =
 		    "\n</transport_recovery_checkpoint>";
 		const size_t prompt_limit =
-		    webcool::ai::kMaxAgentPromptBytes - 8 * 1024;
+		    libai::ai::kMaxAgentPromptBytes - 8 * 1024;
 		if (turn.input.user_prompt.size() + checkpoint_prefix.size() +
 		        checkpoint_suffix.size() <
 		    prompt_limit) {
@@ -300,11 +300,11 @@ bool coding_tool_loop_t::retry_interrupted_stream(
 	log_model_request(turn);
 	update_runtime_progress(
 	    runtime_task, "model_retry", "", executed_tool_calls);
-	webcool::ai::completion_result_t retry_output;
+	libai::ai::completion_result_t retry_output;
 	runtime_stream_observer_t retry_observer(runtime_task, project_path);
 	std::string retry_err;
 	model_call_completed =
-	    webcool::ai::provider_client_t::complete(provider, api_key,
+	    libai::ai::provider_client_t::complete(provider, api_key,
 	        turn.input, retry_output, retry_err, &retry_observer);
 	if (!wait_while_runtime_paused(runtime_task)) {
 		err = "agent run cancelled";
@@ -348,7 +348,7 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 		    turn.output.effective_max_output_tokens > 0 ?
 		    turn.output.effective_max_output_tokens :
 		    turn.input.max_output_tokens;
-		webcool::ai::annotate_output_token_limit(
+		libai::ai::annotate_output_token_limit(
 		    err, turn.output.incomplete_reason, actual_output_limit);
 		// Record the original failure before retries can replace its details.
 		// Error text may echo this user's credential, even without an sk- prefix.
@@ -383,7 +383,7 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 			    prompt_id::tool_arguments_repair, chinese);
 		err.clear();
 		log_model_request(turn);
-		model_call_completed = webcool::ai::provider_client_t::complete(
+		model_call_completed = libai::ai::provider_client_t::complete(
 		    provider, api_key, turn.input, turn.output, err, &observer);
 	}
 	// Never discard a response that was already paid for. A pause requested
@@ -397,9 +397,9 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 	if ((!model_call_completed && turn.output.retryable_error &&
 	        !turn.output.transport_retry_attempted &&
 	        (turn.output.error_category ==
-	                webcool::ai::provider_error_timeout ||
+	                libai::ai::provider_error_timeout ||
 	            (turn.output.error_category ==
-	                    webcool::ai::provider_error_network &&
+	                    libai::ai::provider_error_network &&
 	                (err.find(
 	                     "cannot read AI provider streaming response") !=
 	                        std::string::npos ||
@@ -413,7 +413,7 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 		    turn.output.effective_max_output_tokens > 0 ?
 		    turn.output.effective_max_output_tokens :
 		    turn.input.max_output_tokens;
-		webcool::ai::annotate_output_token_limit(
+		libai::ai::annotate_output_token_limit(
 		    err, turn.output.incomplete_reason, actual_output_limit);
 		append_model_operation_event(runtime_task,
 		    "model_request_failed", turn.output, err,
@@ -441,7 +441,7 @@ bool coding_tool_loop_t::request_model(coding_turn_t &turn)
 		        runtime_task, project_path, original_prompt,
 		        persistent_transcript, failed_reasoning, err, turn.call,
 		        save_err)) {
-			webcool::ai::ai_log_error(
+			libai::ai::ai_log_error(
 			    "agent.runtime", "save-failed-progress", save_err);
 			err +=
 			    " (additionally failed to save recovery progress: " +

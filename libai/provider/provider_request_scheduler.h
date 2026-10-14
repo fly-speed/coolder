@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -60,4 +60,4 @@ public:
 };
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

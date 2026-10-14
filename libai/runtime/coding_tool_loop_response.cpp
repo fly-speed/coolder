@@ -38,7 +38,7 @@ bool final_text_defers_implementation(const std::string &text)
 
 namespace
 {
-std::string coding_tool_schema(const webcool::ai::agent_tool_t &tool)
+std::string coding_tool_schema(const libai::ai::agent_tool_t &tool)
 {
 	if (!tool.parameters_json.empty())
 		return tool.parameters_json;
@@ -64,7 +64,7 @@ std::string coding_tool_schema(const webcool::ai::agent_tool_t &tool)
 	writer.EndObject();
 	return std::string(buffer.GetString(), buffer.GetSize());
 }
-std::string check_coding_tool(const webcool::ai::completion_request_t &input,
+std::string check_coding_tool(const libai::ai::completion_request_t &input,
     const std::string &name, const std::string &arguments)
 {
 	for (const auto &tool : input.tools) {
@@ -77,8 +77,8 @@ std::string check_coding_tool(const webcool::ai::completion_request_t &input,
 	}
 	return "tool not advertised for this turn";
 }
-std::string check_fallback_tool(const webcool::ai::completion_request_t &input,
-    const webcool::ai::agent_protocol_message_t &message)
+std::string check_fallback_tool(const libai::ai::completion_request_t &input,
+    const libai::ai::agent_protocol_message_t &message)
 {
 	try {
 		namespace json = libai::governance_detail::json;
@@ -119,9 +119,9 @@ coding_tool_loop_t::step_t coding_tool_loop_t::validate_tool_schema(
 			}
 		}
 	} else {
-		rejection = webcool::ai::validate_agent_final_message(turn.output.text);
-		webcool::ai::agent_protocol_message_t message;
-		if (rejection.empty() && webcool::ai::parse_agent_protocol_message(turn.output.text, message) &&
+		rejection = libai::ai::validate_agent_final_message(turn.output.text);
+		libai::ai::agent_protocol_message_t message;
+		if (rejection.empty() && libai::ai::parse_agent_protocol_message(turn.output.text, message) &&
 		    !message.final_message) {
 			rejection = check_fallback_tool(turn.input, message);
 		}
@@ -185,7 +185,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::handle_preview_response(
 			    prompt_id::read_budget_exhausted, chinese));
 		else {
 			++executed_tool_calls;
-			result = webcool::ai::preview_project_read(
+			result = libai::ai::preview_project_read(
 			    runtime_task->preview_context_directory,
 			    requested.name, requested.path, requested.query);
 		}
@@ -206,7 +206,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::handle_preview_response(
 		item.add_text("tool", requested.name.c_str());
 		item.add_text("path", requested.path.c_str());
 		item.add_text("result",
-		    webcool::ai::utf8_prefix(result, 32 * 1024).c_str());
+		    libai::ai::utf8_prefix(result, 32 * 1024).c_str());
 		transcript += prompt_text(prompt_id::source_evidence, chinese) +
 		    serialize_json(item);
 		append_runtime_operation_event(runtime_task, item);
@@ -249,7 +249,7 @@ void coding_tool_loop_t::record_model_response(coding_turn_t &turn)
 	provider_tool_outputs.clear();
 	provider_response_pending = false;
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		runtime_task->provider_response_id.clear();
 		runtime_task->provider_response_pending = false;
 		runtime_task->provider_tool_outputs.clear();
@@ -285,7 +285,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::parse_model_response(
 			turn.message.tool.content = turn.output.tool_content;
 		}
 	} else {
-		parsed_protocol = webcool::ai::parse_agent_protocol_message(
+		parsed_protocol = libai::ai::parse_agent_protocol_message(
 		    turn.output.text, turn.message);
 		turn.provider_tool_call_count =
 		    turn.message.final_message ? 0 : 1;
@@ -345,7 +345,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::parse_model_response(
 		    (chinese ?
 		            "模型连续返回不符合工具调用或最终结果协议的内容，修复重试已用尽。可恢复本次运行继续处理。" :
 		            "AI provider repeatedly returned invalid tool-call or final-result protocol");
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "protocol-repair", err);
 		std::string save_err;
 		if (save_coding_progress(progress_store, provider, runtime_task,
@@ -355,7 +355,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::parse_model_response(
 			mark_runtime_recovery_available(
 			    runtime_task, progress_store.relative_path());
 		} else {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "save-protocol-repair-progress", save_err);
 		}
 		return step_t::failed;
@@ -408,7 +408,7 @@ void coding_tool_loop_t::merge_final_proposals(coding_turn_t &turn)
 	session_title = turn.message.session_title;
 	rejected_changes =
 	    validate_change_proposals(workspace, project_path, changes);
-	webcool::ai::assign_agent_review_generations(
+	libai::ai::assign_agent_review_generations(
 	    changes_before_final, changes);
 }
 
@@ -418,12 +418,12 @@ bool coding_tool_loop_t::run_automatic_validation(const std::string &operation,
     if(!prepare_execution_revision())return false;
     std::string source;
     if(!workspace.tree_sha256(project_path,source,err))return false;
-    const auto proposal=webcool::ai::agent_workspace_t::content_sha256(staged_change_fingerprint(changes));
-    webcool::ai::agent_validation_receipt_t cached;
-    {std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);cached=runtime_task->validation_receipt;}
+    const auto proposal=libai::ai::agent_workspace_t::content_sha256(staged_change_fingerprint(changes));
+    libai::ai::agent_validation_receipt_t cached;
+    {std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);cached=runtime_task->validation_receipt;}
     if(!cached.effect_key.empty() && cached.execution_revision==runtime_task->coding_execution_revision &&
         cached.source_sha256==source && cached.proposal_sha256==proposal) {
-        {std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        {std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
         for(auto item=runtime_task->tool_effects.rbegin();item!=runtime_task->tool_effects.rend();++item)
             if((item->state=="done"||item->state=="confirmed_applied") && item->name.compare(0,7,"coding.")==0 &&
                 item->name.find("_validation")!=std::string::npos) {
@@ -470,10 +470,10 @@ bool coding_tool_loop_t::run_automatic_validation(const std::string &operation,
         json_text(report["proposal_sha256"])!=proposal || json_text(report["tool_execution_key"])!=verification.effect_key) {
         err="automatic validation receipt does not match its input snapshot; host reconciliation required";return false;
     }
-    webcool::ai::agent_validation_receipt_t receipt;
+    libai::ai::agent_validation_receipt_t receipt;
     receipt.effect_key=verification.effect_key;receipt.execution_revision=runtime_task->coding_execution_revision;
     receipt.source_sha256=source;receipt.proposal_sha256=proposal;receipt.report_json=validation;
-    {std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);runtime_task->validation_receipt=receipt;}
+    {std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);runtime_task->validation_receipt=receipt;}
 	if(settle_tool_effect(verification,step_t::proceed)==step_t::failed)return false;
 	append_simple_operation_event(runtime_task,"automatic_validation_committed",
 	    verification.message.tool.name,"",executed_tool_calls);
@@ -507,7 +507,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 		++executed_tool_calls;
 		merge_final_proposals(turn);
 		{
-			std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+			std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 			runtime_task->changes=changes;
 			runtime_task->completed_tool_calls=executed_tool_calls;
 			++runtime_task->staged_change_version;
@@ -537,9 +537,9 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 	            std::string::npos);
 	const bool inspection_without_edits = changes.empty() &&
 	    !has_task_revision &&
-	    !webcool::ai::verification_only_task(original_prompt);
+	    !libai::ai::verification_only_task(original_prompt);
 	if (inspection_without_edits &&
-	    !webcool::ai::read_only_analysis_task(original_prompt))
+	    !libai::ai::read_only_analysis_task(original_prompt))
 		final_output.text += chinese ?
 		    "\n本轮未提交代码修改；未触发既有项目的自动修复，也未确认所需功能已完成。" :
 		    "\nNo code changes were submitted in this run; existing project failures were not automatically repaired and requested functionality is not verified.";
@@ -569,14 +569,14 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 		evidence.add_text("event", "validation_completed");
 		evidence.add_text("report", validation.c_str());
 		evidence.add_text("draft_sha256",
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        final_fingerprint)
 		        .c_str());
 		append_runtime_operation_event(runtime_task, evidence);
 		traces.push_back(validation_trace);
 		last_validated_fingerprint = final_fingerprint;
 		const bool compile_completed =
-		    webcool::ai::focused_compile_repair(original_prompt) &&
+		    libai::ai::focused_compile_repair(original_prompt) &&
 		    validation.find("\"compile_repair_completed\":true") !=
 		        std::string::npos;
 		const bool checks_failed = !compile_completed &&
@@ -592,7 +592,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 		    json_text(failed_validation["failed_command_id"]) :
 		    "";
 		const bool compiler_failure =
-		    webcool::ai::compile_command(failed_command) ||
+		    libai::ai::compile_command(failed_command) ||
 		    validation.find("[build failed]") != std::string::npos;
 		const std::string browser_status = failed_validation.finish() ?
 		    json_text(failed_validation["browser_acceptance"]) :

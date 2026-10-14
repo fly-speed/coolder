@@ -7,7 +7,7 @@
 #include <cctype>
 #include <cstring>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -21,17 +21,17 @@ namespace
 
 std::string node_text(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::scalar_text(node);
+	return ::libai::ai::json_value::scalar_text(node);
 }
 
 acl::json_node *object_child(acl::json_node *node, const char *name)
 {
-	return ::webcool::ai::json_value::object_child(node, name);
+	return ::libai::ai::json_value::object_child(node, name);
 }
 
 acl::json_node *array_value(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::array_value(node);
+	return ::libai::ai::json_value::array_value(node);
 }
 
 std::string trim_ascii(const std::string &value)
@@ -199,4 +199,4 @@ bool parse_agent_protocol_message(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

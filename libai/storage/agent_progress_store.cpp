@@ -24,14 +24,14 @@
 #include <set>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_progress_mutex;
+libai::mutex g_progress_mutex;
 const size_t kMaxTranscriptBytes = kMaxAgentTranscriptBytes;
 const size_t kMaxReasoningBytes = 1024 * 1024;
 const size_t kMaxProgressFileBytes = 4 * 1024 * 1024;
@@ -40,11 +40,11 @@ const size_t kMaxProgressFileBytes = 4 * 1024 * 1024;
 // lower and later restore the configured limit without corrupting checkpoints.
 const size_t kMaxCompletedToolCalls = 256;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 bool valid_session_id(const std::string &id)
 {
-	return id.empty() || ::webcool::ai::identifiers::valid_id(id);
+	return id.empty() || ::libai::ai::identifiers::valid_id(id);
 }
 
 std::string progress_name(const std::string &session_id)
@@ -55,7 +55,7 @@ std::string progress_name(const std::string &session_id)
 
 bool normal_directory(const std::string &path)
 {
-	return ::webcool::ai::file_ops::safe_directory(path);
+	return ::libai::ai::file_ops::safe_directory(path);
 }
 
 bool resolve_project(const std::string &user_root,
@@ -101,21 +101,21 @@ bool ensure_progress_directory(
 	return true;
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 std::string json_text(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::string_text(node);
+	return ::libai::ai::json_value::string_text(node);
 }
 
 long long json_number(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::number(node);
+	return ::libai::ai::json_value::number(node);
 }
 
 bool json_boolean(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::boolean(node);
+	return ::libai::ai::json_value::boolean(node);
 }
 
 bool safe_progress(const agent_progress_t &progress)
@@ -409,7 +409,7 @@ bool agent_progress_store_t::save_impl(const agent_progress_t &progress,
 	if (!resolve_project(user_root_, project_path_, project, err)) {
 		return ai_error("agent.progress", "resolve-project", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_progress_mutex);
+	std::lock_guard<libai::mutex> guard(g_progress_mutex);
 	std::string directory;
 	if (!ensure_progress_directory(project, directory, err)) {
 		return ai_error("agent.progress", "prepare-directory", err);
@@ -488,7 +488,7 @@ bool agent_progress_store_t::load_snapshot(agent_progress_t &progress,
 	    join_path(project, ".webcool_agent"), progress_name(session_id_));
 	std::string content;
 	{
-		std::lock_guard<webcool::mutex> guard(g_progress_mutex);
+		std::lock_guard<libai::mutex> guard(g_progress_mutex);
 #ifndef _WIN32
         bool input_found=false;
         if(!read_checkpoint_bytes(join_path(project,".webcool_agent"),progress_name(session_id_),content,input_found,err))return false;
@@ -712,7 +712,7 @@ bool agent_progress_store_t::remove(std::string &err) const
 	}
 	const std::string path = join_path(
 	    join_path(project, ".webcool_agent"), progress_name(session_id_));
-	std::lock_guard<webcool::mutex> guard(g_progress_mutex);
+	std::lock_guard<libai::mutex> guard(g_progress_mutex);
 #ifndef _WIN32
     const auto directory=join_path(project,".webcool_agent");
     struct stat metadata;
@@ -729,4 +729,4 @@ bool agent_progress_store_t::remove(std::string &err) const
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

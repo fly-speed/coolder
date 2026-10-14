@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -57,4 +57,4 @@ std::string select_next_agent_run(const std::vector<agent_run_slot_t> &runs,
     size_t global_limit, size_t per_user_limit);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

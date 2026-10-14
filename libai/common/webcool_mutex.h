@@ -6,7 +6,7 @@
 #include "fiber/lib_fiber.hpp"
 #endif
 
-namespace webcool
+namespace libai
 {
 
 // Initialize ACL thread state without starting a scheduler or changing its hooks.
@@ -72,4 +72,4 @@ private:
 #endif
 };
 
-} // namespace webcool
+} // namespace libai

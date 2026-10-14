@@ -24,7 +24,7 @@
 #include <sstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -34,24 +34,24 @@ namespace
 // runs.v1 is a private, versioned, line-oriented metadata file. Text fields are
 // hex encoded so tabs/newlines cannot corrupt record boundaries. The entire
 // bounded file is rewritten through a 0600 temporary file and atomic rename.
-webcool::mutex g_run_store_mutex;
+libai::mutex g_run_store_mutex;
 const char *kHeaderV1 = "WEBCOOL_AGENT_RUNS_V1";
 const char *kHeaderV2 = "WEBCOOL_AGENT_RUNS_V2";
 const char *kRunFile = ".webcool_agent/runs.v1";
 const size_t kMaxStoredRuns = 100;
 const size_t kMaxErrorBytes = 2000;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool parse_number(const std::string &value, long long &number)
 {
@@ -133,7 +133,7 @@ std::string store_path(const std::string &user_root)
 	return join_path(user_root, kRunFile);
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool newer_run(const agent_run_record_t &left, const agent_run_record_t &right)
 {
@@ -370,7 +370,7 @@ bool agent_run_store_t::create(
 		err = "invalid new agent run record";
 		return ai_error("agent.run-store", "validate-create", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_run_store_mutex);
 	std::vector<agent_run_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.run-store", "load-for-create", err);
@@ -396,7 +396,7 @@ bool agent_run_store_t::complete(const std::string &id, long long input_tokens,
     long long proposed_changes, long long rejected_changes,
     std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_run_store_mutex);
 	if (update_terminal(user_root_, id, "completed", input_tokens,
 	        output_tokens, cached_input_tokens, reasoning_tokens,
 	        latency_ms, tool_calls, proposed_changes, rejected_changes, "",
@@ -415,7 +415,7 @@ bool agent_run_store_t::fail(const std::string &id, const std::string &error,
     const std::string &provider_error_category, int provider_http_status,
     bool provider_error_retryable, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_run_store_mutex);
 	if (update_terminal(user_root_, id, "failed", 0, 0, 0, 0, 0, 0, 0, 0,
 	        error, provider_error_category, provider_http_status,
 	        provider_error_retryable, err))
@@ -427,7 +427,7 @@ bool agent_run_store_t::fail(const std::string &id, const std::string &error,
 
 bool agent_run_store_t::cancel(const std::string &id, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_run_store_mutex);
 	if (update_terminal(user_root_, id, "cancelled", 0, 0, 0, 0, 0, 0, 0, 0,
 	        "", "cancelled", 0, false, err))
 		return true;
@@ -441,7 +441,7 @@ bool agent_run_store_t::get(
 		err = "invalid agent run id";
 		return ai_error("agent.run-store", "validate-get-id", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_run_store_mutex);
 	std::vector<agent_run_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.run-store", "load-for-get", err);
@@ -461,7 +461,7 @@ bool agent_run_store_t::list(size_t limit,
 {
 	if (limit == 0 || limit > kMaxStoredRuns)
 		limit = kMaxStoredRuns;
-	std::lock_guard<webcool::mutex> guard(g_run_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_run_store_mutex);
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.run-store", "list", err);
 	}
@@ -473,4 +473,4 @@ bool agent_run_store_t::list(size_t limit,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

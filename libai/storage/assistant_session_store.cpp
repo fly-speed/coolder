@@ -16,7 +16,7 @@
 #include <memory>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -31,32 +31,32 @@ const int kSqlDone = 101;
 
 bool make_directory(const std::string &path)
 {
-	return ::webcool::ai::file_ops::make_private_directory(path);
+	return ::libai::ai::file_ops::make_private_directory(path);
 }
 
 std::string node_text(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::nullable_text(node);
+	return ::libai::ai::json_value::nullable_text(node);
 }
 
 long long node_number(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::number(node);
+	return ::libai::ai::json_value::number(node);
 }
 
 bool node_bool(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::text_boolean(node);
+	return ::libai::ai::json_value::text_boolean(node);
 }
 
 acl::json_node *object_child(acl::json_node *node, const char *name)
 {
-	return ::webcool::ai::json_value::object_child(node, name);
+	return ::libai::ai::json_value::object_child(node, name);
 }
 
 acl::json_node *array_value(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::array_value(node);
+	return ::libai::ai::json_value::array_value(node);
 }
 
 bool valid_message(const assistant_message_t &message)
@@ -845,4 +845,4 @@ bool assistant_session_store_t::remove_tags(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

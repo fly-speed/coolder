@@ -9,18 +9,18 @@ namespace action
 namespace agent_detail
 {
 
-bool workspace_entry_state(webcool::ai::agent_workspace_t &workspace,
+bool workspace_entry_state(libai::ai::agent_workspace_t &workspace,
     const std::string &raw_path, bool &exists, bool &directory,
     std::string &err)
 {
 	std::string path;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::ai::agent_workspace_t::normalize_path(
 	        raw_path, path, false, err))
 		return false;
 	const size_t slash = path.rfind('/');
 	const std::string parent =
 	    slash == std::string::npos ? "" : path.substr(0, slash);
-	std::vector<webcool::ai::workspace_entry_t> entries;
+	std::vector<libai::ai::workspace_entry_t> entries;
 	if (!workspace.list(parent, entries, err, false)) {
 		if (err != "workspace path does not exist")
 			return false;
@@ -42,9 +42,9 @@ bool workspace_entry_state(webcool::ai::agent_workspace_t &workspace,
 }
 
 bool verify_result_changes_applied(const std::string &user_root,
-    const webcool::ai::agent_result_t &result, std::string &err)
+    const libai::ai::agent_result_t &result, std::string &err)
 {
-	webcool::ai::agent_workspace_t workspace(user_root);
+	libai::ai::agent_workspace_t workspace(user_root);
 	for (size_t i = 0; i < result.changes.size(); ++i) {
 		const agent_change_proposal_t &change = result.changes[i];
 		bool exists = false;
@@ -89,10 +89,10 @@ bool verify_result_changes_applied(const std::string &user_root,
 }
 
 bool workspace_change_matches(const std::string &user_root,
-    const webcool::ai::workspace_change_input_t &change, bool &matches,
+    const libai::ai::workspace_change_input_t &change, bool &matches,
     std::string &err)
 {
-	webcool::ai::agent_workspace_t workspace(user_root);
+	libai::ai::agent_workspace_t workspace(user_root);
 	bool exists = false;
 	bool directory = false;
 	if (!workspace_entry_state(
@@ -141,7 +141,7 @@ bool workspace_path_is_below(
 std::string persistent_draft_root(const std::string &user_root,
     const std::string &project_path, const std::string &run_id)
 {
-	return webcool::ai::agent_draft_store_t(user_root, project_path, run_id)
+	return libai::ai::agent_draft_store_t(user_root, project_path, run_id)
 	    .root_path();
 }
 
@@ -160,7 +160,7 @@ bool materialize_staged_worktree(const std::string &user_root,
 	append_runtime_operation_event(task, begin);
 	bool reused = false;
 	const bool ok =
-	    webcool::ai::agent_draft_store_t(user_root, project_path, run_id)
+	    libai::ai::agent_draft_store_t(user_root, project_path, run_id)
 	        .materialize(changes, skipped_files, err, &reused, NULL,
 	            [task] { return task && runtime_cancel_requested(task); });
 	acl::json end_json;
@@ -187,19 +187,19 @@ bool synchronize_live_review_state(
 	// and discard only exact generations that the browser has resolved.
 	std::vector<agent_change_proposal_t> review_snapshot;
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		review_snapshot = runtime_task->changes;
 	}
-	webcool::ai::agent_result_store_t ledger(
+	libai::ai::agent_result_store_t ledger(
 	    runtime_task->user_root, project_path);
-	webcool::ai::agent_result_t durable_review;
+	libai::ai::agent_result_t durable_review;
 	bool ledger_found = false;
 	if (!ledger.load(runtime_task->id, durable_review, ledger_found, err))
 		return false;
 	if (ledger_found)
 		review_snapshot = durable_review.changes;
 	const std::vector<agent_change_proposal_t> before = active_changes;
-	resolved_count = webcool::ai::remove_resolved_agent_review_changes(
+	resolved_count = libai::ai::remove_resolved_agent_review_changes(
 	    review_snapshot, active_changes);
 	if (resolved_count == 0)
 		return true;
@@ -211,7 +211,7 @@ bool synchronize_live_review_state(
 	if (!materialize_staged_worktree(runtime_task->user_root, project_path,
 	        runtime_task->id, active_changes, skipped_files, err)) {
 		active_changes = before;
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "synchronize-live-review-worktree", err);
 		return false;
 	}
@@ -240,7 +240,7 @@ bool remove_persistent_worktree(const std::string &user_root,
 	begin.add_text("event", "draft_cleanup_started");
 	append_runtime_operation_event(task, begin);
 	const bool ok =
-	    webcool::ai::agent_draft_store_t(user_root, project_path, run_id)
+	    libai::ai::agent_draft_store_t(user_root, project_path, run_id)
 	        .remove(err);
 	acl::json end_json;
 	acl::json_node &end = end_json.create_node();
@@ -287,7 +287,7 @@ bool schedule_reviewed_worktree_cleanup(const std::string &user_root,
 {
 	const std::string retired = new_run_id();
 	bool detached = false;
-	if (!webcool::ai::agent_draft_store_t(user_root, project_path, run_id)
+	if (!libai::ai::agent_draft_store_t(user_root, project_path, run_id)
 	         .retire(retired, detached, err))
 		return false;
 	if (!detached)
@@ -332,11 +332,11 @@ void reviewed_cleanup_queue_t::run()
 		begin.add_text("cleanup_id", job.retired.c_str());
 		append_runtime_operation_event(cleanup_task, begin);
 		std::string cleanup_err;
-		const bool ok = webcool::ai::agent_draft_store_t(
+		const bool ok = libai::ai::agent_draft_store_t(
 		    job.user_root, job.project, job.retired)
 		                    .remove(cleanup_err);
 		if (!ok)
-			webcool::ai::ai_log_error("agent.draft",
+			libai::ai::ai_log_error("agent.draft",
 			    "background-reviewed-cleanup", cleanup_err);
 		acl::json end_json;
 		auto &end = end_json.create_node();
@@ -356,7 +356,7 @@ std::string staged_change_fingerprint(
 	for (size_t i = 0; i < changes.size(); ++i) {
 		fingerprint += changes[i].operation + "\n" + changes[i].path +
 		    "\n" + changes[i].target_path + "\n" +
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        changes[i].content) +
 		    "\n";
 	}
@@ -370,13 +370,13 @@ std::string staged_cycle_fingerprint(
 	for (const auto &change : changes)
 		entries.push_back(change.operation + "\n" + change.path + "\n" +
 		    change.target_path + "\n" +
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        change.content));
 	std::sort(entries.begin(), entries.end());
 	std::string canonical;
 	for (const auto &entry : entries)
 		canonical += std::to_string(entry.size()) + ":" + entry;
-	return webcool::ai::agent_workspace_t::content_sha256(canonical);
+	return libai::ai::agent_workspace_t::content_sha256(canonical);
 }
 
 } // namespace agent_detail

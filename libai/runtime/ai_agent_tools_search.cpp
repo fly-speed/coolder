@@ -10,7 +10,7 @@ namespace workspace_tool_detail
 {
 
 static bool overlay_search_change(workspace_tool_context_t &context, size_t i,
-    std::vector<webcool::ai::workspace_match_t> &matches, bool &truncated)
+    std::vector<libai::ai::workspace_match_t> &matches, bool &truncated)
 {
 
 	const agent_change_proposal_t &change = (*context.staged_changes)[i];
@@ -18,7 +18,7 @@ static bool overlay_search_change(workspace_tool_context_t &context, size_t i,
 		return true;
 	// Formal matches for a staged file are stale. Remove them and index the
 	// private proposed contents in memory for this response only.
-	for (std::vector<webcool::ai::workspace_match_t>::iterator it =
+	for (std::vector<libai::ai::workspace_match_t>::iterator it =
 	         matches.begin();
 	     it != matches.end();) {
 		if (it->path == change.path)
@@ -35,7 +35,7 @@ static bool overlay_search_change(workspace_tool_context_t &context, size_t i,
 		std::string text = change.content.substr(begin,
 		    end == std::string::npos ? std::string::npos : end - begin);
 		if (text.find(context.request.query) != std::string::npos) {
-			webcool::ai::workspace_match_t match;
+			libai::ai::workspace_match_t match;
 			match.path = change.path;
 			match.line = line;
 			if (text.size() > 500)
@@ -63,7 +63,7 @@ std::string execute_workspace_search(workspace_tool_context_t &context)
 		return tool_error_json(
 		    "reference query must contain 1-256 bytes");
 	}
-	std::vector<webcool::ai::workspace_match_t> matches;
+	std::vector<libai::ai::workspace_match_t> matches;
 	bool truncated = false;
 	if (!context.read_workspace.search(context.draft_path,
 	        context.request.query, matches, truncated, context.err)) {
@@ -120,7 +120,7 @@ std::string execute_workspace_symbols(workspace_tool_context_t &context)
 		// a newly created or renamed symbol is visible immediately. Results are
 		// bounded textual symbol candidates; workspace.outline supplies structural
 		// details for the selected file.
-		std::vector<webcool::ai::workspace_match_t> matches;
+		std::vector<libai::ai::workspace_match_t> matches;
 		bool truncated = false;
 		if (!context.read_workspace.search(context.draft_path,
 		        context.request.query, matches, truncated, context.err))
@@ -161,12 +161,12 @@ std::string execute_workspace_symbols(workspace_tool_context_t &context)
 		context.trace.truncated = true;
 		return tool_error_json("tool result exceeds the context limit");
 	}
-	webcool::ai::agent_project_store_t project_store(context.user_root);
-	std::vector<webcool::ai::agent_project_record_t> projects;
+	libai::ai::agent_project_store_t project_store(context.user_root);
+	std::vector<libai::ai::agent_project_record_t> projects;
 	if (!project_store.list(0, projects, context.err))
 		return workspace_inspection_error(
 		    context.err, context.path, context.chinese);
-	const webcool::ai::agent_project_record_t *project = NULL;
+	const libai::ai::agent_project_record_t *project = NULL;
 	for (size_t i = 0; i < projects.size(); ++i) {
 		if (!(projects[i].project_path == context.project_path))
 			continue;
@@ -175,8 +175,8 @@ std::string execute_workspace_symbols(workspace_tool_context_t &context)
 	}
 	if (project == NULL)
 		return tool_error_json("project semantic index is unavailable");
-	webcool::ai::agent_project_index_store_t store(context.user_root);
-	webcool::ai::agent_project_index_snapshot_t snapshot;
+	libai::ai::agent_project_index_store_t store(context.user_root);
+	libai::ai::agent_project_index_snapshot_t snapshot;
 	// Refresh on every semantic query. The index implementation fingerprints
 	// files and only reparses changed sources, so this keeps results current
 	// without turning each query into a full-project source scan.
@@ -194,7 +194,7 @@ std::string execute_workspace_symbols(workspace_tool_context_t &context)
 	context.root.add_child("symbols", items);
 	size_t count = 0;
 	for (size_t i = 0; i < snapshot.files.size() && count < 100; ++i) {
-		const webcool::ai::agent_project_index_entry_t &file =
+		const libai::ai::agent_project_index_entry_t &file =
 		    snapshot.files[i];
 		if (!path_is_in_project(context.path, file.path))
 			continue;
@@ -227,7 +227,7 @@ std::string execute_workspace_symbols(workspace_tool_context_t &context)
 
 std::string execute_workspace_outline(workspace_tool_context_t &context)
 {
-	std::vector<webcool::ai::workspace_outline_item_t> outline;
+	std::vector<libai::ai::workspace_outline_item_t> outline;
 	bool truncated = false;
 	if (!context.read_workspace.outline(
 	        context.draft_path, outline, truncated, context.err)) {

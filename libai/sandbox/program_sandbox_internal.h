@@ -32,7 +32,7 @@
 #endif
 #endif
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -105,7 +105,7 @@ void append_windows_pipe(HANDLE pipe, std::string &output, size_t &total,
 }
 }
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

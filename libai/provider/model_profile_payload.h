@@ -1,7 +1,7 @@
 #pragma once
 #include "ai_provider_store.h"
 #include "../sdk/model_profile.h"
-namespace webcool { namespace ai { namespace provider_detail {
+namespace libai { namespace ai { namespace provider_detail {
 // Validate every outgoing attempt, including transport and protocol repair retries.
 inline bool model_profile_payload(const provider_config_t &provider,
     const std::string &payload,std::string &error) {

@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <set>
 #include <limits>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

@@ -18,17 +18,17 @@ struct coding_turn_t {
 	// Whether this turn should deliver existing work near the call limit.
 	bool budget_delivery_turn{};
 	// Provider-neutral request prepared for the current model turn.
-	webcool::ai::completion_request_t input{};
+	libai::ai::completion_request_t input{};
 	// Normalized provider completion for the current model turn.
-	webcool::ai::completion_result_t output{};
+	libai::ai::completion_result_t output{};
 	// Per-attempt telemetry before retry usage is merged into billable totals.
-	webcool::ai::completion_result_t retry_usage{};
+	libai::ai::completion_result_t retry_usage{};
 	// Whether a failed attempt supplied usage that must still be accounted for.
 	bool has_retry_usage = false;
 	// Whether investigation requires a summary before more reads.
 	bool investigation_checkpoint{};
 	// Parsed model protocol message selecting a tool or final answer.
-	webcool::ai::agent_protocol_message_t message{};
+	libai::ai::agent_protocol_message_t message{};
 	// Number of native calls emitted by the latest model response.
 	size_t provider_tool_call_count{};
 	// Metadata describing the current tool execution.
@@ -50,7 +50,7 @@ struct coding_turn_t {
 	// Serialized result returned to the model after tool execution.
 	std::string tool_result{};
 	// Native outputs produced by this turn's tool calls.
-	std::vector<webcool::ai::completion_tool_output_t>
+	std::vector<libai::ai::completion_tool_output_t>
 	    current_tool_outputs{};
 	// Whether native call results are ready for the next model request.
 	bool have_native_outputs{};
@@ -67,7 +67,7 @@ struct coding_turn_t {
 	// Whether the current edit revisits a previously observed draft.
 	bool draft_cycle{};
 	// Supervisor decision derived from the current tool outcome.
-	webcool::ai::agent_progress_decision_t progress_decision{};
+	libai::ai::agent_progress_decision_t progress_decision{};
 	// Proposal rejection evidence retained for progress supervision.
 	std::vector<std::string> proposal_failures{};
 	// Whether the current proposal repeats a known rejection cause.
@@ -90,11 +90,11 @@ std::string validation_repair_context(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     const std::vector<agent_change_proposal_t> &changes,
     const std::string &validation_result, size_t maximum_bytes,
-    const webcool::ai::completion_request_t *evidence = NULL);
+    const libai::ai::completion_request_t *evidence = NULL);
 
 // Persist resumable transcript, reasoning and staged-change state.
-bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
-    const webcool::ai::provider_config_t &provider,
+bool save_coding_progress(libai::ai::agent_progress_store_t &store,
+    const libai::ai::provider_config_t &provider,
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
     const std::string &project_path, const std::string &original_prompt,
     const std::string &transcript, const std::string &reasoning,

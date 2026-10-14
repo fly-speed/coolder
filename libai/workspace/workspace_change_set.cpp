@@ -31,14 +31,14 @@
 #include <sstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace change_set_detail
 {
 
-webcool::mutex g_change_set_mutex;
+libai::mutex g_change_set_mutex;
 const char *kHeaderV1 = "WEBCOOL_WORKSPACE_CHANGE_SET_V1";
 const char *kHeaderV2 = "WEBCOOL_WORKSPACE_CHANGE_SET_V2";
 const char *kJournalHeaderV1 = "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V1";
@@ -50,19 +50,19 @@ const size_t kMaxTotalBytes = 2 * 1024 * 1024;
 const size_t kMaxReasonBytes = 1000;
 const size_t kMaxDiffBytes = 128 * 1024;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
-using ::webcool::ai::file_ops::safe_directory;
+using ::libai::ai::file_ops::safe_directory;
 
 bool ensure_directory(const std::string &path)
 {
@@ -77,7 +77,7 @@ bool ensure_directory(const std::string &path)
 #endif
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool prepare_directory(
     const std::string &user_root, std::string &directory, std::string &err)
@@ -378,7 +378,7 @@ bool workspace_change_set_store_t::create(
     const std::vector<workspace_change_input_t> &changes,
     workspace_change_set_preview_t &preview, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+	std::lock_guard<libai::mutex> guard(g_change_set_mutex);
 #if defined(__unix__) || defined(__APPLE__)
     std::unique_ptr<libai::file_execution_store_t> lease;
     try {lease=change_set_lease(user_root_);}
@@ -640,7 +640,7 @@ bool workspace_change_set_store_t::create_locked(
 bool workspace_change_set_store_t::apply(const std::string &id,
     std::vector<workspace_change_result_t> &results, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+	std::lock_guard<libai::mutex> guard(g_change_set_mutex);
 #if defined(__unix__) || defined(__APPLE__)
     std::unique_ptr<libai::file_execution_store_t> lease;
     try {lease=change_set_lease(user_root_);}
@@ -867,7 +867,7 @@ bool workspace_change_set_store_t::create_and_apply(
     workspace_change_set_preview_t &preview,
     std::vector<workspace_change_result_t> &results, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+	std::lock_guard<libai::mutex> guard(g_change_set_mutex);
 #if defined(__unix__) || defined(__APPLE__)
     std::unique_ptr<libai::file_execution_store_t> lease;
     try {lease=change_set_lease(user_root_);}
@@ -880,7 +880,7 @@ bool workspace_change_set_store_t::create_and_apply(
 
 bool workspace_change_set_store_t::recover(std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_change_set_mutex);
+	std::lock_guard<libai::mutex> guard(g_change_set_mutex);
 #if defined(__unix__) || defined(__APPLE__)
     std::unique_ptr<libai::file_execution_store_t> lease;
     try {lease=change_set_lease(user_root_);}
@@ -898,4 +898,4 @@ long long workspace_change_set_store_t::lifetime_seconds()
 	return kLifetimeSeconds;
 }
 } // namespace ai
-} // namespace webcool
+} // namespace libai

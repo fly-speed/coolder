@@ -6,13 +6,13 @@
 #include "../common/identifiers.h"
 #include "../common/json_value.h"
 #include "../common/webcool_mutex.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
-webcool::mutex contract_mutex;
+libai::mutex contract_mutex;
 struct request_t {
 	std::string run, text;
 };
@@ -43,7 +43,7 @@ bool begin_task_contract(const std::string &user_root,
     const std::string &run_id, const std::string &prompt, bool resume,
     std::string &contract, std::string &error)
 {
-	std::lock_guard<webcool::mutex> lock(contract_mutex);
+	std::lock_guard<libai::mutex> lock(contract_mutex);
 	if (!identifiers::valid_id(run_id) ||
 	    (!session_id.empty() && !identifiers::valid_id(session_id))) {
 		error = "invalid task contract identity";

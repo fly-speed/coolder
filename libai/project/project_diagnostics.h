@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -31,4 +31,4 @@ void parse_project_diagnostics(const std::string &source,
     std::vector<project_diagnostic_t> &diagnostics);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

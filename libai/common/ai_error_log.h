@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -55,4 +55,4 @@ inline void ai_log_error(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

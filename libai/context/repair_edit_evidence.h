@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <sstream>
 #include <string>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

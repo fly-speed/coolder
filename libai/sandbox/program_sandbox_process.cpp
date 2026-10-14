@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "program_sandbox_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

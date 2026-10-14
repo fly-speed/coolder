@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

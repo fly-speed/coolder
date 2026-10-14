@@ -5,7 +5,7 @@
 #include "../workspace/agent_workspace.h"
 #include "../agent/agent_protocol.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -43,7 +43,7 @@ inline bool resolve_project_tool_path(const std::string &raw_path,
     const std::string &project_path, bool allow_empty, std::string &path,
     std::string &err)
 {
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::ai::agent_workspace_t::normalize_path(
 	        raw_path, path, allow_empty, err))
 		return false;
 	if (path_is_in_project(project_path, path))
@@ -53,7 +53,7 @@ inline bool resolve_project_tool_path(const std::string &raw_path,
 		return false;
 	}
 	std::string project_relative;
-	if (!webcool::ai::agent_workspace_t::normalize_path(
+	if (!libai::ai::agent_workspace_t::normalize_path(
 	        project_path + "/" + path, project_relative, false, err) ||
 	    !path_is_in_project(project_path, project_relative)) {
 		err = "tool path is outside the selected project";
@@ -115,7 +115,7 @@ inline bool inspect_proposal_target(agent_workspace_t &workspace,
 	const std::string target_parent = target_slash == std::string::npos ?
 	    "" :
 	    target.substr(0, target_slash);
-	std::vector<webcool::ai::workspace_entry_t> target_entries;
+	std::vector<libai::ai::workspace_entry_t> target_entries;
 	if (!workspace.list(target_parent, target_entries, err)) {
 		reject(err == "workspace path does not exist" ?
 		        "parent_missing" :
@@ -144,7 +144,7 @@ inline bool inspect_proposal_parent(agent_workspace_t &workspace,
 	const size_t slash = normalized.rfind('/');
 	const std::string parent =
 	    slash == std::string::npos ? "" : normalized.substr(0, slash);
-	std::vector<webcool::ai::workspace_entry_t> entries;
+	std::vector<libai::ai::workspace_entry_t> entries;
 	bool virtual_parent = false;
 	for (size_t j = 0; j < accepted.size(); ++j) {
 		if (!(accepted[j].creates_directory &&
@@ -186,7 +186,7 @@ inline bool inspect_proposal_parent(agent_workspace_t &workspace,
 
 // Validate and normalize proposals against the current workspace baseline.
 inline size_t validate_change_proposals(
-    webcool::ai::agent_workspace_t &workspace, const std::string &project_path,
+    libai::ai::agent_workspace_t &workspace, const std::string &project_path,
     std::vector<agent_change_proposal_t> &changes,
     std::vector<proposal_validation_error_t> *errors = NULL,
     bool auto_missing_parents = false,
@@ -379,4 +379,4 @@ inline size_t validate_change_proposals(
 }
 
 }
-} // namespace webcool::ai
+} // namespace libai::ai

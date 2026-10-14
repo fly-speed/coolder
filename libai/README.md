@@ -3,7 +3,7 @@
 新应用推荐从 `<libai/agent.h>` 和 `libai::agent_t` 开始。SDK 提供可插拔模型、自定义 JSON 工具、
 多轮会话、流式输出、权限回调、取消、期限和运行预算。完整包中的 `provider_model_t` 复用已有模型客户端，
 `add_workspace_tools` 为编程助手提供受限目录内的文件读取、搜索及带摘要校验的修改。
-现有 `<libai/coding.h>` 与 `webcool::ai` 接口继续兼容。
+完整编程后端入口为 `<libai/coding.h>`，命名空间统一使用 `libai::ai`。
 
 详见 [通用 Agent API、集成示例与边界](docs/AGENT_SDK.md)。
 SDK 与独立 C++ Agent 支持 [最终 JSON Schema 校验与有限修正](docs/STRUCTURED_OUTPUT.md)；
@@ -50,7 +50,7 @@ cmake --install libai/build-sdk --prefix /absolute/path/to/libai-sdk
 | `cmake/`、`tests/`、`examples/` | 构建包配置、独立链接测试和可执行程序示例 |
 
 `#include <libai/coding.h>` 保持不变。直接引用细分接口时使用功能目录，
-例如 `#include <libai/provider/ai_provider_client.h>`；类型和命名空间保持原有定义。
+例如 `#include <libai/provider/ai_provider_client.h>`；完整后端类型使用 `libai::ai` 命名空间。
 
 ## 模块边界
 
@@ -60,8 +60,10 @@ cmake --install libai/build-sdk --prefix /absolute/path/to/libai-sdk
 
 HTTP 路由、用户鉴权、项目目录授权和前端保留在 `webcool/action/ai/` 等宿主代码中。
 宿主鉴权后显式传入存储根目录、用户目录、模型配置和沙盒策略。库不依赖 webcool 的 HTTP 实现。
-已有 C++ 命名空间 `webcool::ai`、`webcool::ai::coding` 保留，以避免改变现有接口和行为；
-后者是原运行时命名空间 `action::agent_detail` 的别名。
+完整后端的 C++ 命名空间已由历史宿主命名迁移到 `libai::ai`；通用 SDK 使用 `libai`，
+独立 C++ 封装使用 `libai::cpp`。`libai::ai::coding` 仍是内部运行时的入口别名。
+此次迁移不保留旧命名空间别名；直接使用完整后端的消费方需更新限定名并重新编译。
+持久数据格式、C ABI、JNI 和语言层公开接口不因 C++ 命名空间迁移而改名。
 
 ACL/fiber、OpenSSL 是外部依赖，不合并进归档。宿主负责 ACL/fiber 初始化和线程生命周期。
 沙盒执行仍需部署 `webcool-sandbox-helper`，并按 `sandbox/program_sandbox.h`、`agent/ai_admin_policy.h` 配置。
@@ -108,7 +110,7 @@ target_link_libraries(my_agent PRIVATE libai::ai)
 
 ```cpp
 #include <libai/coding.h>
-// 使用 webcool::ai 中的模型、工作区、存储等接口。
+// 使用 libai::ai 中的模型、工作区、存储等接口。
 ```
 
 配置消费项目时将 `CMAKE_PREFIX_PATH` 指向 SDK 安装目录，并指定其依赖的 `ACL_PATH`、

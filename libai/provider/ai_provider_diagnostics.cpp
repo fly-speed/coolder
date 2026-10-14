@@ -7,7 +7,7 @@
 #include <functional>
 #include <sstream>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -451,4 +451,4 @@ const char *provider_client_t::error_category_name(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

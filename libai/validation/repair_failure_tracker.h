@@ -4,7 +4,7 @@
 #include <sstream>
 #include <regex>
 #include <deque>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

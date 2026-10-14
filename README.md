@@ -478,7 +478,7 @@ coolder/
 
 第三方 C++ APP 推荐包含 `<libai_cpp/agent.h>` / `<libai_cpp/coding.h>` 并链接 `libai::cpp`，公共头文件只暴露独立类型。其他语言使用各自绑定。原始核心的 `<libai/coding.h>` / `libai::ai` 保留为底层源码集成入口；完整桌面宿主仍须管理 ACL/fiber、鉴权、目录授权及沙盒辅助进程。
 
-库保留 `webcool::ai` 等命名空间、内部 `.webcool_*` 存储格式，以及 `webcool-sandbox-helper` 辅助程序名作为兼容约定；Coolder 可以独立构建和运行，无需构建 webcool 应用。
+库使用 `libai`（通用 SDK）、`libai::ai`（完整编程后端）和 `libai::cpp`（独立 C++ 封装）命名空间，不保留旧宿主命名空间别名。内部 `.webcool_*` 存储格式及 `webcool-sandbox-helper` 辅助程序名保持兼容；Coolder 可以独立构建和运行，无需构建 webcool 应用。
 
 前端源脚本由 CMake 自动合并为 `coolder/html/coolder.js`，请修改原始脚本，不要直接编辑生成文件。详细集成方式见 [libai 文档](libai/README.md)。
 
@@ -572,7 +572,7 @@ Java 标准模式的单次模型输出上限为 16,384 tokens，大项目模式�
 | --- | --- | --- |
 | 代码问答、解释或自定义业务助手 | `provider_client_t` 与请求/响应类型 | 上下文、业务流程、模型配置、凭据和结果展示 |
 | 自定义工具型 Agent | 各语言 `Agent`、模型回调、工具注册与事件钩子 | 模型客户端、工具参数校验、授权、工具实现与线程管理；SDK 管理循环和预算 |
-| 完整编程 Agent | `webcool::ai::coding` 运行时、工作区、存储及审核接口 | 任务初始化、身份与路径授权、ACL/fiber 生命周期、策略、事件展示和审核入口 |
+| 完整编程 Agent | `libai::ai::coding` 运行时、工作区、存储及审核接口 | 任务初始化、身份与路径授权、ACL/fiber 生命周期、策略、事件展示和审核入口 |
 
 建议先验证库链接，再完成一次模型调用，最后接入工具和持久化。直接调用模型不会自动获得文件修改、验证、恢复或变更审核流程。
 
@@ -615,7 +615,7 @@ target_link_libraries(my_agent PRIVATE libai::ai)
 
 int main()
 {
-    const auto* agent = webcool::ai::agent_registry_t::instance().find("coding");
+    const auto* agent = libai::ai::agent_registry_t::instance().find("coding");
     if (!agent) return 1;
     std::cout << "Agent: " << agent->id
               << "\nTools: " << agent->tools.size() << '\n';
@@ -644,22 +644,22 @@ cmake --build /absolute/my-agent/build --parallel 4
 #include <libai/coding.h>
 
 // Call from an initialized host worker; credentials remain host-owned.
-bool ask_model(const webcool::ai::provider_config_t& provider,
+bool ask_model(const libai::ai::provider_config_t& provider,
                const std::string& api_key,
                const std::string& question,
                std::string& answer,
                std::string& error)
 {
-    webcool::ai::completion_request_t request{};
+    libai::ai::completion_request_t request{};
     request.system_prompt = "You are a coding assistant. Explain assumptions clearly.";
     request.user_prompt = question;
     request.ui_language = "en";
     request.max_output_tokens = 4096;
     request.transport_session =
-        webcool::ai::provider_client_t::create_transport_session();
+        libai::ai::provider_client_t::create_transport_session();
 
-    webcool::ai::completion_result_t result{};
-    if (!webcool::ai::provider_client_t::complete(
+    libai::ai::completion_result_t result{};
+    if (!libai::ai::provider_client_t::complete(
             provider, api_key, request, result, error)) return false;
     answer = result.text;
     return true;
@@ -672,7 +672,7 @@ bool ask_model(const webcool::ai::provider_config_t& provider,
 
 ### 4. 接入完整编程 Agent
 
-运行时入口包括同步执行函数 `webcool::ai::coding::run_coding_tool_loop(...)`，以及执行已注册任务的 `run_async_coding_task(...)`。后者仍需宿主调度 worker，不能仅凭函数名假定它会自行创建后台线程。接口声明与生命周期约束见 [coding_runtime.h](libai/runtime/coding_runtime.h)。
+运行时入口包括同步执行函数 `libai::ai::coding::run_coding_tool_loop(...)`，以及执行已注册任务的 `run_async_coding_task(...)`。后者仍需宿主调度 worker，不能仅凭函数名假定它会自行创建后台线程。接口声明与生命周期约束见 [coding_runtime.h](libai/runtime/coding_runtime.h)。
 
 | 接入步骤 | 宿主需要完成的工作 | 实现参考 |
 | --- | --- | --- |
@@ -1218,7 +1218,7 @@ coolder/
 
 Third-party C++ APPs should use `<libai_cpp/agent.h>` / `<libai_cpp/coding.h>` and link `libai::cpp`, with independent public types. Other languages use their bindings. Raw `<libai/coding.h>` / `libai::ai` remain available for low-level source integration; full desktop hosts must manage ACL/fiber, authentication, path authorization, and the sandbox helper.
 
-The library retains namespaces such as `webcool::ai`, internal `.webcool_*` storage formats, and the helper name `webcool-sandbox-helper` for compatibility. Coolder builds and runs independently without building the webcool application.
+The library uses `libai` for the portable SDK, `libai::ai` for the full coding backend, and `libai::cpp` for the independent C++ facade, without aliases for the former host namespace. Internal `.webcool_*` storage formats and the helper name `webcool-sandbox-helper` remain compatible. Coolder builds and runs independently without building the webcool application.
 
 CMake bundles frontend source scripts into `coolder/html/coolder.js`. Edit the original scripts rather than the generated file. See the [libai guide](libai/README.md) for integration details.
 
@@ -1312,7 +1312,7 @@ Desktop applications, CLI tools, and backend services can link libai directly to
 | --- | --- | --- |
 | Code Q&A, explanations, or a custom business assistant | `provider_client_t` and request/response types | Context, workflow, model configuration, credentials, and presentation |
 | An agent with custom tools | Language-specific `Agent`, model callbacks, tool registration, and hooks | Model clients, argument validation, authorization, tool implementations, and threading; the SDK manages the loop and budgets |
-| A complete coding agent | `webcool::ai::coding` runtime, workspace, storage, and review interfaces | Task initialization, identity and path authorization, ACL/fiber lifecycle, policy, events, and review UI |
+| A complete coding agent | `libai::ai::coding` runtime, workspace, storage, and review interfaces | Task initialization, identity and path authorization, ACL/fiber lifecycle, policy, events, and review UI |
 
 Start with linking, then make a model request, and finally integrate tools and persistence. Calling a model directly does not automatically provide file changes, validation, recovery, or revision review.
 
@@ -1355,7 +1355,7 @@ Save the following `main.cpp`. It queries the built-in agent definition to verif
 
 int main()
 {
-    const auto* agent = webcool::ai::agent_registry_t::instance().find("coding");
+    const auto* agent = libai::ai::agent_registry_t::instance().find("coding");
     if (!agent) return 1;
     std::cout << "Agent: " << agent->id
               << "\nTools: " << agent->tools.size() << '\n';
@@ -1384,22 +1384,22 @@ This function demonstrates the actual model interface for an initialized applica
 #include <libai/coding.h>
 
 // Call from an initialized host worker; credentials remain host-owned.
-bool ask_model(const webcool::ai::provider_config_t& provider,
+bool ask_model(const libai::ai::provider_config_t& provider,
                const std::string& api_key,
                const std::string& question,
                std::string& answer,
                std::string& error)
 {
-    webcool::ai::completion_request_t request{};
+    libai::ai::completion_request_t request{};
     request.system_prompt = "You are a coding assistant. Explain assumptions clearly.";
     request.user_prompt = question;
     request.ui_language = "en";
     request.max_output_tokens = 4096;
     request.transport_session =
-        webcool::ai::provider_client_t::create_transport_session();
+        libai::ai::provider_client_t::create_transport_session();
 
-    webcool::ai::completion_result_t result{};
-    if (!webcool::ai::provider_client_t::complete(
+    libai::ai::completion_result_t result{};
+    if (!libai::ai::provider_client_t::complete(
             provider, api_key, request, result, error)) return false;
     answer = result.text;
     return true;
@@ -1412,7 +1412,7 @@ Before network requests, follow the [Coolder entry point](coolder/main.cpp) to i
 
 ### 4. Integrate the Complete Coding Runtime
 
-Entry points include the synchronous `webcool::ai::coding::run_coding_tool_loop(...)` and `run_async_coding_task(...)`, which executes an already registered task. The latter still requires host worker scheduling; its name does not imply that it creates a background thread automatically. See [coding_runtime.h](libai/runtime/coding_runtime.h) for declarations and lifecycle contracts.
+Entry points include the synchronous `libai::ai::coding::run_coding_tool_loop(...)` and `run_async_coding_task(...)`, which executes an already registered task. The latter still requires host worker scheduling; its name does not imply that it creates a background thread automatically. See [coding_runtime.h](libai/runtime/coding_runtime.h) for declarations and lifecycle contracts.
 
 | Step | Host responsibilities | Reference |
 | --- | --- | --- |

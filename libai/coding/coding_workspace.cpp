@@ -2,7 +2,7 @@
 #include "../workspace/agent_workspace.h"
 #include "../workspace/workspace_patch.h"
 #include "../workspace/workspace_change_set.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

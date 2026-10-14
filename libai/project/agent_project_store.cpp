@@ -25,38 +25,38 @@
 #include <set>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_project_store_mutex;
+libai::mutex g_project_store_mutex;
 const char *kHeader = "WEBCOOL_AGENT_PROJECTS_V1";
 const char *kFile = ".webcool_agent/projects.v1";
 const size_t kMaxModules = 64;
 const size_t kMaxTasks = 500;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool parse_number(const std::string &text, long long &value)
 {
-	return ::webcool::ai::record_codec::parse_nonnegative_number(
+	return ::libai::ai::record_codec::parse_nonnegative_number(
 	    text, value);
 }
 
 bool valid_project_id(const std::string &id)
 {
-	return ::webcool::ai::identifiers::valid_id(id);
+	return ::libai::ai::identifiers::valid_id(id);
 }
 
 bool valid_plan_id(const std::string &id)
@@ -154,7 +154,7 @@ void split_list(const std::string &value, std::vector<std::string> &values)
 	}
 }
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
 bool ensure_directory(const std::string &user_root, std::string &err)
 {
@@ -197,7 +197,7 @@ bool ensure_directory(const std::string &user_root, std::string &err)
 	return true;
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool newer_project(
     const agent_project_record_t &left, const agent_project_record_t &right)
@@ -563,7 +563,7 @@ bool agent_project_store_t::create(const std::string &title,
 		err = "invalid agent project settings";
 		return ai_error("agent.project-store", "validate-create", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	std::vector<agent_project_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.project-store", "load-for-create", err);
@@ -603,7 +603,7 @@ bool agent_project_store_t::get(const std::string &id,
 		err = "invalid agent project id";
 		return ai_error("agent.project-store", "validate-get", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	std::vector<agent_project_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.project-store", "load-for-get", err);
@@ -626,7 +626,7 @@ bool agent_project_store_t::find_by_path(const std::string &project_path,
 		return ai_error(
 		    "agent.project-store", "validate-find-path", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	std::vector<agent_project_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error(
@@ -646,7 +646,7 @@ bool agent_project_store_t::list(size_t limit,
     std::vector<agent_project_record_t> &records, std::string &err) const
 {
 
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.project-store", "load-list", err);
 	}
@@ -664,7 +664,7 @@ bool agent_project_store_t::remove(const std::string &id,
 		err = "invalid agent project id";
 		return ai_error("agent.project-store", "validate-remove", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	std::vector<agent_project_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.project-store", "load-for-remove", err);
@@ -720,7 +720,7 @@ bool agent_project_store_t::save_plan(const std::string &id,
 		return ai_error(
 		    "agent.project-store", "validate-new-task-state", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	std::vector<agent_project_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error(
@@ -826,7 +826,7 @@ bool agent_project_store_t::update_task_status(const std::string &project_id,
 		return ai_error(
 		    "agent.project-store", "validate-task-update", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_project_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_project_store_mutex);
 	std::vector<agent_project_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error(
@@ -895,4 +895,4 @@ bool agent_project_store_t::update_task_status(const std::string &project_id,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

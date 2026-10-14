@@ -23,27 +23,27 @@
 #include <sys/stat.h>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_checkpoint_mutex;
+libai::mutex g_checkpoint_mutex;
 const char *kHeader = "WEBCOOL_AGENT_CHECKPOINT_V1";
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool safe_checkpoint(const agent_checkpoint_t &checkpoint)
 {
@@ -202,7 +202,7 @@ bool ensure_directory(const std::string &user_root, std::string &err)
 	return true;
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 } // namespace
 
@@ -228,7 +228,7 @@ bool agent_checkpoint_store_t::save(
 	        ciphertext, err)) {
 		return ai_error("agent.checkpoint", "encrypt", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_checkpoint_mutex);
+	std::lock_guard<libai::mutex> guard(g_checkpoint_mutex);
 	if (!ensure_directory(user_root_, err)) {
 		return ai_error("agent.checkpoint", "prepare-directory", err);
 	}
@@ -270,7 +270,7 @@ bool agent_checkpoint_store_t::load(const std::string &run_id,
 	}
 	std::string ciphertext;
 	{
-		std::lock_guard<webcool::mutex> guard(g_checkpoint_mutex);
+		std::lock_guard<libai::mutex> guard(g_checkpoint_mutex);
 		record_json::input in(checkpoint_path(user_root_, run_id).c_str(),
 		    std::ios::in | std::ios::binary);
 		if (!in.good()) {
@@ -306,7 +306,7 @@ bool agent_checkpoint_store_t::remove(
 		err = "invalid agent run id";
 		return ai_error("agent.checkpoint", "validate-remove", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_checkpoint_mutex);
+	std::lock_guard<libai::mutex> guard(g_checkpoint_mutex);
 	const std::string path = checkpoint_path(user_root_, run_id);
 	if (!(::remove(path.c_str()) != 0 && errno != ENOENT))
 		return true;
@@ -319,11 +319,11 @@ bool agent_checkpoint_store_t::exists(const std::string &run_id) const
 {
 	if (!valid_id(run_id))
 		return false;
-	std::lock_guard<webcool::mutex> guard(g_checkpoint_mutex);
+	std::lock_guard<libai::mutex> guard(g_checkpoint_mutex);
 	struct stat st;
 	return stat(checkpoint_path(user_root_, run_id).c_str(), &st) == 0 &&
 	    S_ISREG(st.st_mode);
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

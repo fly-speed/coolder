@@ -10,7 +10,7 @@
 #include <map>
 #include <mutex>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -19,7 +19,7 @@ namespace provider_detail
 
 namespace
 {
-webcool::mutex g_provider_output_limit_mutex;
+libai::mutex g_provider_output_limit_mutex;
 std::map<std::string, long long> g_provider_output_limits;
 } // namespace
 
@@ -34,7 +34,7 @@ std::string provider_output_limit_key(const provider_config_t &provider)
 long long effective_provider_output_limit(
     const provider_config_t &provider, long long requested)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_output_limit_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_output_limit_mutex);
 	const std::string key = provider_output_limit_key(provider);
 	auto found = g_provider_output_limits.find(key);
 	if (!(found == g_provider_output_limits.end()))
@@ -53,7 +53,7 @@ long long effective_provider_output_limit(
 void remember_provider_output_limit(
     const provider_config_t &provider, long long limit)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_output_limit_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_output_limit_mutex);
 	long long &saved =
 	    g_provider_output_limits[provider_output_limit_key(provider)];
 	if (saved == 0 || limit < saved)
@@ -326,22 +326,22 @@ std::string responses_compact_url(const provider_config_t &provider)
 
 std::string node_text(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::string_text(node);
+	return ::libai::ai::json_value::string_text(node);
 }
 
 long long node_number(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::number(node);
+	return ::libai::ai::json_value::number(node);
 }
 
 bool node_bool(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::boolean(node);
+	return ::libai::ai::json_value::boolean(node);
 }
 
 acl::json_node *object_child(acl::json_node *node, const char *name)
 {
-	return ::webcool::ai::json_value::object_child(node, name);
+	return ::libai::ai::json_value::object_child(node, name);
 }
 
 acl::json_node *first_array_item(acl::json_node *node)
@@ -354,10 +354,10 @@ acl::json_node *first_array_item(acl::json_node *node)
 
 acl::json_node *array_value(acl::json_node *node)
 {
-	return ::webcool::ai::json_value::array_value(node);
+	return ::libai::ai::json_value::array_value(node);
 }
 
 } // namespace provider_detail
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

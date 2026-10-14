@@ -6,7 +6,7 @@ namespace action
 namespace agent_detail
 {
 void attach_change_preview_diffs(std::vector<agent_change_proposal_t> &changes,
-    const webcool::ai::workspace_change_set_preview_t &preview)
+    const libai::ai::workspace_change_set_preview_t &preview)
 {
 	// Transaction preview sorts directory creation before child writes. Match by
 	// validated operation/path identity rather than position so every generated
@@ -32,7 +32,7 @@ void attach_change_preview_diffs(std::vector<agent_change_proposal_t> &changes,
 }
 
 void add_run_record_json(
-    acl::json_node &item, const webcool::ai::agent_run_record_t &record)
+    acl::json_node &item, const libai::ai::agent_run_record_t &record)
 {
 	item.add_text("run_id", record.id.c_str());
 	item.add_text("agent_id", record.agent_id.c_str());
@@ -43,7 +43,7 @@ void add_run_record_json(
 	item.add_text("path", record.project_path.c_str());
 	item.add_number("started_at", record.started_at);
 	item.add_number("finished_at", record.finished_at);
-	const auto timing = webcool::ai::run_timing(record.started_at, record.finished_at, record.status);
+	const auto timing = libai::ai::run_timing(record.started_at, record.finished_at, record.status);
 	item.add_number("elapsed_ms", timing.elapsed_ms);
 	item.add_bool("elapsed_available", timing.available);
 	item.add_number("elapsed_resolution_ms", 1000);
@@ -72,13 +72,13 @@ void add_run_record_json(
 
 void add_runtime_result_json(acl::json_node &root,
     const std::shared_ptr<agent_runtime_task_t> &task,
-    const webcool::ai::agent_result_t *persisted, bool include_changes)
+    const libai::ai::agent_result_t *persisted, bool include_changes)
 {
 	if (!task) {
 		root.add_bool("result_available", false);
 		return;
 	}
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	root.add_bool("cancel_requested", task->cancel_requested);
 	root.add_bool("pause_requested", task->pause_requested);
 	root.add_bool("paused", task->phase == "paused");
@@ -154,7 +154,7 @@ void add_runtime_result_json(acl::json_node &root,
 	root.add_number("reasoning_tokens", task->output.reasoning_tokens);
 	root.add_number("latency_ms", task->output.latency_ms);
 	root.add_text("provider_error_category",
-	    webcool::ai::provider_client_t::error_category_name(
+	    libai::ai::provider_client_t::error_category_name(
 	        task->output.error_category));
 	root.add_bool("provider_error_retryable", task->output.retryable_error);
 	if (task->output.http_status > 0) {
@@ -266,18 +266,18 @@ void add_runtime_result_json(acl::json_node &root,
 // replying, so the browser can offer the project-level "resume from progress"
 // action instead of presenting a restart as an unrecoverable provider failure.
 static bool add_hinted_recovery(acl::json_node &root,
-    const std::string &user_root, const webcool::ai::agent_run_record_t &record,
+    const std::string &user_root, const libai::ai::agent_run_record_t &record,
     const std::string &session_hint,
-    webcool::ai::agent_session_store_t &session_store, std::string &err)
+    libai::ai::agent_session_store_t &session_store, std::string &err)
 {
 	if (session_hint.empty())
 		return false;
 
-	webcool::ai::agent_session_record_t hinted;
+	libai::ai::agent_session_record_t hinted;
 	if (session_store.get(session_hint, hinted, err) &&
 	    hinted.project_path == record.project_path) {
 		bool found = false;
-		webcool::ai::agent_progress_store_t progress_store(
+		libai::ai::agent_progress_store_t progress_store(
 		    user_root, hinted.project_path, hinted.id);
 		if (progress_store.exists(found, err)) {
 			root.add_bool("recovery_available", found);
@@ -288,26 +288,26 @@ static bool add_hinted_recovery(acl::json_node &root,
 			    progress_store.relative_path().c_str());
 			return true;
 		}
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.run", "probe-hinted-progress", err);
 	}
 	return false;
 }
 
 void add_durable_recovery_json(acl::json_node &root,
-    const std::string &user_root, const webcool::ai::agent_run_record_t &record,
+    const std::string &user_root, const libai::ai::agent_run_record_t &record,
     const std::string &session_hint)
 {
 	if (record.error != "agent run interrupted by service restart")
 		return;
-	webcool::ai::agent_session_store_t session_store(user_root);
+	libai::ai::agent_session_store_t session_store(user_root);
 	std::string err;
 	if (add_hinted_recovery(
 	        root, user_root, record, session_hint, session_store, err))
 		return;
-	std::vector<webcool::ai::agent_session_record_t> sessions;
+	std::vector<libai::ai::agent_session_record_t> sessions;
 	if (!session_store.list(50, sessions, err)) {
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.run", "list-restart-sessions", err);
 		root.add_bool("recovery_available", false);
 		return;
@@ -323,10 +323,10 @@ void add_durable_recovery_json(acl::json_node &root,
 		if (!owns_run)
 			continue;
 		bool found = false;
-		webcool::ai::agent_progress_store_t progress_store(
+		libai::ai::agent_progress_store_t progress_store(
 		    user_root, sessions[i].project_path, sessions[i].id);
 		if (!progress_store.exists(found, err)) {
-			webcool::ai::ai_log_error(
+			libai::ai::ai_log_error(
 			    "agent.run", "probe-restart-progress", err);
 			root.add_bool("recovery_available", false);
 			return;
@@ -344,7 +344,7 @@ void add_durable_recovery_json(acl::json_node &root,
 }
 
 void add_persisted_result_json(acl::json_node &root,
-    const webcool::ai::agent_result_t &result, const std::string &relative_path)
+    const libai::ai::agent_result_t &result, const std::string &relative_path)
 {
 	root.add_bool("result_available", true);
 	root.add_bool("result_persisted", true);

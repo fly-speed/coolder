@@ -3,7 +3,7 @@
 #include "../sdk/provider_model.h"
 #include "../provider/output_token_limit.h"
 #include <algorithm>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

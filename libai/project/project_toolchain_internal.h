@@ -2,7 +2,7 @@
 #include "project_toolchain.h"
 #include "../workspace/agent_workspace.h"
 #include "../agent/ai_admin_policy.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

@@ -2,7 +2,7 @@
 #include "../common/record_json.h"
 #include "agent_workspace_internal.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -19,14 +19,14 @@ std::string registry_path(const std::string &user_root)
 	return user_root + "/.webcool_agent/external-project-roots.v1";
 }
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
 bool hex_decode(const std::string &value, std::string &decoded)
 {
 	if (!(value.size() % 2 != 0))
-		return ::webcool::ai::record_codec::hex_decode(value, decoded);
+		return ::libai::ai::record_codec::hex_decode(value, decoded);
 	return false;
 }
 

@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #endif
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

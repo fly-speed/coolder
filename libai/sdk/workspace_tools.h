@@ -73,9 +73,9 @@ inline agent_t &add_workspace_tools(
     agent_t &agent, const std::string &root, bool writes = false)
 {
 	using namespace workspace_detail;
-	using webcool::ai::json_value::string_text;
+	using libai::ai::json_value::string_text;
 	auto workspace =
-	    std::make_shared<webcool::ai::agent_workspace_t>(root, false);
+	    std::make_shared<libai::ai::agent_workspace_t>(root, false);
 	bind(agent,
 	    spec("workspace.read",
 	        "Read a relative text file and its SHA-256 baseline",
@@ -92,7 +92,7 @@ inline agent_t &add_workspace_tools(
 		result.add_bool("truncated", truncated);
 		if (!truncated)
 			result.add_text("sha256",
-			    webcool::ai::agent_workspace_t::content_sha256(
+			    libai::ai::agent_workspace_t::content_sha256(
 			        content)
 			        .c_str());
 		return serialized(result);
@@ -102,7 +102,7 @@ inline agent_t &add_workspace_tools(
 	        "List a relative directory; empty path means root", { "path" }),
 	    [workspace](acl::json &arguments) {
 		std::string error;
-		std::vector<webcool::ai::workspace_entry_t> entries;
+		std::vector<libai::ai::workspace_entry_t> entries;
 		if (!workspace->list(
 		        string_text(arguments["path"]), entries, error, false))
 			return tool_result_t::failure(error);
@@ -122,7 +122,7 @@ inline agent_t &add_workspace_tools(
 	    [workspace](acl::json &arguments) {
 		std::string error;
 		bool truncated = false;
-		std::vector<webcool::ai::workspace_match_t> matches;
+		std::vector<libai::ai::workspace_match_t> matches;
 		if (!workspace->search(string_text(arguments["path"]),
 		        string_text(arguments["query"]), matches, truncated,
 		        error))

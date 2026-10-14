@@ -2,7 +2,7 @@
 #include "record_codec.h"
 #include <openssl/rand.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

@@ -2,7 +2,7 @@
 #include "agent_registry.h"
 #include "../prompt/prompt_templates.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -228,4 +228,4 @@ const agent_tool_t *agent_registry_t::find_tool(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

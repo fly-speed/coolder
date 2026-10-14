@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -144,4 +144,4 @@ size_t agent_progress_supervisor_t::consecutive_no_progress() const
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

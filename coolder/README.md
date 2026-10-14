@@ -94,7 +94,7 @@ coolder.exe --html html --data "..\..\..\var"
 - `sandbox/sandbox_helper_main.cpp`：从 webcool 复制的沙盒辅助进程。二进制名保留 `webcool-sandbox-helper`，因为 libai 按此名称寻找相邻 helper。主程序仍为 `coolder`。
 - `tests/http_test.py`、`tests/accounts_test.py`：本地模拟模型、多用户隔离、并发任务和账户生命周期的真实 HTTP 集成测试。
 
-libai 仍使用原 `webcool::ai` / `action::agent_detail` 命名空间和内部 `.webcool_*` 持久化格式；它们是库的兼容约定，不代表依赖 webcool 应用。脚手架文字及模型系统提示中的少量 WebCool 标识来自 libai，未为此修改共享库。
+libai 的通用 SDK 使用 `libai`，完整编程后端使用 `libai::ai`；Coolder 通过独立封装 `libai::cpp` 访问库能力。旧宿主命名空间不再保留别名，直接使用旧后端类型的 C++ 消费方需更新限定名并重新编译。内部 `.webcool_*` 持久化格式及辅助程序名称保持兼容，不代表依赖 webcool 应用。
 
 ## 服务范围与配置
 

@@ -23,13 +23,13 @@ coding_tool_loop_t::coding_tool_loop_t(const coding_loop_arguments_t &arguments)
               initial_completed_tool_calls + max_tool_calls)
 {
 	browser_debug_report_threshold =
-	    webcool::ai::ai_runtime_policy_get().browser_debug_report_threshold;
+	    libai::ai::ai_runtime_policy_get().browser_debug_report_threshold;
 	browser_evidence.enabled = !runtime_task->text_preview &&
 	    !runtime_task->assistant_chat &&
-	    webcool::ai::browser_repair_evidence_t::requests_debug(
+	    libai::ai::browser_repair_evidence_t::requests_debug(
 	        original_prompt) &&
-	    !webcool::ai::read_only_analysis_task(original_prompt) &&
-	    !webcool::ai::verification_only_task(original_prompt);
+	    !libai::ai::read_only_analysis_task(original_prompt) &&
+	    !libai::ai::verification_only_task(original_prompt);
 }
 
 bool coding_tool_loop_t::run_impl()

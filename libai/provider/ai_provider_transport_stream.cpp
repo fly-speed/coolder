@@ -20,7 +20,7 @@
 #include <memory>
 
 #include "ai_provider_transport_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

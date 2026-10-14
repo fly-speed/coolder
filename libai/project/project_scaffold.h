@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -33,4 +33,4 @@ bool create_project_scaffold(agent_workspace_t &workspace,
     std::string &err);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

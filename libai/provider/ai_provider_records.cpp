@@ -2,7 +2,7 @@
 #include "../sdk/model_profile.h"
 #include "../common/record_json.h"
 #include "ai_provider_store_internal.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -22,7 +22,7 @@ bool valid_rotation_username(const std::string &username)
 	return username != "." && username != "..";
 }
 
-using ::webcool::ai::file_ops::safe_directory;
+using ::libai::ai::file_ops::safe_directory;
 
 bool safe_regular_file(const std::string &path)
 {
@@ -41,7 +41,7 @@ bool safe_regular_file(const std::string &path)
 #endif
 }
 
-using ::webcool::ai::file_ops::path_entry_exists;
+using ::libai::ai::file_ops::path_entry_exists;
 
 // A restart checkpoint is encrypted with the current provider keyring. Retiring
 // either key while a checkpoint exists could make an interrupted run

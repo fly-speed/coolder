@@ -61,13 +61,13 @@ bool coding_tool_requires_confirmation(const agent_tool_request_t &request)
 	    request.name == "workspace.execute_batch";
 }
 
-std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
+std::string execute_workspace_tool(libai::ai::agent_workspace_t &workspace,
     const std::string &user_root, const std::string &project_path,
     bool allow_file_content, const agent_tool_request_t &request,
     agent_tool_trace_t &trace,
     std::vector<agent_change_proposal_t> *staged_changes,
     const std::string &run_id,
-    const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
+    const libai::ai::sandbox_limits_t &sandbox_limits, bool chinese,
     const unavailable_validation_t *unavailable_validation,
     validation_cache_t *validation_cache, std::string *saved_proposal_batch,
     batch_validation_evidence_t *batch_validation,
@@ -79,10 +79,10 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 	trace.ok = false;
 	trace.truncated = false;
 	trace.native = false;
-	if (!webcool::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
+	if (!libai::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
 		return tool_error_json("invalid workspace tool execution key");
-	const webcool::ai::ai_admin_policy_t read_policy =
-	    webcool::ai::ai_runtime_policy_get();
+	const libai::ai::ai_admin_policy_t read_policy =
+	    libai::ai::ai_runtime_policy_get();
 	const size_t read_chunk_bytes = read_policy.read_chunk_kib * 1024;
 	const size_t read_file_limit_bytes =
 	    read_policy.read_file_limit_kib * 1024;
@@ -95,11 +95,11 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 		    unavailable_validation, validation_cache,
 		    saved_proposal_batch, batch_validation, tool_execution_key);
 	}
-	const webcool::ai::agent_definition_t *definition =
-	    webcool::ai::agent_registry_t::instance().find("coding");
-	const webcool::ai::agent_tool_t *registered_tool = definition == NULL ?
+	const libai::ai::agent_definition_t *definition =
+	    libai::ai::agent_registry_t::instance().find("coding");
+	const libai::ai::agent_tool_t *registered_tool = definition == NULL ?
 	    NULL :
-	    webcool::ai::agent_registry_t::instance().find_tool(
+	    libai::ai::agent_registry_t::instance().find_tool(
 	        *definition, request.name);
 	if (registered_tool == NULL || !registered_tool->model_enabled) {
 		return tool_error_json(
@@ -110,7 +110,7 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 			return tool_error_json(
 			    "Provider is not authorized to receive page content");
 		const auto result =
-		    webcool::ai::browser_debug_tool(user_root, project_path,
+		    libai::ai::browser_debug_tool(user_root, project_path,
 		        run_id, request.name, request.query, request.content, tool_execution_key);
 		acl::json evidence(result.c_str());
 		const auto *ok = evidence["ok"];
@@ -155,16 +155,16 @@ std::string execute_workspace_tool(webcool::ai::agent_workspace_t &workspace,
 	    lstat(draft_root.c_str(), &draft_stat) != 0 && errno == ENOENT;
 	const bool live_source_view = missing_draft &&
 	    (staged_changes == NULL || staged_changes->empty());
-	webcool::ai::agent_workspace_t draft_workspace(draft_root);
+	libai::ai::agent_workspace_t draft_workspace(draft_root);
 	if (!missing_draft) {
 		std::map<std::string, std::string> mounts;
-		if (!webcool::ai::agent_draft_store_t(
+		if (!libai::ai::agent_draft_store_t(
 		        user_root, project_path, run_id)
 		         .readonly_dependencies(mounts, err))
 			return tool_error_json(err);
 		draft_workspace.set_readonly_mounts(mounts);
 	}
-	webcool::ai::agent_workspace_t &read_workspace =
+	libai::ai::agent_workspace_t &read_workspace =
 	    live_source_view ? workspace : draft_workspace;
 	std::string draft_path;
 	if (!project_path_to_draft_path(project_path, path, draft_path))

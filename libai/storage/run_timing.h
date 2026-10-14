@@ -2,7 +2,7 @@
 #include <ctime>
 #include <limits>
 #include <string>
-namespace webcool { namespace ai {
+namespace libai { namespace ai {
 // Legacy audit timestamps have second resolution; never imply monotonic precision.
 struct run_timing_t {
     long long elapsed_ms = 0;

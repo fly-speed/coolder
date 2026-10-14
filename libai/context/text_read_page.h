@@ -1,7 +1,7 @@
 #pragma once
 #include "../common/utf8_text.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

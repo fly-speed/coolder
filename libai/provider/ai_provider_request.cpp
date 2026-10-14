@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <map>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -961,4 +961,4 @@ bool provider_client_t::supports_reasoning_effort(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

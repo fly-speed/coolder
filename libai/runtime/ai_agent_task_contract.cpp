@@ -12,11 +12,11 @@ std::string relative(const std::string &project, const std::string &path)
 }
 }
 void refresh_result_task_contract(const std::string &user_root,
-    const std::string &status, webcool::ai::agent_result_t &result)
+    const std::string &status, libai::ai::agent_result_t &result)
 {
     try {
         std::string project, error;
-        if (!webcool::ai::agent_workspace_t::resolve_project_root(
+        if (!libai::ai::agent_workspace_t::resolve_project_root(
             user_root, result.project_path, project, error))
             throw std::runtime_error(error);
         acl::json input;
@@ -43,10 +43,10 @@ void refresh_result_task_contract(const std::string &user_root,
             acl::json test_report(report_text.c_str());
             if (test_report.finish()) run.add_child("test_validation",test_report.get_root());
             // Serialize while both parsed documents still own their nodes.
-            result.acceptance_contract_json=webcool::ai::coding_service_call(
+            result.acceptance_contract_json=libai::ai::coding_service_call(
                 project,"tasks.describe_run",run.to_string().c_str());
         } else {
-            result.acceptance_contract_json=webcool::ai::coding_service_call(
+            result.acceptance_contract_json=libai::ai::coding_service_call(
                 project,"tasks.describe_run",run.to_string().c_str());
         }
     } catch (const std::exception &e) {
@@ -56,10 +56,10 @@ void refresh_result_task_contract(const std::string &user_root,
     }
 }
 void add_current_task_contract_json(acl::json_node &root,const std::string &user_root,
-    const webcool::ai::agent_run_record_t &record)
+    const libai::ai::agent_run_record_t &record)
 {
-    webcool::ai::agent_result_store_t store(user_root,record.project_path);
-    webcool::ai::agent_result_t result;bool found=false;std::string error;
+    libai::ai::agent_result_store_t store(user_root,record.project_path);
+    libai::ai::agent_result_t result;bool found=false;std::string error;
     if (!store.load(record.id,result,found,error) || !found) return;
     const auto previous=result.acceptance_contract_json;
     refresh_result_task_contract(user_root,record.status,result);

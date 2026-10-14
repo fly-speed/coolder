@@ -7,7 +7,7 @@ namespace action
 namespace agent_detail
 {
 
-webcool::mutex g_agent_runtime_mutex;
+libai::mutex g_agent_runtime_mutex;
 std::map<std::string, std::shared_ptr<agent_runtime_task_t>>
     g_agent_runtime_tasks;
 const size_t kMaxActiveAgentRuns = 16;
@@ -74,22 +74,22 @@ bool register_runtime_task(
 	task->scope.tool_free = task->text_preview;
 	task->scope.conversation_id = task->conversation_id;
 	task->scope.document_path =
-	    webcool::ai::normalize_agent_resource_path(task->document_path);
+	    libai::ai::normalize_agent_resource_path(task->document_path);
 	if (!task->text_preview) {
 		std::string actual_project;
-		if (!webcool::ai::agent_workspace_t::resolve_project_root(
+		if (!libai::ai::agent_workspace_t::resolve_project_root(
 		        task->user_root, task->project_path, actual_project,
 		        err))
 			return false;
 		task->scope.project_path =
-		    webcool::ai::normalize_agent_resource_path(actual_project);
+		    libai::ai::normalize_agent_resource_path(actual_project);
 	}
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	cleanup_runtime_tasks_locked(static_cast<long long>(time(NULL)));
 	const std::string key = runtime_task_key(task->user_root, task->id);
 	if (g_agent_runtime_tasks.find(key) != g_agent_runtime_tasks.end()) {
 		err = "agent run is already active";
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "register-duplicate", err);
 		return false;
 	}
@@ -107,7 +107,7 @@ bool register_runtime_task(
 		++user_registered;
 		const bool same_saved_session = !task->session_id.empty() &&
 		    it->second->session_id == task->session_id;
-		if (!webcool::ai::agent_run_scopes_conflict(
+		if (!libai::ai::agent_run_scopes_conflict(
 		        task->scope, it->second->scope))
 			continue;
 		err = task->text_preview ?
@@ -117,12 +117,12 @@ bool register_runtime_task(
 		    (same_saved_session ?
 		            "this agent session already has an active run" :
 		            "this project already has an active agent run");
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "register-scope-conflict", err);
 		return false;
 	}
 	const size_t policy_user_limit = static_cast<size_t>(
-	    webcool::ai::ai_runtime_policy_get().max_active_runs_per_user);
+	    libai::ai::ai_runtime_policy_get().max_active_runs_per_user);
 	const size_t max_user_registered =
 	    std::max<size_t>(4, policy_user_limit * 4);
 	if (registered >= kMaxQueuedAgentRuns ||
@@ -130,7 +130,7 @@ bool register_runtime_task(
 		err = user_registered >= max_user_registered ?
 		    "this user's agent run queue is full" :
 		    "the server agent run queue is full";
-		webcool::ai::ai_log_error(
+		libai::ai::ai_log_error(
 		    "agent.runtime", "register-capacity", err);
 		return false;
 	}
@@ -142,13 +142,13 @@ bool register_runtime_task(
 static bool admit_runtime_task_locked(
     const std::shared_ptr<agent_runtime_task_t> &task)
 {
-	std::vector<webcool::ai::agent_run_slot_t> slots;
+	std::vector<libai::ai::agent_run_slot_t> slots;
 	slots.reserve(g_agent_runtime_tasks.size());
 	for (std::map<std::string,
 	         std::shared_ptr<agent_runtime_task_t>>::const_iterator it =
 	         g_agent_runtime_tasks.begin();
 	     it != g_agent_runtime_tasks.end(); ++it) {
-		webcool::ai::agent_run_slot_t slot;
+		libai::ai::agent_run_slot_t slot;
 		slot.key = it->first;
 		slot.user_scope = it->second->user_root;
 		slot.sequence = it->second->queue_sequence;
@@ -159,8 +159,8 @@ static bool admit_runtime_task_locked(
 		slots.push_back(slot);
 	}
 	const size_t user_limit = static_cast<size_t>(
-	    webcool::ai::ai_runtime_policy_get().max_active_runs_per_user);
-	const std::string selected = webcool::ai::select_next_agent_run(
+	    libai::ai::ai_runtime_policy_get().max_active_runs_per_user);
+	const std::string selected = libai::ai::select_next_agent_run(
 	    slots, kMaxActiveAgentRuns, user_limit);
 	if (selected == runtime_task_key(task->user_root, task->id)) {
 		task->execution_admitted = true;
@@ -176,7 +176,7 @@ bool wait_for_runtime_admission(
 {
 	for (;;) {
 		{
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_agent_runtime_mutex);
 			if (task->done || task->cancel_requested)
 				return false;
@@ -196,13 +196,13 @@ bool wait_for_runtime_admission(
 
 void remove_runtime_task(const std::string &user_root, const std::string &id)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	g_agent_runtime_tasks.erase(runtime_task_key(user_root, id));
 }
 
 bool runtime_cancel_requested(const std::shared_ptr<agent_runtime_task_t> &task)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	return task->cancel_requested;
 }
 
@@ -211,7 +211,7 @@ size_t runtime_completed_tool_count(
 {
 	if (!task)
 		return 0;
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	return task->completed_tool_calls;
 }
 
@@ -251,7 +251,7 @@ bool wait_while_runtime_paused(
 	bool entered_pause = false;
 	for (;;) {
 		{
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_agent_runtime_mutex);
 			if (task->done || task->cancel_requested)
 				return false;
@@ -271,7 +271,7 @@ bool wait_while_runtime_paused(
 bool request_runtime_pause(const std::string &user_root, const std::string &id,
     bool paused, bool &already_done, bool &pause_requested)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	const std::map<std::string,
 	    std::shared_ptr<agent_runtime_task_t>>::iterator it =
 	    g_agent_runtime_tasks.find(runtime_task_key(user_root, id));
@@ -307,7 +307,7 @@ bool request_runtime_cancel(
 {
 	std::shared_ptr<acl::fiber> worker;
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		const std::map<std::string,
 		    std::shared_ptr<agent_runtime_task_t>>::iterator it =
 		    g_agent_runtime_tasks.find(runtime_task_key(user_root, id));
@@ -335,7 +335,7 @@ void attach_runtime_worker(const std::shared_ptr<agent_runtime_task_t> &task,
 {
 	bool cancel_now = false;
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		if (!task->done) {
 			task->worker = worker;
 			cancel_now = task->cancel_requested;
@@ -351,7 +351,7 @@ void update_runtime_progress(const std::shared_ptr<agent_runtime_task_t> &task,
     size_t completed_tool_calls)
 {
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		if (task->done || task->cancel_requested)
 			return;
 		task->phase = phase;
@@ -367,7 +367,7 @@ void complete_runtime_tool(const std::shared_ptr<agent_runtime_task_t> &task,
     const agent_tool_trace_t &trace, size_t completed_tool_calls)
 {
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		if (task->done || task->cancel_requested)
 			return;
 		task->phase = "model_call";
@@ -398,7 +398,7 @@ void complete_runtime_tool(const std::shared_ptr<agent_runtime_task_t> &task,
 void begin_runtime_model_stream(
     const std::shared_ptr<agent_runtime_task_t> &task)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	if (task->done || task->cancel_requested)
 		return;
 	task->streamed_text.clear();
@@ -414,14 +414,14 @@ void begin_runtime_model_stream(
 std::string runtime_reasoning_snapshot(
     const std::shared_ptr<agent_runtime_task_t> &task)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	return task->streamed_reasoning;
 }
 
 std::string runtime_reasoning_for_save(
     const std::shared_ptr<agent_runtime_task_t> &task)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	// Non-streaming compatible providers may expose reasoning only in the final
 	// completion object. Prefer it after completion; otherwise save the live
 	// accumulated stream visible in the reasoning window.
@@ -435,7 +435,7 @@ void mark_runtime_recovery_available(
     const std::string &progress_file)
 {
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		task->recovery_available = true;
 		task->progress_file = progress_file;
 		++task->event_version;
@@ -450,7 +450,7 @@ void mark_runtime_recovery_available(
 bool append_runtime_reasoning_delta(
     const std::shared_ptr<agent_runtime_task_t> &task, const std::string &delta)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	if (task->done || task->cancel_requested)
 		return false;
 	// Keep the expandable preview bounded independently from the final answer.
@@ -467,7 +467,7 @@ bool append_runtime_reasoning_delta(
 bool append_runtime_model_delta(
     const std::shared_ptr<agent_runtime_task_t> &task, const std::string &delta)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	if (task->done || task->cancel_requested)
 		return false;
 	// The transient preview has the same one-hour lifecycle as the completed
@@ -487,7 +487,7 @@ unsigned long long runtime_event_version(
 {
 	if (!task)
 		return 0;
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	return task->event_version;
 }
 
@@ -496,7 +496,7 @@ unsigned long long runtime_staged_change_version(
 {
 	if (!task)
 		return 0;
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	return task->staged_change_version;
 }
 
@@ -505,7 +505,7 @@ bool begin_runtime_subscription(
 {
 	if (!task)
 		return true;
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	if (task->event_subscribers >= kMaxEventSubscribersPerRun)
 		return false;
 	++task->event_subscribers;
@@ -515,7 +515,7 @@ bool begin_runtime_subscription(
 std::shared_ptr<agent_runtime_task_t> find_runtime_task(
     const std::string &user_root, const std::string &id)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	cleanup_runtime_tasks_locked(static_cast<long long>(time(NULL)));
 	const std::map<std::string,
 	    std::shared_ptr<agent_runtime_task_t>>::iterator it =
@@ -527,7 +527,7 @@ std::shared_ptr<agent_runtime_task_t> find_runtime_task(
 
 void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
     const std::string &status, const std::string &error,
-    const webcool::ai::completion_result_t *output,
+    const libai::ai::completion_result_t *output,
     const std::vector<agent_tool_trace_t> *traces,
     const std::vector<agent_change_proposal_t> *changes,
     size_t rejected_changes)
@@ -535,14 +535,14 @@ void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
 	std::string final_status = status;
 	std::string final_error = error;
 	if (task->assistant_chat) {
-		webcool::ai::assistant_message_t message;
+		libai::ai::assistant_message_t message;
 		message.role = "assistant";
 		message.run_id = task->id;
 		message.failed = status != "completed";
 		{
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_agent_runtime_mutex);
-			const webcool::ai::completion_result_t &result =
+			const libai::ai::completion_result_t &result =
 			    output ? *output : task->output;
 			message.text = status == "completed" ?
 			    result.text :
@@ -552,9 +552,9 @@ void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
 			message.duration = result.latency_ms;
 		}
 		std::string save_err;
-		if (!webcool::ai::assistant_session_store_t(task->user_root)
+		if (!libai::ai::assistant_session_store_t(task->user_root)
 		         .append(task->conversation_id, message, save_err)) {
-			webcool::ai::ai_log_error(
+			libai::ai::ai_log_error(
 			    "assistant", "persist-reply", save_err);
 			final_status = "failed";
 			final_error =
@@ -566,7 +566,7 @@ void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
 	std::string persisted_reply;
 	long long persisted_duration_ms = 0;
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		task->status = final_status;
 		task->error = final_error;
 		task->done = true;
@@ -619,7 +619,7 @@ void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
 			    "智能体运行已取消。" :
 			    "智能体运行失败。";
 		}
-		webcool::ai::agent_session_store_t session_store(
+		libai::ai::agent_session_store_t session_store(
 		    task->user_root);
 		std::string session_err;
 		const std::string title = task->initial_session_title.empty() ?
@@ -633,7 +633,7 @@ void finish_runtime_task(const std::shared_ptr<agent_runtime_task_t> &task,
 		        task->output.cached_input_tokens,
 		        task->output.output_tokens,
 		        task->output.reasoning_tokens, session_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "persist-terminal-session", session_err);
 		}
 	}
@@ -643,7 +643,7 @@ void set_runtime_result_artifact(
     const std::shared_ptr<agent_runtime_task_t> &task, const std::string &path,
     const std::string &decision)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	task->result_file = path;
 	task->result_decision = decision;
 }
@@ -652,7 +652,7 @@ void set_runtime_completion_summary(
     const std::shared_ptr<agent_runtime_task_t> &task,
     const std::string &completion_summary)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	task->completion_summary = completion_summary;
 }
 
@@ -661,7 +661,7 @@ void set_runtime_changes_applied(
     const std::string &apply_error, const std::string &last_path,
     size_t mutation_count)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	const bool state_changed = task->changes_applied != applied ||
 	    task->changes_apply_error != apply_error;
 	task->changes_applied = applied;
@@ -682,7 +682,7 @@ void publish_runtime_staged_changes(
     const std::shared_ptr<agent_runtime_task_t> &task,
     const std::vector<agent_change_proposal_t> &changes)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	if (task->done || task->cancel_requested)
 		return;
 	// These are review-only snapshots. Publishing them increments the event
@@ -694,10 +694,10 @@ void publish_runtime_staged_changes(
 
 void publish_runtime_change_reviews(
     const std::shared_ptr<agent_runtime_task_t> &task,
-    const std::vector<webcool::ai::agent_change_review_t> & /* reviews */,
-    const webcool::ai::agent_result_t &persisted)
+    const std::vector<libai::ai::agent_change_review_t> & /* reviews */,
+    const libai::ai::agent_result_t &persisted)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	// Mirror the durable result wholesale. Besides avoiding divergent badges in
 	// another browser, this also removes legacy intermediate generations that a
 	// single latest-file decision superseded in the result store.

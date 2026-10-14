@@ -1,7 +1,7 @@
 #pragma once
 #include "coding_internal.h"
 #include "../sdk/task_contract_json.h"
-namespace webcool { namespace ai { namespace coding_detail {
+namespace libai { namespace ai { namespace coding_detail {
 // Portable and desktop paths use exactly the same strict contract decoder.
 inline bool task_contract_decoded(const libai::task_contract_t &c,acl::json_node &out)
 {

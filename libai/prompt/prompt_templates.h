@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -855,4 +855,4 @@ inline std::string localized_tool_description(
 }
 
 }
-} // namespace webcool::ai
+} // namespace libai::ai

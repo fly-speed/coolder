@@ -48,7 +48,7 @@ Windows 完成了工程 XML 和引用路径检查，未实机编译。
 
 HTTP 路由、用户鉴权、项目目录授权和前端保留在 `webcool/action/ai/` 等宿主代码中。
 宿主鉴权后显式传入存储根目录、用户目录、模型配置和沙盒策略。库不依赖 webcool 的 HTTP 实现。
-已有 C++ 命名空间 `webcool::ai`、`webcool::ai::coding` 保留，以避免改变现有接口和行为；
+已有 C++ 命名空间 `libai::ai`、`libai::ai::coding` 保留，以避免改变现有接口和行为；
 后者是原运行时命名空间 `action::agent_detail` 的别名。
 
 ACL/fiber、OpenSSL 是外部依赖，不合并进归档。宿主负责 ACL/fiber 初始化和线程生命周期。
@@ -87,7 +87,7 @@ target_link_libraries(my_agent PRIVATE libai::ai)
 
 ```cpp
 #include <libai/coding.h>
-// 使用 webcool::ai 中的模型、工作区、存储等接口。
+// 使用 libai::ai 中的模型、工作区、存储等接口。
 ```
 
 配置消费项目时将 `CMAKE_PREFIX_PATH` 指向 SDK 安装目录，并指定其依赖的 `ACL_PATH`、

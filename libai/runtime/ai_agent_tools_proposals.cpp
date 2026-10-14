@@ -75,7 +75,7 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 		if (!context.saved_proposal_batch ||
 		    context.saved_proposal_batch->empty() ||
 		    json_text(reference["saved_batch"]) !=
-		        webcool::ai::agent_workspace_t::content_sha256(
+		        libai::ai::agent_workspace_t::content_sha256(
 		            *context.saved_proposal_batch))
 			return tool_error_json(
 			    "saved_batch is unavailable in this running task");
@@ -83,11 +83,11 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 		limit = json_number(reference["limit"], -1);
 		if (offset < 0 || limit < 1 ||
 		    static_cast<size_t>(limit) >
-		        webcool::ai::kMaxProposalBatchItems)
+		        libai::ai::kMaxProposalBatchItems)
 			return tool_error_json(
 			    "saved_batch requires offset >= 0 and limit in 1-" +
 			    std::to_string(
-			        webcool::ai::kMaxProposalBatchItems));
+			        libai::ai::kMaxProposalBatchItems));
 		payload = *context.saved_proposal_batch;
 	}
 	acl::json batch_json(payload.c_str());
@@ -110,8 +110,8 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 			continue;
 		selected_bytes += json_text((*object)["content"]).size();
 	}
-	if (selected > webcool::ai::kMaxProposalBatchItems ||
-	    selected_bytes > webcool::ai::kMaxProposalBatchBytes) {
+	if (selected > libai::ai::kMaxProposalBatchItems ||
+	    selected_bytes > libai::ai::kMaxProposalBatchBytes) {
 		acl::json failure;
 		acl::json_node &out = failure.get_root();
 		out.add_bool("ok", false);
@@ -121,17 +121,17 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 		        "批次超过容量，未暂存任何修改" :
 		        "Batch exceeds capacity; no changes were staged");
 		out.add_number(
-		    "max_items", webcool::ai::kMaxProposalBatchItems);
+		    "max_items", libai::ai::kMaxProposalBatchItems);
 		out.add_number(
-		    "max_content_bytes", webcool::ai::kMaxProposalBatchBytes);
+		    "max_content_bytes", libai::ai::kMaxProposalBatchBytes);
 		out.add_number("received_items", selected);
 		out.add_number("received_content_bytes", selected_bytes);
 		if (!(context.saved_proposal_batch &&
-		        payload.size() <= webcool::ai::kMaxSavedProposalBytes))
+		        payload.size() <= libai::ai::kMaxSavedProposalBytes))
 			return serialize_json(out);
 		*context.saved_proposal_batch = payload;
 		out.add_text("saved_batch",
-		    webcool::ai::agent_workspace_t::content_sha256(payload)
+		    libai::ai::agent_workspace_t::content_sha256(payload)
 		        .c_str());
 		out.add_number("total_items", total);
 		out.add_text("next_action",
@@ -194,13 +194,13 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 			continue;
 		}
 		bytes += item_content.size();
-		if (item_content.size() > webcool::ai::kMaxProposalFileBytes ||
-		    bytes > webcool::ai::kMaxProposalBatchBytes ||
+		if (item_content.size() > libai::ai::kMaxProposalFileBytes ||
+		    bytes > libai::ai::kMaxProposalBatchBytes ||
 		    item_content.find('\0') != std::string::npos) {
 			return tool_error_json(
 			    "propose_batch invalid text at " + item_path +
 			    ": each file must be NUL-free and at most " +
-			    std::to_string(webcool::ai::kMaxProposalFileBytes) +
+			    std::to_string(libai::ai::kMaxProposalFileBytes) +
 			    " bytes; no changes staged");
 		}
 		bool already_staged = false;

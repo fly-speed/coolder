@@ -4,7 +4,7 @@
 #include "../project/project_toolchain.h"
 #include "../project/project_diagnostics.h"
 #include "../workspace/agent_workspace.h"
-namespace webcool
+namespace libai
 {
 namespace ai
 {

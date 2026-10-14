@@ -19,7 +19,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
-using namespace webcool::ai;
+using namespace libai::ai;
 using namespace action::agent_detail;
 
 namespace action { namespace agent_detail {

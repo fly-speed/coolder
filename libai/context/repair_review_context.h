@@ -4,7 +4,7 @@
 #include <string>
 #include <regex>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

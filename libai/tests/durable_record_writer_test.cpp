@@ -5,7 +5,7 @@
 #include <iterator>
 #include <dirent.h>
 #include <sys/wait.h>
-using namespace webcool::ai;
+using namespace libai::ai;
 static std::string read(const std::string &path){
     std::ifstream file(path.c_str(),std::ios::binary);
     return std::string(std::istreambuf_iterator<char>(file),std::istreambuf_iterator<char>());

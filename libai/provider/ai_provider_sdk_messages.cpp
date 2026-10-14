@@ -3,7 +3,7 @@
 #include <map>
 #include "../common/json_value.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -246,4 +246,4 @@ bool add_sdk_messages(const provider_config_t &provider,
 
 } // namespace provider_detail
 } // namespace ai
-} // namespace webcool
+} // namespace libai

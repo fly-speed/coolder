@@ -31,7 +31,7 @@ bool path_has_pending_proposal(
 
 // Convert a provider-native call into the runtime's normalized tool request.
 agent_tool_request_t completion_tool_request(
-    const webcool::ai::completion_tool_call_t &call);
+    const libai::ai::completion_tool_call_t &call);
 
 // Classify failures encountered while inspecting proposal targets.
 std::string workspace_inspection_error(
@@ -39,7 +39,7 @@ std::string workspace_inspection_error(
 
 // Retain one source page together with its version and offset metadata.
 bool remember_read_page(
-    acl::json_node &page, webcool::ai::agent_read_context_t &context);
+    acl::json_node &page, libai::ai::agent_read_context_t &context);
 
 namespace workspace_tool_detail
 {
@@ -56,7 +56,7 @@ struct workspace_tool_context_t {
 	// Response root node owned by the accompanying JSON document.
 	acl::json_node &root;
 	// Authorized workspace used by this operation.
-	webcool::ai::agent_workspace_t &workspace;
+	libai::ai::agent_workspace_t &workspace;
 	// Filesystem root belonging to the authenticated user.
 	const std::string &user_root;
 	// Logical path identifying the selected project.
@@ -66,7 +66,7 @@ struct workspace_tool_context_t {
 	// Identifier of the associated agent run.
 	const std::string &run_id;
 	// Resource limits applied to external command execution.
-	const webcool::ai::sandbox_limits_t &sandbox_limits;
+	const libai::ai::sandbox_limits_t &sandbox_limits;
 	// Whether user-facing output selects the Chinese prompt variant.
 	bool chinese;
 	// Tracks checks that cannot run in the current environment.
@@ -74,9 +74,9 @@ struct workspace_tool_context_t {
 	// Cached build/test evidence tied to the exact staged revision.
 	validation_cache_t *validation_cache;
 	// Private workspace containing the staged source revision.
-	webcool::ai::agent_workspace_t &draft_workspace;
+	libai::ai::agent_workspace_t &draft_workspace;
 	// Workspace view used when resolving read-only tool requests.
-	webcool::ai::agent_workspace_t &read_workspace;
+	libai::ai::agent_workspace_t &read_workspace;
 	// Path of the file or resource associated with this record.
 	const std::string &path;
 	// Logical path mapped into the private draft workspace.
@@ -105,13 +105,13 @@ std::string workspace_read_path_to_project(const std::string &project_path,
     bool live_source_view, const std::string &value);
 
 // Execute the workspace batch tool against its authorized context.
-std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
+std::string execute_workspace_batch(libai::ai::agent_workspace_t &workspace,
     const std::string &user_root, const std::string &project_path,
     bool allow_file_content, const agent_tool_request_t &request,
     agent_tool_trace_t &trace,
     std::vector<agent_change_proposal_t> *staged_changes,
     const std::string &run_id,
-    const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
+    const libai::ai::sandbox_limits_t &sandbox_limits, bool chinese,
     const unavailable_validation_t *unavailable_validation,
     validation_cache_t *validation_cache, std::string *saved_proposal_batch,
     batch_validation_evidence_t *batch_validation,

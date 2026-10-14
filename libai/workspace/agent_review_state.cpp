@@ -2,7 +2,7 @@
 #include "agent_review_state.h"
 #include "agent_workspace.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -127,4 +127,4 @@ size_t remove_resolved_agent_review_changes(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

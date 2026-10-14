@@ -23,14 +23,14 @@
 #include <fstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_session_store_mutex;
+libai::mutex g_session_store_mutex;
 const char *kLegacyHeader = "WEBCOOL_AGENT_SESSIONS_V1";
 const char *kMessageHistoryHeader = "WEBCOOL_AGENT_SESSIONS_V2";
 const char *kReasoningHistoryHeader = "WEBCOOL_AGENT_SESSIONS_V3";
@@ -46,23 +46,23 @@ const size_t kMaxReasoningBytes = 1024 * 1024;
 const size_t kMaxCompletionSummaryBytes = 4 * 1024;
 const size_t kMaxTranscriptBytes = 8 * 1024 * 1024;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool parse_number(const std::string &text, long long &value)
 {
-	return ::webcool::ai::record_codec::parse_nonnegative_number(
+	return ::libai::ai::record_codec::parse_nonnegative_number(
 	    text, value);
 }
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
 bool safe_message(const agent_session_message_t &message)
 {
@@ -260,7 +260,7 @@ bool parse_messages(const std::string &input, int format_version,
 	    transcript_bytes(messages) <= kMaxTranscriptBytes;
 }
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
 bool safe_record(const agent_session_record_t &record)
 {
@@ -319,7 +319,7 @@ bool ensure_directory(const std::string &user_root, std::string &err)
 	return true;
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool load_records(const std::string &user_root,
     std::vector<agent_session_record_t> &records, std::string &err)
@@ -519,7 +519,7 @@ bool agent_session_store_t::create(const std::string &title,
 		err = "invalid agent session settings";
 		return ai_error("agent.session-store", "validate-create", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	std::vector<agent_session_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.session-store", "load-for-create", err);
@@ -565,7 +565,7 @@ bool agent_session_store_t::update_after_run(const std::string &id,
 		err = "invalid agent session update";
 		return ai_error("agent.session-store", "validate-update", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	std::vector<agent_session_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.session-store", "load-for-update", err);
@@ -637,7 +637,7 @@ bool agent_session_store_t::get(const std::string &id,
 		err = "invalid agent session id";
 		return ai_error("agent.session-store", "validate-get", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	std::vector<agent_session_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.session-store", "load-for-get", err);
@@ -659,7 +659,7 @@ bool agent_session_store_t::list(size_t limit,
 		err = "agent session list limit is invalid";
 		return ai_error("agent.session-store", "validate-list", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.session-store", "load-list", err);
 	}
@@ -680,7 +680,7 @@ bool agent_session_store_t::list_for_project(const std::string &project_path,
 		return ai_error(
 		    "agent.session-store", "validate-project-memory", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	std::vector<agent_session_record_t> all;
 	if (!load_records(user_root_, all, err)) {
 		return ai_error(
@@ -705,7 +705,7 @@ bool agent_session_store_t::remove(
 		err = "invalid agent session id";
 		return ai_error("agent.session-store", "validate-remove", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	std::vector<agent_session_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error("agent.session-store", "load-for-remove", err);
@@ -734,7 +734,7 @@ bool agent_session_store_t::remove_for_project(const std::string &project_path,
 		return ai_error(
 		    "agent.session-store", "validate-remove-project", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_session_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_session_store_mutex);
 	std::vector<agent_session_record_t> records;
 	if (!load_records(user_root_, records, err)) {
 		return ai_error(
@@ -757,4 +757,4 @@ bool agent_session_store_t::remove_for_project(const std::string &project_path,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

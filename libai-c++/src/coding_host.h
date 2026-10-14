@@ -32,10 +32,10 @@ namespace libai
 namespace cpp
 {
 // Keep host access behind the binding without copying core declarations.
-namespace coding = ::webcool::ai;
+namespace coding = ::libai::ai;
 // Internal runtime compatibility; third-party applications use public APIs.
 namespace runtime = ::action::agent_detail;
 // Cooperative mutex owned by the facade's desktop implementation.
-using Mutex = ::webcool::mutex;
+using Mutex = ::libai::mutex;
 }
 }

@@ -4,7 +4,7 @@
 #include <vector>
 namespace libai {class execution_store_t;}
 namespace acl {class json_node;}
-namespace webcool
+namespace libai
 {
 namespace ai
 {

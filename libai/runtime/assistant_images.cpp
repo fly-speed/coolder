@@ -10,11 +10,11 @@ namespace agent_detail
 
 static bool save_generated_image(
     const std::shared_ptr<agent_runtime_task_t> &task,
-    const std::string &response, webcool::ai::completion_result_t &output,
+    const std::string &response, libai::ai::completion_result_t &output,
     std::string &err)
 {
-	using namespace webcool::ai;
-	using namespace webcool::ai::provider_detail;
+	using namespace libai::ai;
+	using namespace libai::ai::provider_detail;
 	acl::json result(response.c_str());
 	if (!result.finish()) {
 		err = "invalid image provider JSON response";
@@ -83,11 +83,11 @@ static bool save_generated_image(
 }
 
 bool run_assistant_image_task(const std::shared_ptr<agent_runtime_task_t> &task,
-    const webcool::ai::provider_config_t &provider, const std::string &api_key,
-    webcool::ai::completion_result_t &output, std::string &err)
+    const libai::ai::provider_config_t &provider, const std::string &api_key,
+    libai::ai::completion_result_t &output, std::string &err)
 {
-	using namespace webcool::ai;
-	using namespace webcool::ai::provider_detail;
+	using namespace libai::ai;
+	using namespace libai::ai::provider_detail;
 	output.input_tokens = output.output_tokens = -1;
 	struct elapsed_guard_t {
 		completion_result_t &result;

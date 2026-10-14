@@ -28,7 +28,7 @@
 #include <sys/stat.h>
 #include "../common/webcool_mutex.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -38,7 +38,7 @@ namespace provider_store_detail
 // providers.v1 contains metadata plus AES-256-GCM ciphertext. The 32-byte
 // installation master key is separate from every user's provider file, and
 // additional authenticated data binds ciphertext to username + provider ID.
-webcool::mutex g_provider_store_mutex;
+libai::mutex g_provider_store_mutex;
 const char *kAgentDir = ".webcool_agent";
 const char *kProviderFile = "providers.v1";
 const char *kProviderHealthFile = "provider_health.v1";
@@ -47,13 +47,13 @@ const char *kHeader = "WEBCOOL_AI_PROVIDERS_V1";
 const char *kHealthHeader = "WEBCOOL_AI_PROVIDER_HEALTH_V1";
 const char *kMasterKeyHeader = "WEBCOOL_AI_MASTER_KEY_V2";
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
-using ::webcool::ai::record_codec::hex_decode;
+using ::libai::ai::record_codec::hex_decode;
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 std::string lower_ascii(std::string value)
 {
@@ -64,9 +64,9 @@ std::string lower_ascii(std::string value)
 	return value;
 }
 
-using ::webcool::ai::identifiers::valid_id;
+using ::libai::ai::identifiers::valid_id;
 
-using ::webcool::ai::identifiers::new_id;
+using ::libai::ai::identifiers::new_id;
 
 std::string agent_dir(const std::string &user_root)
 {
@@ -152,7 +152,7 @@ provider_store_t::provider_store_t(const std::string &upload_root,
 bool provider_store_t::list(
     std::vector<provider_config_t> &providers, std::string &err) const
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	if (!load_unlocked(user_root_, providers, err)) {
 		return ai_error("provider.store", "list", err);
 	}
@@ -164,7 +164,7 @@ bool provider_store_t::list(
 bool provider_store_t::save(
     const provider_input_t &input, provider_config_t &saved, std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	std::vector<provider_config_t> providers;
 	if (!load_unlocked(user_root_, providers, err)) {
 		return ai_error("provider.store", "load-for-save", err);
@@ -251,7 +251,7 @@ bool provider_store_t::save(
 
 bool provider_store_t::remove(const std::string &id, std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	if (!valid_id(id)) {
 		err = "invalid AI provider id";
 		return ai_error("provider.store", "validate-remove-id", err);
@@ -289,7 +289,7 @@ bool provider_store_t::reveal_api_key(const provider_config_t &provider,
 	// Rotation changes the key journal and provider files as one logical unit.
 	// Serialize decryptions with it so a request cannot observe a half-written
 	// cross-file transition.
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	std::vector<provider_config_t> providers;
 	if (!load_unlocked(user_root_, providers, err)) {
 		return ai_error("provider.store", "reload-for-decrypt", err);
@@ -320,7 +320,7 @@ static void cleanse_rotation_plaintext(std::string &plaintext)
 bool provider_store_t::rotate_master_key(const std::string &upload_root,
     master_key_rotation_result_t &result, std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	result = master_key_rotation_result_t();
 	master_keyring_t keyring;
 	if (!read_master_keyring(upload_root, keyring, err)) {
@@ -461,7 +461,7 @@ bool provider_store_t::seal_user_data(const std::string &upload_root,
     const std::string &username, const std::string &binding,
     const std::string &plaintext, std::string &encoded, std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	if (username.empty() || binding.empty()) {
 		err = "invalid AI user data encryption binding";
 		return ai_error("provider.user-data", "validate-seal", err);
@@ -476,7 +476,7 @@ bool provider_store_t::open_user_data(const std::string &upload_root,
     const std::string &username, const std::string &binding,
     const std::string &encoded, std::string &plaintext, std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	if (username.empty() || binding.empty()) {
 		err = "invalid AI user data encryption binding";
 		return ai_error("provider.user-data", "validate-open", err);
@@ -491,7 +491,7 @@ bool provider_store_t::record_test_result(const std::string &id, bool succeeded,
     int http_status, long long latency_ms, const std::string &error_summary,
     std::string &err)
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_store_mutex);
 	if (!valid_id(id)) {
 		err = "invalid AI provider id";
 		return ai_error(
@@ -662,4 +662,4 @@ bool provider_store_t::validate_input(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

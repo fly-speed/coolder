@@ -6,7 +6,7 @@
 #include <string>
 #include <openssl/sha.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

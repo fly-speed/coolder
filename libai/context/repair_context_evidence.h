@@ -2,7 +2,7 @@
 #include "../provider/ai_provider_client.h"
 #include "acl_cpp/lib_acl.hpp"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

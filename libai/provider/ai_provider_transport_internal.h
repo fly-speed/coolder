@@ -2,7 +2,7 @@
 #include "ai_provider_client_internal.h"
 #include <chrono>
 #include <memory>
-namespace webcool
+namespace libai
 {
 namespace ai
 {

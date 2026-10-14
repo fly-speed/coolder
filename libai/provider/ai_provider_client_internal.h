@@ -19,7 +19,7 @@ class http_request;
 class openssl_conf;
 }
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -304,4 +304,4 @@ bool post_json_stream(const provider_config_t &provider,
 
 } // namespace provider_detail
 } // namespace ai
-} // namespace webcool
+} // namespace libai

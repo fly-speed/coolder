@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -50,4 +50,4 @@ bool build_agent_execution_profile(const std::string &mode,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

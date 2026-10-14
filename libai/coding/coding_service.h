@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

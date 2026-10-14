@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "agent_workspace_internal.h"
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -35,7 +35,7 @@ std::string random_hex_id()
 	return value;
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool install_new_file(const std::string &temporary, const std::string &target)
 {

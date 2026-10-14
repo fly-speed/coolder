@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -142,4 +142,4 @@ unsigned long ai_tool_call_limit_for_mode(
     const ai_admin_policy_t &policy, const std::string &mode);
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

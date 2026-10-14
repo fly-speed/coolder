@@ -7,7 +7,7 @@ namespace agent_detail
 {
 
 std::string annotate_read_coverage(const std::string &name,
-    const std::string &result, webcool::ai::agent_read_coverage_t &coverage,
+    const std::string &result, libai::ai::agent_read_coverage_t &coverage,
     bool chinese)
 {
 	acl::json parsed(result.c_str());
@@ -143,7 +143,7 @@ void collect_observation_signatures(const std::string &name,
 			    "read:" + json_text((*object)["path"]) + ":" +
 			    json_text((*object)["file_sha256"]) + ":" +
 			    json_text((*object)["offset"]) + ":" +
-			    webcool::ai::agent_workspace_t::content_sha256(
+			    libai::ai::agent_workspace_t::content_sha256(
 			        json_text((*object)["content"])));
 		}
 	} else if (name == "workspace.read" && parsed["content"] != NULL) {
@@ -152,17 +152,17 @@ void collect_observation_signatures(const std::string &name,
 		signatures.push_back("read:" + json_text(parsed["path"]) + ":" +
 		    json_text(parsed["file_sha256"]) + ":" +
 		    json_text(parsed["offset"]) + ":" +
-		    webcool::ai::agent_workspace_t::content_sha256(
+		    libai::ai::agent_workspace_t::content_sha256(
 		        json_text(parsed["content"])));
 	} else {
 		signatures.push_back(name + ":" +
-		    webcool::ai::agent_workspace_t::content_sha256(result));
+		    libai::ai::agent_workspace_t::content_sha256(result));
 	}
 }
 
 // Extract only failure evidence, not timestamps, build paths or PASS lines.
 bool repeated_repair_failure(const std::string &report,
-    const std::string &draft, webcool::ai::repair_failure_tracker_t &tracker)
+    const std::string &draft, libai::ai::repair_failure_tracker_t &tracker)
 {
 	acl::json parsed(report.c_str());
 	if (!parsed.finish())
@@ -184,7 +184,7 @@ bool repeated_repair_failure(const std::string &report,
 		if (!command ||
 		    json_text((*command)["command_id"]) != failed_command)
 			continue;
-		const auto extracted = webcool::ai::repair_failure_signatures(
+		const auto extracted = libai::ai::repair_failure_signatures(
 		    json_text((*command)["diagnostic"]));
 		failures.insert(extracted.begin(), extracted.end());
 	}
@@ -317,7 +317,7 @@ std::string batch_read_continuation(
 }
 
 bool remember_read_page(
-    acl::json_node &page, webcool::ai::agent_read_context_t &context)
+    acl::json_node &page, libai::ai::agent_read_context_t &context)
 {
 	const std::string path = json_text(page["path"]);
 	const std::string version = json_text(page["file_sha256"]);
@@ -329,7 +329,7 @@ bool remember_read_page(
 }
 
 bool remember_read_result(const std::string &name, const std::string &result,
-    webcool::ai::agent_read_context_t &context)
+    libai::ai::agent_read_context_t &context)
 {
 	if (name != "workspace.read" && name != "workspace.read_batch" &&
 	    name != "workspace.execute_batch")
@@ -375,7 +375,7 @@ bool remember_read_result(const std::string &name, const std::string &result,
 // Check after the whole batch has been inserted: a later page can evict a
 // successful earlier put. Only omit raw exchanges when every page still exists.
 bool read_result_is_retained(const std::string &name, const std::string &result,
-    const webcool::ai::agent_read_context_t &context)
+    const libai::ai::agent_read_context_t &context)
 {
 	acl::json parsed(result.c_str());
 	if (!parsed.finish())
@@ -421,7 +421,7 @@ bool read_result_is_retained(const std::string &name, const std::string &result,
 
 static void restore_context_pages(const std::string &transcript, size_t begin,
     size_t end, const std::string &tag,
-    webcool::ai::agent_read_context_t &context)
+    libai::ai::agent_read_context_t &context)
 {
 	acl::json parsed(
 	    transcript.substr(begin + tag.size(), end - begin - tag.size())
@@ -440,7 +440,7 @@ static void restore_context_pages(const std::string &transcript, size_t begin,
 }
 
 void restore_read_context(
-    const std::string &transcript, webcool::ai::agent_read_context_t &context)
+    const std::string &transcript, libai::ai::agent_read_context_t &context)
 {
 	const std::string tag = "<read_working_set>";
 	const size_t begin = transcript.rfind(tag);
@@ -503,7 +503,7 @@ std::string draft_path_to_project_path(
 // reuse a failure for a different source tree. On an unreadable/large snapshot,
 // conservatively disable reuse rather than relying on timestamps alone.
 std::string validation_baseline_fingerprint(
-    webcool::ai::agent_workspace_t &workspace, const std::string &project_path)
+    libai::ai::agent_workspace_t &workspace, const std::string &project_path)
 {
 	std::string digest, err;
 	return workspace.tree_sha256(project_path, digest, err) ? digest : "";
@@ -512,10 +512,10 @@ std::string validation_baseline_fingerprint(
 void append_edit_snapshot(acl::json &json, acl::json_node &root,
     const std::string &source, size_t at, bool chinese)
 {
-	const auto excerpt = webcool::ai::edit_excerpt(source, at, 2048);
+	const auto excerpt = libai::ai::edit_excerpt(source, at, 2048);
 	acl::json_node &snapshot = json.create_node();
 	snapshot.add_text("file_sha256",
-	    webcool::ai::agent_workspace_t::content_sha256(source).c_str());
+	    libai::ai::agent_workspace_t::content_sha256(source).c_str());
 	snapshot.add_number("offset", excerpt.offset);
 	snapshot.add_number("total_bytes", source.size());
 	snapshot.add_text("content", excerpt.content.c_str());

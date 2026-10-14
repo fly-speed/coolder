@@ -20,40 +20,40 @@
 #include <sstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_request_store_mutex;
+libai::mutex g_request_store_mutex;
 const size_t kMaxRequestBytes = 32 * 1024 * 1024;
 const unsigned long kMaxRequestsPerRun = 1000000;
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 bool valid_run_id(const std::string &id)
 {
-	return ::webcool::ai::identifiers::valid_id(id);
+	return ::libai::ai::identifiers::valid_id(id);
 }
 
 bool normal_directory(const std::string &path)
 {
-	return ::webcool::ai::file_ops::safe_directory(path);
+	return ::libai::ai::file_ops::safe_directory(path);
 }
 
 bool make_directory(const std::string &path)
 {
-	return ::webcool::ai::file_ops::make_private_directory(path);
+	return ::libai::ai::file_ops::make_private_directory(path);
 }
 
 bool path_exists(const std::string &path)
 {
-	return ::webcool::ai::file_ops::path_entry_exists(path);
+	return ::libai::ai::file_ops::path_entry_exists(path);
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool resolve_project(const std::string &user_root,
     const std::string &project_path, std::string &project, std::string &err)
@@ -156,7 +156,7 @@ bool agent_request_store_t::append(const std::string &payload,
 	if (!resolve_project(user_root_, project_path_, project, err)) {
 		return ai_error("agent.request", "resolve-project", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_request_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_request_store_mutex);
 	std::string directory;
 	if (!prepare_directory(project, directory, err)) {
 		return ai_error("agent.request", "prepare-directory", err);
@@ -190,7 +190,7 @@ bool agent_request_store_t::operation_log(
 	std::string project;
 	if (!resolve_project(user_root_, project_path_, project, err))
 		return false;
-	std::lock_guard<webcool::mutex> guard(g_request_store_mutex);
+	std::lock_guard<libai::mutex> guard(g_request_store_mutex);
 	const std::string directory = join_path(project, ".webcool_agent");
 	if (!(write ? make_directory(directory) :
 	              normal_directory(directory))) {
@@ -207,4 +207,4 @@ bool agent_request_store_t::operation_log(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

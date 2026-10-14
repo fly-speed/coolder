@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <string>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {

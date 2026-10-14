@@ -2,7 +2,7 @@
 #include <algorithm>
 #include "../agent/ai_admin_policy.h"
 #include "../project/project_toolchain.h"
-namespace webcool { namespace ai { namespace coding_detail {
+namespace libai { namespace ai { namespace coding_detail {
 // Generic process runtime configuration; the trusted embedding host owns authorization.
 bool runtime(const std::string &op, acl::json_node &a, acl::json_node &out, std::string &error)
 {

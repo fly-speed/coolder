@@ -14,7 +14,7 @@
 #include <deque>
 #include <map>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -30,7 +30,7 @@ struct provider_queue_state_t {
 	std::deque<unsigned long long> waiters;
 };
 
-webcool::mutex g_provider_scheduler_mutex;
+libai::mutex g_provider_scheduler_mutex;
 std::map<std::string, provider_queue_state_t> g_provider_queues;
 
 long long monotonic_ms()
@@ -65,7 +65,7 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 	}
 	unsigned long long ticket = 0;
 	{
-		std::lock_guard<webcool::mutex> guard(
+		std::lock_guard<libai::mutex> guard(
 		    g_provider_scheduler_mutex);
 		provider_queue_state_t &state = g_provider_queues[opaque_key];
 		ticket = state.next_ticket++;
@@ -74,7 +74,7 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 
 	for (;;) {
 		if (cancelled != NULL && cancelled(cancel_context)) {
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_provider_scheduler_mutex);
 			std::map<std::string, provider_queue_state_t>::iterator
 			    found = g_provider_queues.find(opaque_key);
@@ -85,7 +85,7 @@ bool provider_request_scheduler_t::acquire(const std::string &opaque_key,
 		}
 		unsigned long wait_ms = 25;
 		{
-			std::lock_guard<webcool::mutex> guard(
+			std::lock_guard<libai::mutex> guard(
 			    g_provider_scheduler_mutex);
 			provider_queue_state_t &state =
 			    g_provider_queues[opaque_key];
@@ -120,7 +120,7 @@ void provider_request_scheduler_t::finish(provider_request_permit_t &permit,
 {
 	if (!permit.active || permit.key.empty())
 		return;
-	std::lock_guard<webcool::mutex> guard(g_provider_scheduler_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_scheduler_mutex);
 	provider_queue_state_t &state = g_provider_queues[permit.key];
 	const size_t observed_in_flight = state.in_flight;
 	if (state.in_flight > 0)
@@ -157,7 +157,7 @@ provider_request_scheduler_snapshot_t provider_request_scheduler_t::inspect(
     const std::string &opaque_key)
 {
 	provider_request_scheduler_snapshot_t snapshot;
-	std::lock_guard<webcool::mutex> guard(g_provider_scheduler_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_scheduler_mutex);
 	const std::map<std::string, provider_queue_state_t>::const_iterator
 	    found = g_provider_queues.find(opaque_key);
 	if (found == g_provider_queues.end())
@@ -172,9 +172,9 @@ provider_request_scheduler_snapshot_t provider_request_scheduler_t::inspect(
 
 void provider_request_scheduler_t::reset_for_tests()
 {
-	std::lock_guard<webcool::mutex> guard(g_provider_scheduler_mutex);
+	std::lock_guard<libai::mutex> guard(g_provider_scheduler_mutex);
 	g_provider_queues.clear();
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

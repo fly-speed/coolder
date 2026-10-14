@@ -4,7 +4,7 @@
 #include <map>
 #include <set>
 
-namespace webcool { namespace ai { namespace coding_detail {
+namespace libai { namespace ai { namespace coding_detail {
 namespace {
 acl::json_node *object(acl::json_node *n)
 {

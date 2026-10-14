@@ -39,24 +39,24 @@ public:
         const agent_tool_request_t &request,const std::vector<agent_tool_request_t> &children)
         :key_(key),project_(project) {
         if(key.empty())return; // Legacy host calls make no durable claim.
-        if(!webcool::ai::program_sandbox_t::valid_idempotency_key(key))throw std::invalid_argument("invalid batch execution key");
+        if(!libai::ai::program_sandbox_t::valid_idempotency_key(key))throw std::invalid_argument("invalid batch execution key");
         const auto directory=root+"/.webcool_agent/tool_batches";
-        if(!webcool::ai::file_ops::make_private_directory(root+"/.webcool_agent") ||
-            !webcool::ai::file_ops::make_private_directory(directory))throw std::runtime_error("cannot prepare batch receipts");
+        if(!libai::ai::file_ops::make_private_directory(root+"/.webcool_agent") ||
+            !libai::ai::file_ops::make_private_directory(directory))throw std::runtime_error("cannot prepare batch receipts");
         store_.reset(new libai::file_execution_store_t(directory,libai::execution_file_codec_t::plaintext()));
-        scope_="tool_batch_"+webcool::ai::agent_workspace_t::content_sha256(key);
+        scope_="tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key);
         const auto snapshot=store_->open(scope_);revision_=snapshot.revision;
         if(!snapshot.state_json.empty())throw std::runtime_error("batch already has child receipts; host inspection required");
-        request_sha_=webcool::ai::agent_workspace_t::content_sha256(request.content);
+        request_sha_=libai::ai::agent_workspace_t::content_sha256(request.content);
         for(size_t i=0;i<children.size();++i) {
-            child_t child;child.key="batch."+webcool::ai::agent_workspace_t::content_sha256(key+"\n"+std::to_string(i));
+            child_t child;child.key="batch."+libai::ai::agent_workspace_t::content_sha256(key+"\n"+std::to_string(i));
             child.name=children[i].name;
             acl::json identity;auto &item=identity.create_node();
             item.add_text("name",child.name.c_str()).add_text("path",children[i].path.c_str())
                 .add_text("query",children[i].query.c_str()).add_text("old_text",children[i].old_text.c_str())
                 .add_text("target_path",children[i].target_path.c_str()).add_text("content",children[i].content.c_str())
                 .add_bool("content_present",children[i].content_present);
-            child.request_sha=webcool::ai::agent_workspace_t::content_sha256(serialize_json(item));children_.push_back(child);
+            child.request_sha=libai::ai::agent_workspace_t::content_sha256(serialize_json(item));children_.push_back(child);
         }
         save(); // Freeze order and identity before any child or materialization.
     }
@@ -69,7 +69,7 @@ public:
     void returned(size_t ordinal,const agent_tool_trace_t &trace,const std::string &output) {
         if(!store_)return;std::lock_guard<std::mutex> guard(mutex_);
         auto &child=children_.at(ordinal);child.state="returned";child.ok=trace.ok;
-        child.output_sha=webcool::ai::agent_workspace_t::content_sha256(output);save();
+        child.output_sha=libai::ai::agent_workspace_t::content_sha256(output);save();
     }
 };
 #else
@@ -157,7 +157,7 @@ static std::string serialize_workspace_batch(
 		    kMaxToolResultBytes - result_bytes :
 		    0;
 		if (!paged_read && value.size() > remaining) {
-			value = webcool::ai::utf8_prefix(value, remaining);
+			value = libai::ai::utf8_prefix(value, remaining);
 			trace.truncated = true;
 		}
 		item.add_text("result", value.c_str());
@@ -177,7 +177,7 @@ static void cleanup_failed_provider_batch(const std::string &user_root,
 	std::string cleanup_err;
 	if (!remove_persistent_worktree(
 	        user_root, project_path, batch_run_id, cleanup_err)) {
-		webcool::ai::ai_log_error("agent.runtime",
+		libai::ai::ai_log_error("agent.runtime",
 		    "cleanup-failed-provider-batch", cleanup_err);
 	}
 }
@@ -199,13 +199,13 @@ static void record_batch_validation(batch_validation_evidence_t &verified,
 	}
 }
 
-std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
+std::string execute_workspace_batch(libai::ai::agent_workspace_t &workspace,
     const std::string &user_root, const std::string &project_path,
     bool allow_file_content, const agent_tool_request_t &request,
     agent_tool_trace_t &trace,
     std::vector<agent_change_proposal_t> *staged_changes,
     const std::string &run_id,
-    const webcool::ai::sandbox_limits_t &sandbox_limits, bool chinese,
+    const libai::ai::sandbox_limits_t &sandbox_limits, bool chinese,
     const unavailable_validation_t *unavailable_validation,
     validation_cache_t *validation_cache, std::string *saved_proposal_batch,
     batch_validation_evidence_t *batch_validation,
@@ -229,12 +229,12 @@ std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
 	std::vector<std::string> child_results(requests.size());
 	auto child_key = [=](size_t ordinal) {
 		return tool_execution_key.empty() ? std::string() :
-		    "batch." + webcool::ai::agent_workspace_t::content_sha256(
+		    "batch." + libai::ai::agent_workspace_t::content_sha256(
 		        tool_execution_key + "\n" + std::to_string(ordinal));
 	};
 	auto execute_child = [=, &receipts](const agent_tool_request_t child, size_t ordinal)
 	    -> std::pair<agent_tool_trace_t, std::string> {
-		webcool::ai::agent_workspace_t child_workspace(user_root);
+		libai::ai::agent_workspace_t child_workspace(user_root);
 		agent_tool_trace_t child_trace;
         receipts.begin(ordinal);
 		const std::string result = execute_workspace_tool(
@@ -280,7 +280,7 @@ std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
 		std::string batch_err;
 		if (!materialize_staged_worktree(user_root, project_path,
 		        batch_run_id, candidate, skipped_files, batch_err)) {
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "initialize-provider-batch", batch_err);
 			return tool_error_json(batch_err);
 		}
@@ -330,13 +330,13 @@ std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
 			        batch_run_id, candidate, skipped_files,
 			        batch_err))
 				continue;
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "advance-provider-batch", batch_err);
 			std::string cleanup_err;
 			if (remove_persistent_worktree(user_root, project_path,
 			        batch_run_id, cleanup_err))
 				return tool_error_json(batch_err);
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "cleanup-invalid-provider-batch", cleanup_err);
 
 			return tool_error_json(batch_err);
@@ -354,7 +354,7 @@ std::string execute_workspace_batch(webcool::ai::agent_workspace_t &workspace,
 		        user_root, project_path, batch_run_id, cleanup_err)) {
 			// The accepted candidate remains valid. A stale private worktree is
 			// harmless but must be logged for administrator cleanup.
-			webcool::ai::ai_log_error("agent.runtime",
+			libai::ai::ai_log_error("agent.runtime",
 			    "cleanup-provider-batch", cleanup_err);
 		}
 	}
@@ -388,7 +388,7 @@ static bool validate_workspace_batch_receipt(const std::string &wire,const std::
         for(size_t i=0;i<record["children"].Size();++i) {
             const auto &child=record["children"][static_cast<json::SizeType>(i)];
             if(!child.IsObject()||(child.MemberCount()!=7&&child.MemberCount()!=8)||!child.HasMember("ordinal")||!child["ordinal"].IsUint64()||child["ordinal"].GetUint64()!=i ||
-                string_field(child,"key")!="batch."+webcool::ai::agent_workspace_t::content_sha256(key+"\n"+std::to_string(i)) ||
+                string_field(child,"key")!="batch."+libai::ai::agent_workspace_t::content_sha256(key+"\n"+std::to_string(i)) ||
                 string_field(child,"name").empty()||!digest(string_field(child,"request_sha256"))||
                 !child.HasMember("callback_ok")||!child["callback_ok"].IsBool())throw std::invalid_argument("invalid batch child identity");
             const auto state=string_field(child,"state"),output=string_field(child,"output_sha256");
@@ -418,7 +418,7 @@ bool confirm_workspace_batch_child(const std::string &root,const std::string &ar
         auto field=[&](const char *name){if(!input.HasMember(name)||!input[name].IsString())throw std::invalid_argument("invalid batch confirmation string");
             std::string s(input[name].GetString(),input[name].GetStringLength());if(s.find('\0')!=std::string::npos)throw std::invalid_argument("NUL in batch confirmation");return s;};
         const auto key=field("idempotency_key"),revision=field("revision"),outcome=field("outcome"),reference=field("reference");
-        if(key.empty()||!webcool::ai::program_sandbox_t::valid_idempotency_key(key)||revision.empty()||reference.empty()||reference.size()>2048||
+        if(key.empty()||!libai::ai::program_sandbox_t::valid_idempotency_key(key)||revision.empty()||reference.empty()||reference.size()>2048||
             (outcome!="none"&&outcome!="applied"))throw std::invalid_argument("invalid batch confirmation identity");
         const auto &result=input["result"];
         if(outcome=="none") {if(!result.ObjectEmpty())throw std::invalid_argument("none batch result must be empty");}
@@ -426,7 +426,7 @@ bool confirm_workspace_batch_child(const std::string &root,const std::string &ar
             result["output_sha256"].GetStringLength()!=64||std::string(result["output_sha256"].GetString()).find_first_not_of("0123456789abcdef")!=std::string::npos||
             !result.HasMember("callback_ok")||!result["callback_ok"].IsBool())throw std::invalid_argument("invalid batch confirmed result");
         libai::file_execution_store_t store(root+"/.webcool_agent/tool_batches",libai::execution_file_codec_t::plaintext());
-        const auto scope="tool_batch_"+webcool::ai::agent_workspace_t::content_sha256(key);const auto snapshot=store.open(scope);
+        const auto scope="tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key);const auto snapshot=store.open(scope);
         if(snapshot.state_json.empty()||snapshot.revision!=revision)throw std::runtime_error("batch receipt revision conflict");
         validate_workspace_batch_receipt(snapshot.state_json,key);
         json::Document record;libai::governance_detail::parse_json_bounded(snapshot.state_json,record,32768);
@@ -435,7 +435,7 @@ bool confirm_workspace_batch_child(const std::string &root,const std::string &ar
         auto &child=record["children"][ordinal];const auto state=std::string(child["state"].GetString());
         if(state!="running"&&state!="returned")throw std::runtime_error("batch child is not awaiting host confirmation");
         std::vector<std::shared_ptr<libai::execution_store_t>> command_leases;
-        if(!webcool::ai::coding_detail::lock_command_children(root,record["project_path"].GetString(),child["key"].GetString(),outcome,command_leases,error))return false;
+        if(!libai::ai::coding_detail::lock_command_children(root,record["project_path"].GetString(),child["key"].GetString(),outcome,command_leases,error))return false;
         auto &allocator=record.GetAllocator();child["state"].SetString(outcome=="none"?"confirmed_none":"confirmed_applied",allocator);
         child.AddMember("reference",json::Value(reference.c_str(),static_cast<json::SizeType>(reference.size()),allocator),allocator);
         if(outcome=="none"){child["output_sha256"].SetString("",allocator);child["callback_ok"].SetBool(false);}
@@ -458,7 +458,7 @@ bool lock_workspace_batch_parent_receipt(const std::string &root,const std::stri
         const auto directory=root+"/.webcool_agent/tool_batches";struct stat info;
         if(stat(directory.c_str(),&info)!=0){if(errno==ENOENT)return true;throw std::runtime_error("cannot inspect batch children");}
         auto lease=std::make_shared<libai::file_execution_store_t>(directory,libai::execution_file_codec_t::plaintext());
-        const auto snapshot=lease->open("tool_batch_"+webcool::ai::agent_workspace_t::content_sha256(key));leases.push_back(lease);
+        const auto snapshot=lease->open("tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key));leases.push_back(lease);
         if(snapshot.state_json.empty())return true; // Legacy missing child log is not fabricated.
         if(validate_workspace_batch_receipt(snapshot.state_json,key))throw std::runtime_error("batch child requires host reconciliation");
         namespace json=libai::governance_detail::json;json::Document record;
@@ -467,7 +467,7 @@ bool lock_workspace_batch_parent_receipt(const std::string &root,const std::stri
             throw std::runtime_error("batch parent identity or count mismatch");
         for(const auto &child:record["children"].GetArray()) {
             const auto state=std::string(child["state"].GetString()),name=std::string(child["name"].GetString());
-            if(!webcool::ai::coding_detail::lock_command_children(root,project,child["key"].GetString(),outcome,leases,error))return false;
+            if(!libai::ai::coding_detail::lock_command_children(root,project,child["key"].GetString(),outcome,leases,error))return false;
             if(outcome=="none"&&!is_parallel_read_tool(name)&&state!="pending"&&state!="confirmed_none")
                 throw std::runtime_error("none parent receipt conflicts with batch child effects");
         }
@@ -484,7 +484,7 @@ bool inspect_workspace_batch_receipt(const std::string &root,const std::string &
 {
 #if defined(__unix__) || defined(__APPLE__)
     try {
-        if(key.empty()||!webcool::ai::program_sandbox_t::valid_idempotency_key(key))
+        if(key.empty()||!libai::ai::program_sandbox_t::valid_idempotency_key(key))
             throw std::invalid_argument("invalid batch inspection key");
         const auto directory=root+"/.webcool_agent/tool_batches";
         struct stat info;
@@ -493,7 +493,7 @@ bool inspect_workspace_batch_receipt(const std::string &root,const std::string &
             throw std::runtime_error("cannot inspect batch receipt directory");
         }
         libai::file_execution_store_t store(directory,libai::execution_file_codec_t::plaintext());
-        const auto snapshot=store.open("tool_batch_"+webcool::ai::agent_workspace_t::content_sha256(key));
+        const auto snapshot=store.open("tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key));
         out.add_bool("found",!snapshot.state_json.empty());
         if(snapshot.state_json.empty())return true;
         const bool unknown=validate_workspace_batch_receipt(snapshot.state_json,key);

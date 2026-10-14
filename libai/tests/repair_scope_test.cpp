@@ -1,7 +1,7 @@
 #include "../validation/repair_scope.h"
 #include "../validation/diagnostic_source.h"
 #include <cassert>
-using namespace webcool::ai;
+using namespace libai::ai;
 int main()
 {
 	assert(unique_diagnostic_source("server_test.go",

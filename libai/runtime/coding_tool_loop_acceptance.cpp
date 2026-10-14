@@ -14,7 +14,7 @@ bool coding_tool_loop_t::prepare_task_contract()
 {
 	if (runtime_task->text_preview || runtime_task->assistant_chat)
 		return true;
-	if (!webcool::ai::begin_task_contract(runtime_task->user_root,
+	if (!libai::ai::begin_task_contract(runtime_task->user_root,
 	        project_path, runtime_task->session_id, runtime_task->id,
 	        original_prompt,
 	        initial_completed_tool_calls > 0 ||
@@ -33,25 +33,25 @@ bool coding_tool_loop_t::prepare_task_contract()
 			continue;
 		recent.push_back(json_text((*request)["text"]));
 	}
-	if (!webcool::ai::read_only_analysis_task(original_prompt) &&
-	    !webcool::ai::verification_only_task(original_prompt)) {
+	if (!libai::ai::read_only_analysis_task(original_prompt) &&
+	    !libai::ai::verification_only_task(original_prompt)) {
 		unsigned long reports = 0;
 		const bool threshold_reached =
-		    webcool::ai::browser_repair_evidence_t::applies_history(
+		    libai::ai::browser_repair_evidence_t::applies_history(
 		        recent, browser_debug_report_threshold + 1, &reports);
 		const bool explicit_request =
-		    webcool::ai::browser_repair_evidence_t::requests_debug(
+		    libai::ai::browser_repair_evidence_t::requests_debug(
 		        original_prompt);
 		browser_evidence.enabled =
 		    explicit_request || threshold_reached;
-		std::lock_guard<webcool::mutex> lock(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> lock(g_agent_runtime_mutex);
 		runtime_task->browser_debug_retry_count =
 		    reports ? reports - 1 : 0;
 		runtime_task->browser_debug_confirmation_required =
 		    threshold_reached && !explicit_request &&
 		    !runtime_task->browser_debug_consent;
 	}
-	std::lock_guard<webcool::mutex> lock(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> lock(g_agent_runtime_mutex);
 	runtime_task->task_contract_json = task_contract;
 	runtime_task->task_acceptance_status = "pending_verification";
 	return true;
@@ -77,9 +77,9 @@ bool coding_tool_loop_t::run()
     const std::string lease_scope="coding_loop_"+(runtime_task->session_id.empty()?std::string("single"):runtime_task->session_id);
     if(!runtime_task->text_preview && !runtime_task->assistant_chat) {
         std::string project;
-        if(!webcool::ai::agent_workspace_t::resolve_project_state_root(runtime_task->user_root,project_path,project,err))return false;
-        const auto directory=webcool::ai::file_ops::join_path(project,".webcool_agent");
-        if(!webcool::ai::file_ops::make_private_directory(directory)) {
+        if(!libai::ai::agent_workspace_t::resolve_project_state_root(runtime_task->user_root,project_path,project,err))return false;
+        const auto directory=libai::ai::file_ops::join_path(project,".webcool_agent");
+        if(!libai::ai::file_ops::make_private_directory(directory)) {
             err="cannot prepare coding execution lease directory";return false;
         }
         try {
@@ -87,7 +87,7 @@ bool coding_tool_loop_t::run()
             const auto snapshot=execution_lease->open(lease_scope);
             // Reserved namespace: this scope owns only a lock, not a snapshot.
             if(!snapshot.state_json.empty()) {err="unexpected coding execution lease state";return false;}
-            std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+            std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
             if(runtime_task->retain_coding_worker_lease)runtime_task->coding_worker_lease=execution_lease;
         }catch(const std::exception &error){err=std::string("coding execution lease unavailable: ")+error.what();return false;}
     }
@@ -150,7 +150,7 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 		auto &options = undo.create_node();
 		options.add_text("undo", "all");
 		temporary_cleanup_failed = !cleanup_browser_style([&](const std::string &key) {
-			return webcool::ai::browser_debug_tool(runtime_task->user_root,
+			return libai::ai::browser_debug_tool(runtime_task->user_root,
 			    project_path, runtime_task->id, "browser.patch_style", "",
 			    serialize_json(options), key);
 		});
@@ -166,7 +166,7 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 	const bool current = !acceptance_report.empty() &&
 	    !acceptance_baseline.empty() &&
 	    acceptance_draft ==
-	        webcool::ai::agent_workspace_t::content_sha256(
+	        libai::ai::agent_workspace_t::content_sha256(
 	            staged_change_fingerprint(changes)) &&
 	    acceptance_baseline ==
 	        validation_baseline_fingerprint(workspace, project_path);
@@ -183,8 +183,8 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 	const bool compile_passed =
 	    valid && json_bool(report["compile_repair_completed"], false);
 	const bool compile_scope =
-	    webcool::ai::focused_compile_repair(original_prompt);
-	const std::string state = webcool::ai::task_acceptance_status(
+	    libai::ai::focused_compile_repair(original_prompt);
+	const std::string state = libai::ai::task_acceptance_status(
 	    current, executed, passed, compile_scope, compile_passed);
 	acl::json json;
 	auto &evidence = json.create_node();
@@ -195,7 +195,7 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 	evidence.add_bool("evidence_current_at_run_end", current);
 	evidence.add_bool("all_user_requirements_verified", false);
 	evidence.add_text("evidence_source", "runtime_fixed_validator");
-	bool browser_interaction_required = webcool::ai::needs_browser_interaction(original_prompt);
+	bool browser_interaction_required = libai::ai::needs_browser_interaction(original_prompt);
 	auto &coverage = json.create_array();
 	evidence.add_child("requirement_coverage", coverage);
 	acl::json contract(task_contract.c_str());
@@ -207,7 +207,7 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 		if (!request)
 			continue;
 		browser_interaction_required = browser_interaction_required ||
-		    webcool::ai::needs_browser_interaction(json_text((*request)["text"]));
+		    libai::ai::needs_browser_interaction(json_text((*request)["text"]));
 		auto &requirement = coverage.add_child(false, true);
 		requirement.add_text(
 		    "request_id", json_text((*request)["id"]).c_str());
@@ -254,7 +254,7 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 		evidence.add_text("browser_interaction_status",
 		    current && !browser_status.empty() ? browser_status.c_str() : "unverified");
 		evidence.add_text("direct_site_acceptance", "coverage_not_established");
-		summary += " " + webcool::ai::browser_evidence_summary(current, browser_status, chinese);
+		summary += " " + libai::ai::browser_evidence_summary(current, browser_status, chinese);
 	}
 	if (browser_evidence.enabled) {
 		refresh_browser_evidence();
@@ -283,13 +283,13 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 			edits.push_back(
 			    { change.operation + " " + change.path, "" });
 		}
-		completion_summary = webcool::ai::task_delivery_summary(
+		completion_summary = libai::ai::task_delivery_summary(
 		    original_prompt, edits, completion_summary, summary,
 		    chinese, requirement_progress_json);
 		memory_summary = summary + "\n" + memory_summary;
 	}
 	{
-		std::lock_guard<webcool::mutex> lock(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> lock(g_agent_runtime_mutex);
 		runtime_task->task_contract_json = task_contract;
 		runtime_task->task_acceptance_json =
 		    evidence.to_string().c_str();

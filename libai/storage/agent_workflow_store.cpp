@@ -20,17 +20,17 @@
 #include <fstream>
 #include <sys/stat.h>
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
 namespace
 {
 
-webcool::mutex g_workflow_mutex;
+libai::mutex g_workflow_mutex;
 const char *kHeader = "WEBCOOL_AGENT_WORKFLOW_V1";
 
-using ::webcool::ai::file_ops::join_path;
+using ::libai::ai::file_ops::join_path;
 
 bool valid_hex_id(const std::string &value)
 {
@@ -60,18 +60,18 @@ bool valid_token(const std::string &value, size_t maximum)
 	return true;
 }
 
-using ::webcool::ai::record_codec::hex_encode;
+using ::libai::ai::record_codec::hex_encode;
 
-using ::webcool::ai::record_codec::hex_value;
+using ::libai::ai::record_codec::hex_value;
 
 bool hex_decode(const std::string &value, std::string &output)
 {
 	if (!(value.size() % 2 != 0))
-		return ::webcool::ai::record_codec::hex_decode(value, output);
+		return ::libai::ai::record_codec::hex_decode(value, output);
 	return false;
 }
 
-using ::webcool::ai::record_codec::split_tabs;
+using ::libai::ai::record_codec::split_tabs;
 
 bool parse_number(const std::string &value, long long &parsed)
 {
@@ -171,7 +171,7 @@ bool ensure_directories(const std::string &root, std::string &err)
 	    ensure_one_directory(directory_path(root), err);
 }
 
-using ::webcool::ai::file_ops::replace_file;
+using ::libai::ai::file_ops::replace_file;
 
 bool remove_matching_files(const std::string &directory,
     const std::string &prefix, const std::string &contains, size_t &removed,
@@ -270,7 +270,7 @@ bool agent_workflow_store_t::save(
 		err = "invalid agent workflow checkpoint";
 		return ai_error("agent.workflow", "validate-save", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
+	std::lock_guard<libai::mutex> guard(g_workflow_mutex);
 	if (!ensure_directories(user_root_, err)) {
 		return ai_error("agent.workflow", "prepare-directory", err);
 	}
@@ -329,7 +329,7 @@ bool agent_workflow_store_t::load(const std::string &project,
 		err = "invalid agent workflow checkpoint identity";
 		return ai_error("agent.workflow", "validate-load", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
+	std::lock_guard<libai::mutex> guard(g_workflow_mutex);
 	record_json::input in(
 	    checkpoint_path(user_root_, project, session, task).c_str(),
 	    std::ios::in | std::ios::binary);
@@ -401,7 +401,7 @@ bool agent_workflow_store_t::remove(const std::string &project,
 		err = "invalid agent workflow checkpoint identity";
 		return ai_error("agent.workflow", "validate-remove", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
+	std::lock_guard<libai::mutex> guard(g_workflow_mutex);
 	if (!(::remove(checkpoint_path(user_root_, project, session, task)
 	                   .c_str()) != 0 &&
 	        errno != ENOENT))
@@ -419,7 +419,7 @@ bool agent_workflow_store_t::remove_for_project(
 		return ai_error(
 		    "agent.workflow", "validate-remove-project", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
+	std::lock_guard<libai::mutex> guard(g_workflow_mutex);
 	if (remove_matching_files(
 	        directory_path(user_root_), project + ".", "", removed, err))
 		return true;
@@ -434,7 +434,7 @@ bool agent_workflow_store_t::remove_for_session(
 		return ai_error(
 		    "agent.workflow", "validate-remove-session", err);
 	}
-	std::lock_guard<webcool::mutex> guard(g_workflow_mutex);
+	std::lock_guard<libai::mutex> guard(g_workflow_mutex);
 	if (remove_matching_files(directory_path(user_root_), "",
 	        "." + session + ".", removed, err))
 		return true;
@@ -442,4 +442,4 @@ bool agent_workflow_store_t::remove_for_session(
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

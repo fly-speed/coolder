@@ -15,7 +15,7 @@ std::string validation_repair_context(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     const std::vector<agent_change_proposal_t> &changes,
     const std::string &validation_result, size_t maximum_bytes,
-    const webcool::ai::completion_request_t *evidence)
+    const libai::ai::completion_request_t *evidence)
 {
 	// A compiler diagnostic often points at an unchanged dependent file rather
 	// than the files already present in `changes`. The old repair guard forbade a
@@ -46,7 +46,7 @@ std::string validation_repair_context(const std::string &user_root,
 			std::string normalized;
 			std::string normalize_err;
 			if (path.empty() ||
-			    !webcool::ai::agent_workspace_t::normalize_path(
+			    !libai::ai::agent_workspace_t::normalize_path(
 			        path, normalized, false, normalize_err))
 				continue;
 			if (!(std::find(diagnostic_paths.begin(),
@@ -61,7 +61,7 @@ std::string validation_repair_context(const std::string &user_root,
 	out << "\n<repair_source_context>\n";
 	size_t used = 0;
 	std::set<std::string> included;
-	webcool::ai::agent_workspace_t draft_workspace(
+	libai::ai::agent_workspace_t draft_workspace(
 	    persistent_draft_root(user_root, project_path, run_id));
 	std::vector<std::string> source_files;
 	if (std::any_of(diagnostic_paths.begin(), diagnostic_paths.end(),
@@ -69,13 +69,13 @@ std::string validation_repair_context(const std::string &user_root,
 		return path.find('/') == std::string::npos;
 	}))
 		source_files =
-		    webcool::ai::diagnostic_source_files(draft_workspace);
+		    libai::ai::diagnostic_source_files(draft_workspace);
 	for (auto &path : diagnostic_paths) {
 		if (!(path.find('/') == std::string::npos))
 			continue;
 
 		const auto resolved =
-		    webcool::ai::unique_diagnostic_source(path, source_files);
+		    libai::ai::unique_diagnostic_source(path, source_files);
 		if (resolved.empty())
 			continue;
 		path = resolved;
@@ -96,9 +96,9 @@ std::string validation_repair_context(const std::string &user_root,
 		    diagnostic_paths[i] :
 		    project_path + "/" + diagnostic_paths[i];
 		if (evidence &&
-		    (webcool::ai::request_has_source(
+		    (libai::ai::request_has_source(
 		         *evidence, display_path, content) ||
-		        webcool::ai::request_has_source(
+		        libai::ai::request_has_source(
 		            *evidence, diagnostic_paths[i], content))) {
 			included.insert(display_path);
 			continue;
@@ -120,15 +120,15 @@ std::string validation_repair_context(const std::string &user_root,
 			    changes[i].content.empty() ||
 			    changes[i].review_status == "rejected" ||
 			    included.find(changes[i].path) != included.end() ||
-			    webcool::ai::staged_interface_path(
+			    libai::ai::staged_interface_path(
 			        changes[i].path) != (priority == 0))
 				continue;
 			if (evidence &&
-			    (webcool::ai::request_has_source(*evidence,
+			    (libai::ai::request_has_source(*evidence,
 			         changes[i].path, changes[i].content) ||
 			        (workspace_path_is_below(
 			             changes[i].path, project_path) &&
-			            webcool::ai::request_has_source(*evidence,
+			            libai::ai::request_has_source(*evidence,
 			                changes[i].path.substr(
 			                    project_path.size() + 1),
 			                changes[i].content))))
@@ -151,8 +151,8 @@ std::string validation_repair_context(const std::string &user_root,
 	return out.str();
 }
 
-static void merge_reviewed_progress(webcool::ai::agent_progress_t &progress,
-    const webcool::ai::agent_result_t &reviewed_result)
+static void merge_reviewed_progress(libai::ai::agent_progress_t &progress,
+    const libai::ai::agent_result_t &reviewed_result)
 {
 	for (size_t i = 0; i < progress.staged_changes.size(); ++i) {
 		for (size_t j = 0; j < reviewed_result.changes.size(); ++j) {
@@ -177,9 +177,9 @@ static void merge_reviewed_progress(webcool::ai::agent_progress_t &progress,
 // mutex; disk reads and checkpoint writes remain outside this critical section.
 static void publish_progress_reviews(
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
-    const webcool::ai::agent_progress_t &progress)
+    const libai::ai::agent_progress_t &progress)
 {
-	std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+	std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 	for (size_t i = 0; i < runtime_task->changes.size(); ++i) {
 		for (size_t j = 0; j < progress.staged_changes.size(); ++j) {
 			if (!(runtime_task->changes[i].path ==
@@ -196,8 +196,8 @@ static void publish_progress_reviews(
 	}
 }
 
-bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
-    const webcool::ai::provider_config_t &provider,
+bool save_coding_progress(libai::ai::agent_progress_store_t &store,
+    const libai::ai::provider_config_t &provider,
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
     const std::string &project_path, const std::string &original_prompt,
     const std::string &transcript, const std::string &reasoning,
@@ -206,7 +206,7 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 {
 	if (runtime_task->text_preview)
 		return true;
-	webcool::ai::agent_progress_t progress;
+	libai::ai::agent_progress_t progress;
 	progress.source_run_id = runtime_task->id;
 	progress.execution_revision = runtime_task->coding_execution_revision;
 	progress.provider_id = provider.id;
@@ -220,7 +220,7 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 	progress.completed_tool_calls = completed_tool_calls;
 	progress.updated_at = static_cast<long long>(time(NULL));
 	{
-		std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
 		progress.tool_effects = runtime_task->tool_effects;
 		progress.validation_receipt = runtime_task->validation_receipt;
 		progress.staged_changes = runtime_task->changes;
@@ -230,7 +230,7 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 		    runtime_task->provider_response_pending;
 		for (size_t i = 0;
 		     i < runtime_task->provider_tool_outputs.size(); ++i) {
-			webcool::ai::agent_progress_tool_output_t output;
+			libai::ai::agent_progress_tool_output_t output;
 			output.call_id =
 			    runtime_task->provider_tool_outputs[i].call_id;
 			output.output =
@@ -242,9 +242,9 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 	// provider request. The result artifact is the authoritative review ledger;
 	// merge matching immutable generations before writing a checkpoint so a stale
 	// in-memory `pending` value cannot resurrect after restart/resume.
-	webcool::ai::agent_result_store_t result_store(
+	libai::ai::agent_result_store_t result_store(
 	    runtime_task->user_root, project_path);
-	webcool::ai::agent_result_t reviewed_result;
+	libai::ai::agent_result_t reviewed_result;
 	bool reviewed_found = false;
 	std::string reviewed_err;
 	if (result_store.load(runtime_task->id, reviewed_result, reviewed_found,
@@ -255,7 +255,7 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
 		// publish in this process could temporarily repaint accepted files pending.
 		publish_progress_reviews(runtime_task, progress);
 	} else if (!reviewed_err.empty()) {
-		webcool::ai::ai_log_error("agent.runtime",
+		libai::ai::ai_log_error("agent.runtime",
 		    "load-review-state-for-progress", reviewed_err);
 	}
     if(!complete_effect.empty()) {
@@ -266,7 +266,7 @@ bool save_coding_progress(webcool::ai::agent_progress_store_t &store,
     }
     if(!store.save(progress,err))return false;
     if(!complete_effect.empty()) {
-        std::lock_guard<webcool::mutex> guard(g_agent_runtime_mutex);
+        std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
         runtime_task->tool_effects=progress.tool_effects;
     }
     return true;
@@ -280,7 +280,7 @@ std::string compact_coding_transcript(const std::string &original_prompt,
 	// Reserve current draft source separately so old history cannot evict newly
 	// generated interfaces. Rebuild it on every compaction from current changes.
 	const std::string records =
-	    webcool::ai::staged_source_records(changes, 32 * 1024);
+	    libai::ai::staged_source_records(changes, 32 * 1024);
 	const std::string staged = records == "[]" ?
 	    "" :
 	    std::string(prompt_text(prompt_id::staged_source_pages, chinese)) +
@@ -288,7 +288,7 @@ std::string compact_coding_transcript(const std::string &original_prompt,
 	const size_t history_limit = kMaxToolTranscriptBytes - staged.size();
 	std::ostringstream out;
 	std::string bounded_prompt =
-	    webcool::ai::utf8_prefix(original_prompt, 24 * 1024);
+	    libai::ai::utf8_prefix(original_prompt, 24 * 1024);
 	out << bounded_prompt << "\n\n<context_compaction>\n"
 	    << prompt_text(prompt_id::retained_source_pages, chinese)
 	    << prompt_text(prompt_id::compacted_source_pages, chinese)

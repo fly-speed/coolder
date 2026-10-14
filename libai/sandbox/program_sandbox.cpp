@@ -33,7 +33,7 @@
 #endif
 #endif
 
-namespace webcool
+namespace libai
 {
 namespace ai
 {
@@ -719,4 +719,4 @@ bool program_sandbox_t::execute(const sandbox_request_t &request,
 }
 
 } // namespace ai
-} // namespace webcool
+} // namespace libai

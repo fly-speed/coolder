@@ -12,7 +12,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-using namespace webcool::ai;
+using namespace libai::ai;
 // Verify provider usage accounting and task acceptance semantics.
 static void test_usage_and_acceptance()
 {
