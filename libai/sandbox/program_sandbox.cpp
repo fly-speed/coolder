@@ -77,7 +77,7 @@ bool canonical_existing_directory(
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		err = "cannot encode sandbox directory path";
 		return false;
 	}
@@ -96,7 +96,7 @@ bool canonical_existing_directory(
 	if (attributes == INVALID_FILE_ATTRIBUTES ||
 	    (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 ||
 	    (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ||
-	    !webcool_wide_to_utf8(&full[0], canonical)) {
+	    !libai_wide_to_utf8(&full[0], canonical)) {
 		err =
 		    "sandbox directory is missing, unsafe, or not a directory";
 		return false;
@@ -149,7 +149,7 @@ void close_fd(int &fd)
 bool ensure_sandbox_temp_directory(
     const std::string &workdir, std::string &temp_directory, std::string &err)
 {
-	temp_directory = workdir + "/.webcool-sandbox-tmp";
+	temp_directory = workdir + "/.libai-sandbox-tmp";
 	struct stat st;
 	if (lstat(temp_directory.c_str(), &st) != 0) {
 		if (errno != ENOENT ||
@@ -221,7 +221,7 @@ std::string adjacent_helper_path()
 	const size_t slash = executable.rfind('/');
 	return slash == std::string::npos ?
 	    "" :
-	    executable.substr(0, slash + 1) + "webcool-sandbox-helper";
+	    executable.substr(0, slash + 1) + "libai-sandbox-helper";
 }
 
 bool mac_process_tree_exceeds(pid_t root, unsigned long limit)
@@ -264,12 +264,12 @@ std::string adjacent_helper_path()
 	const size_t slash = executable.rfind('/');
 	return slash == std::string::npos ?
 	    "" :
-	    executable.substr(0, slash + 1) + "webcool-sandbox-helper";
+	    executable.substr(0, slash + 1) + "libai-sandbox-helper";
 }
 
 void cleanup_linux_cgroup(pid_t helper_pid)
 {
-	const std::string path = "/sys/fs/cgroup/webcool/run-" +
+	const std::string path = "/sys/fs/cgroup/libai/run-" +
 	    std::to_string(static_cast<unsigned long long>(helper_pid));
 	const int kill_fd =
 	    open((path + "/cgroup.kill").c_str(), O_WRONLY | O_CLOEXEC);
@@ -299,9 +299,9 @@ std::string adjacent_helper_path()
 	if (slash == std::wstring::npos)
 		return "";
 	const std::wstring helper =
-	    executable.substr(0, slash + 1) + L"webcool-sandbox-helper.exe";
+	    executable.substr(0, slash + 1) + L"libai-sandbox-helper.exe";
 	std::string utf8;
-	return webcool_wide_to_utf8(helper.c_str(), utf8) ? utf8 : "";
+	return libai_wide_to_utf8(helper.c_str(), utf8) ? utf8 : "";
 }
 
 bool windows_absolute_path(const std::string &path)
@@ -393,13 +393,13 @@ bool program_sandbox_t::browser_runtime_available(
 {
 	reason.clear();
 #if defined(_WIN32)
-	// Windows packages place browser assets beside webcool.exe. The browser
+	// Windows packages place browser assets beside libai.exe. The browser
 	// distribution does not depend on the separate project sandbox helper.
 	std::wstring directory =
 	    windows_browser_runtime::application_directory();
 	if (!helper_executable.empty()) {
 		std::wstring anchor;
-		if (!webcool_utf8_path_to_wide(
+		if (!libai_utf8_path_to_wide(
 		        helper_executable.c_str(), anchor)) {
 			reason = "cannot encode browser installation path";
 			return false;
@@ -567,7 +567,7 @@ bool program_sandbox_t::resolve_request(const sandbox_request_t &request,
 	}
 #else
 	std::wstring executable_wide;
-	if (!webcool_utf8_path_to_wide(
+	if (!libai_utf8_path_to_wide(
 	        command->executable.c_str(), executable_wide)) {
 		err = "cannot encode sandbox executable path";
 		return false;
@@ -668,19 +668,19 @@ bool program_sandbox_t::backend_available(std::string &reason)
 	if (access("/proc/self/ns/user", R_OK) == 0 &&
 	    access("/proc/self/ns/mnt", R_OK) == 0 &&
 	    access("/sys/fs/cgroup/cgroup.controllers", R_OK) == 0 &&
-	    access("/sys/fs/cgroup/webcool", W_OK) == 0)
+	    access("/sys/fs/cgroup/libai", W_OK) == 0)
 		return true;
 	reason = "Linux sandbox requires namespaces and a delegated writable "
-	         "/sys/fs/cgroup/webcool cgroup v2 directory";
+	         "/sys/fs/cgroup/libai cgroup v2 directory";
 #elif defined(_WIN32)
 	// Restricted Token + Job Object containment is implemented in the helper,
-	// but a shared WebCool service account still needs a per-WebCool-user
+	// but a shared LibAI service account still needs a per-LibAI-user
 	// AppContainer/ACL capability before project code can be allowed to run.
 	reason =
 	    "Windows sandbox is fail-closed until per-user AppContainer ACL "
 	    "confinement passes Windows integration tests";
 #else
-	reason = "this operating system has no WebCool sandbox backend";
+	reason = "this operating system has no LibAI sandbox backend";
 #endif
 	return false;
 }

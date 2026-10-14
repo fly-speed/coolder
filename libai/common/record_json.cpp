@@ -1,5 +1,6 @@
 #include "record_json.h"
 #include "record_codec.h"
+#include "legacy_branding.h"
 #include "json_value.h"
 #include <map>
 #include <vector>
@@ -15,7 +16,7 @@ namespace
 using specs = std::vector<std::string>;
 // h=decoded UTF-8 text, n=nonnegative integer, b=boolean, s=literal text.
 const std::map<std::string, specs> tables = {
-	{ "WEBCOOL_AGENT_RUNS_V2",
+	{ "LIBAI_AGENT_RUNS_V2",
 	    { "h:id", "h:agent_id", "h:agent_version", "h:status",
 	        "h:provider_id", "h:model", "h:project_path", "n:started_at",
 	        "n:finished_at", "n:input_tokens", "n:output_tokens",
@@ -23,28 +24,28 @@ const std::map<std::string, specs> tables = {
 	        "n:rejected_changes", "h:error", "n:cached_input_tokens",
 	        "n:reasoning_tokens", "h:provider_error_category",
 	        "n:provider_http_status", "b:provider_error_retryable" } },
-	{ "WEBCOOL_AGENT_SESSIONS_V6",
+	{ "LIBAI_AGENT_SESSIONS_V6",
 	    { "h:id", "h:title", "h:agent_id", "h:provider_id",
 	        "h:project_path", "h:summary", "h:messages", "h:last_run_id",
 	        "n:created_at", "n:updated_at", "n:turn_count" } },
-	{ "WEBCOOL_AGENT_PROJECTS_V1/P",
+	{ "LIBAI_AGENT_PROJECTS_V1/P",
 	    { "s:type", "h:id", "h:title", "h:project_path", "h:language",
 	        "h:platform", "h:goal", "h:status", "n:created_at",
 	        "n:updated_at", "n:plan_version" } },
-	{ "WEBCOOL_AGENT_PROJECTS_V1/M",
+	{ "LIBAI_AGENT_PROJECTS_V1/M",
 	    { "s:type", "h:project_id", "h:id", "h:name", "h:layer", "h:path",
 	        "h:dependencies" } },
-	{ "WEBCOOL_AGENT_PROJECTS_V1/T",
+	{ "LIBAI_AGENT_PROJECTS_V1/T",
 	    { "s:type", "h:project_id", "h:id", "h:title", "h:module_id",
 	        "h:status", "h:dependencies", "h:acceptance_criteria",
 	        "h:test_plan" } },
-	{ "WEBCOOL_AGENT_WORKFLOW_V1/H",
+	{ "LIBAI_AGENT_WORKFLOW_V1/H",
 	    { "s:type", "s:project_id", "s:session_id", "s:task_id",
 	        "s:failed_exit_code", "n:updated_at", "h:failed_command_id" } },
-	{ "WEBCOOL_AGENT_WORKFLOW_V1/Q", { "s:type", "h:command_id" } },
-	{ "WEBCOOL_AGENT_WORKFLOW_V1/D",
+	{ "LIBAI_AGENT_WORKFLOW_V1/Q", { "s:type", "h:command_id" } },
+	{ "LIBAI_AGENT_WORKFLOW_V1/D",
 	    { "s:type", "h:path", "n:line", "n:column", "s:severity" } },
-	{ "WEBCOOL_AI_PROVIDERS_V1",
+	{ "LIBAI_AI_PROVIDERS_V1",
 	    { "h:id", "h:name", "h:protocol", "h:base_url", "h:model",
 	        "h:api_key_ciphertext", "h:api_key_hint", "b:enabled",
 	        "b:allow_file_content", "b:is_default", "b:responses_store",
@@ -54,39 +55,39 @@ const std::map<std::string, specs> tables = {
 	        "h:responses_service_tier", "h:responses_cache_ttl",
 	        "h:openai_organization", "h:openai_project",
 	        "b:qwen_session_cache", "h:model_profile_json" } },
-	{ "WEBCOOL_AI_PROVIDER_HEALTH_V1",
+	{ "LIBAI_AI_PROVIDER_HEALTH_V1",
 	    { "h:id", "h:last_test_status", "n:last_test_at",
 	        "n:last_test_http_status", "n:last_test_latency_ms",
 	        "h:last_test_error" } },
-	{ "WEBCOOL_WORKSPACE_PATCH_V1",
+	{ "LIBAI_WORKSPACE_PATCH_V1",
 	    { "n:created_at", "s:id", "h:path", "s:original_sha256",
 	        "s:proposed_sha256", "h:content" } },
-	{ "WEBCOOL_AGENT_CHECKPOINT_V1", { "s:ciphertext" } },
-	{ "WEBCOOL_SANDBOX_PLAN_V1/H",
+	{ "LIBAI_AGENT_CHECKPOINT_V1", { "s:ciphertext" } },
+	{ "LIBAI_SANDBOX_PLAN_V1/H",
 	    { "s:type", "n:created_at", "s:id", "h:project_path",
 	        "h:command_id", "h:executable", "n:argument_count" } },
-	{ "WEBCOOL_SANDBOX_PLAN_V1/A", { "s:type", "h:argument" } },
-	{ "WEBCOOL_WORKSPACE_CHANGE_SET_V2/H",
+	{ "LIBAI_SANDBOX_PLAN_V1/A", { "s:type", "h:argument" } },
+	{ "LIBAI_WORKSPACE_CHANGE_SET_V2/H",
 	    { "s:type", "n:created_at", "s:id", "n:change_count" } },
-	{ "WEBCOOL_WORKSPACE_CHANGE_SET_V2/C",
+	{ "LIBAI_WORKSPACE_CHANGE_SET_V2/C",
 	    { "s:type", "s:operation", "h:path", "h:target_path",
 	        "b:creates_file", "s:original_sha256", "s:proposed_sha256",
 	        "h:reason", "h:content" } },
-	{ "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V2/H",
+	{ "LIBAI_WORKSPACE_CHANGE_JOURNAL_V2/H",
 	    { "s:type", "s:id", "n:change_count" } },
-	{ "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V2/C",
+	{ "LIBAI_WORKSPACE_CHANGE_JOURNAL_V2/C",
 	    { "s:type", "s:operation", "h:path", "h:target_path",
 	        "b:creates_file", "s:original_sha256", "s:proposed_sha256",
 	        "s:original_content_hex" } },
-	{ "WEBCOOL_AGENT_PROJECT_INDEX_V1/H",
+	{ "LIBAI_AGENT_PROJECT_INDEX_V1/H",
 	    { "s:type", "h:project_id", "h:project_path", "n:revision",
 	        "n:indexed_at", "n:directory_count",
 	        "n:skipped_directory_count", "n:changed_file_count",
 	        "b:truncated" } },
-	{ "WEBCOOL_AGENT_PROJECT_INDEX_V1/E",
+	{ "LIBAI_AGENT_PROJECT_INDEX_V1/E",
 	    { "s:type", "h:path", "h:module_id", "h:kind", "h:language",
 	        "n:size", "n:modified_at" } },
-	{ "WEBCOOL_AGENT_PROJECT_INDEX_V1/S",
+	{ "LIBAI_AGENT_PROJECT_INDEX_V1/S",
 	    { "s:type", "h:path", "n:line", "h:kind", "h:text" } },
 	{ "EXTERNAL_PROJECT_ROOTS", { "h:path", "h:external" } }
 };
@@ -101,11 +102,11 @@ std::vector<std::string> lines(const std::string &value)
 }
 bool multiline(const std::string &format)
 {
-	return format == "WEBCOOL_WORKSPACE_PATCH_V1" ||
-	    format == "WEBCOOL_AGENT_CHECKPOINT_V1" ||
-	    format == "WEBCOOL_SANDBOX_PLAN_V1" ||
-	    format == "WEBCOOL_WORKSPACE_CHANGE_SET_V2" ||
-	    format == "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V2";
+	return format == "LIBAI_WORKSPACE_PATCH_V1" ||
+	    format == "LIBAI_AGENT_CHECKPOINT_V1" ||
+	    format == "LIBAI_SANDBOX_PLAN_V1" ||
+	    format == "LIBAI_WORKSPACE_CHANGE_SET_V2" ||
+	    format == "LIBAI_WORKSPACE_CHANGE_JOURNAL_V2";
 }
 std::vector<std::vector<std::string>> split_records(
     const std::string &format, const std::vector<std::string> &source)
@@ -119,24 +120,24 @@ std::vector<std::vector<std::string>> split_records(
 		}
 		return result;
 	}
-	if (format == "WEBCOOL_WORKSPACE_PATCH_V1" ||
-	    format == "WEBCOOL_AGENT_CHECKPOINT_V1") {
+	if (format == "LIBAI_WORKSPACE_PATCH_V1" ||
+	    format == "LIBAI_AGENT_CHECKPOINT_V1") {
 		result.push_back(source);
 		return result;
 	}
-	const size_t head = format == "WEBCOOL_SANDBOX_PLAN_V1" ?
+	const size_t head = format == "LIBAI_SANDBOX_PLAN_V1" ?
 	    6 :
-	    (format == "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V2" ? 2 : 3);
-	const size_t width = format == "WEBCOOL_SANDBOX_PLAN_V1" ?
+	    (format == "LIBAI_WORKSPACE_CHANGE_JOURNAL_V2" ? 2 : 3);
+	const size_t width = format == "LIBAI_SANDBOX_PLAN_V1" ?
 	    1 :
-	    (format == "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V2" ? 7 : 8);
+	    (format == "LIBAI_WORKSPACE_CHANGE_JOURNAL_V2" ? 7 : 8);
 	if (source.size() < head || (source.size() - head) % width != 0)
 		throw std::runtime_error("invalid multiline record");
 	std::vector<std::string> row{ "H" };
 	row.insert(row.end(), source.begin(), source.begin() + head);
 	result.push_back(row);
 	for (size_t i = head; i < source.size(); i += width) {
-		row = { format == "WEBCOOL_SANDBOX_PLAN_V1" ? "A" : "C" };
+		row = { format == "LIBAI_SANDBOX_PLAN_V1" ? "A" : "C" };
 		row.insert(
 		    row.end(), source.begin() + i, source.begin() + i + width);
 		result.push_back(row);
@@ -216,7 +217,7 @@ std::vector<std::string> decode_fields(
 	if (found == tables.end())
 		throw std::runtime_error("unknown record JSON schema");
 	for (const auto &spec : found->second) {
-		if (format=="WEBCOOL_AI_PROVIDERS_V1" && spec=="h:model_profile_json" && !row["model_profile_json"])
+		if (format=="LIBAI_AI_PROVIDERS_V1" && spec=="h:model_profile_json" && !row["model_profile_json"])
 			fields.push_back(record_codec::hex_encode("{\"version\":1}"));
 		else fields.push_back(decode_cell(row, spec));
 	}
@@ -228,13 +229,13 @@ std::string encode_master_key(const std::string &text)
 	acl::json json;
 	auto &root = json.create_node();
 	root.add_number("version", 1)
-	    .add_text("format", "WEBCOOL_AI_MASTER_KEY_V2");
+	    .add_text("format", "LIBAI_AI_MASTER_KEY_V2");
 	if (source.size() == 1)
 		root.add_text("active", source[0].c_str())
 		    .add_text("secondary", "")
 		    .add_text("phase", "");
 	else if (source.size() == 4 &&
-	    source[0] == "WEBCOOL_AI_MASTER_KEY_V2") {
+	    source[0] == "LIBAI_AI_MASTER_KEY_V2") {
 		for (size_t i = 1; i < source.size(); ++i) {
 			const auto at = source[i].find('=');
 			if (at == std::string::npos)
@@ -249,8 +250,9 @@ std::string encode_master_key(const std::string &text)
 }
 
 }
-std::string encode(const std::string &text, const std::string &path)
+std::string encode(const std::string &original, const std::string &path)
 {
+	const std::string text=legacy_branding::canonical_record(original);
 	if (path.size() >= 11 &&
 	    path.substr(path.size() - 11) == "preferences") {
 		auto source = lines(text);
@@ -293,7 +295,7 @@ std::string encode(const std::string &text, const std::string &path)
 	if (path.find("external-project-roots.v1") != std::string::npos)
 		format = "EXTERNAL_PROJECT_ROOTS";
 	else {
-		if (source.empty() || source[0].compare(0, 8, "WEBCOOL_") != 0)
+		if (source.empty() || source[0].compare(0, 6, "LIBAI_") != 0)
 			throw std::runtime_error(
 			    "unknown structured record format");
 		format = source[0];
@@ -324,7 +326,7 @@ std::string decode(const std::string &text)
 {
 	if (text.find_first_not_of(" \t\r\n") == std::string::npos ||
 	    text[text.find_first_not_of(" \t\r\n")] != '{')
-		return text;
+		return legacy_branding::canonical_record(text);
 	acl::json json(text.c_str());
 	if (!json.finish() || !json.get_root().is_object())
 		throw std::runtime_error("invalid record JSON");
@@ -355,8 +357,8 @@ std::string decode(const std::string &text)
 		}
 		return policy.str();
 	}
-	if (json_value::string_text(json["format"]) ==
-	    "WEBCOOL_AI_MASTER_KEY_V2") {
+	if (legacy_branding::canonical_label(json_value::string_text(json["format"])) ==
+	    "LIBAI_AI_MASTER_KEY_V2") {
 		if (json_value::number(json["version"]) != 1)
 			throw std::runtime_error(
 			    "unsupported master key JSON version");
@@ -365,13 +367,13 @@ std::string decode(const std::string &text)
 		               json_value::string_text(json["secondary"]);
 		if (secondary.empty())
 			return active + "\n";
-		return "WEBCOOL_AI_MASTER_KEY_V2\nactive=" + active +
+		return "LIBAI_AI_MASTER_KEY_V2\nactive=" + active +
 		    "\nsecondary=" + secondary +
 		    "\nphase=" + json_value::string_text(json["phase"]) + "\n";
 	}
 	if (json_value::number(json["version"]) != 1)
 		throw std::runtime_error("invalid record JSON version");
-	const auto format = json_value::string_text(json["format"]);
+	const auto format = legacy_branding::canonical_label(json_value::string_text(json["format"]));
 	auto *records = json_value::array_value(json["records"]);
 	if (format.empty() || !records)
 		throw std::runtime_error("invalid record JSON schema");

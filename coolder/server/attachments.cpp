@@ -66,7 +66,7 @@ bool safe_name(const std::string &name)
 fs::path attachment_root(const account_t &account)
 {
 	fs::path root = account_workspace(account);
-	for (const auto *name : { ".webcool_agent", "attachments" }) {
+	for (const auto *name : { ".libai_agent", "attachments" }) {
 		root /= name;
 		if (fs::is_symlink(fs::symlink_status(root))) {
 			throw std::runtime_error("unsafe attachment directory");
@@ -103,12 +103,12 @@ bool attachment_route(
 	if (discard) {
 		const auto draft = text((*body)["attachment_draft"]);
 		if (draft.size() !=
-		        std::string(".webcool_agent/attachments/draft-")
+		        std::string(".libai_agent/attachments/draft-")
 		                .size() +
 		            24 ||
 		    draft.compare(0,
-		        std::string(".webcool_agent/attachments/draft-").size(),
-		        ".webcool_agent/attachments/draft-") != 0 ||
+		        std::string(".libai_agent/attachments/draft-").size(),
+		        ".libai_agent/attachments/draft-") != 0 ||
 		    draft.substr(draft.size() - 24)
 		            .find_first_not_of("0123456789abcdef") !=
 		        std::string::npos) {
@@ -131,7 +131,7 @@ bool attachment_route(
 		return fail(res, 500, "cannot create attachment draft");
 	}
 	const std::string draft =
-	    ".webcool_agent/attachments/draft-" + id.substr(0, 24);
+	    ".libai_agent/attachments/draft-" + id.substr(0, 24);
 	const auto path = root / fs::path(draft).filename();
 	if (!fs::create_directory(path)) {
 		return fail(res, 500, "cannot create attachment draft");

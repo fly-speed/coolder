@@ -1,12 +1,12 @@
 'use strict';
 
-// Runtime and workers are copied from webcool's vendored Monaco 0.55.1.
+// Bundled Monaco 0.55.1 runtime and workers are served locally.
 const codeEditors = { runtime: null, viewer: null, viewModel: null, sequence: 0, editing: null };
 function loadMonaco() {
   if (codeEditors.runtime) return codeEditors.runtime;
   const root = '/vendor/monaco-editor/vs';
   const locale = { zh: 'zh-cn', ja: 'ja', ko: 'ko' }[i18n.language] || 'en';
-  window.__webcoolMonacoAmdConfig = {
+  window.__libaiMonacoAmdConfig = {
     paths: {
       vs: root,
       'vs/nls.messages.ja': root + '/nls.messages.ja.js',

@@ -1,3 +1,4 @@
+#include "../common/legacy_branding.h"
 #include "stdafx.h"
 #include "project_toolchain.h"
 #include "../workspace/agent_workspace.h"
@@ -41,7 +42,7 @@ void discover_git_commands(const std::string &normalized,
 			"/usr/bin/git", "/usr/local/bin/git"
 		};
 		const std::string git =
-		    administrator_executable("WEBCOOL_AI_GIT", git_paths, 4);
+		    administrator_executable("LIBAI_AI_GIT", git_paths, 4);
 #ifdef _WIN32
 		const char *disabled_hooks_path = "NUL";
 #else
@@ -76,13 +77,13 @@ void discover_git_commands(const std::string &normalized,
 		add_fixed_command(result, "git.branch-create", git,
 		    std::vector<std::string>{ "--no-pager", "-c",
 		        std::string("core.hooksPath=") + disabled_hooks_path,
-		        "checkout", "-b", "webcool-agent-work" });
+		        "checkout", "-b", "libai-agent-work" });
 		add_fixed_command(result, "git.checkpoint-tracked", git,
 		    std::vector<std::string>{ "--no-pager", "-c",
-		        "user.name=WebCool Agent", "-c",
-		        "user.email=webcool-agent@localhost", "-c",
+		        "user.name=LibAI Agent", "-c",
+		        "user.email=libai-agent@localhost", "-c",
 		        std::string("core.hooksPath=") + disabled_hooks_path,
-		        "commit", "-am", "WebCool agent checkpoint" });
+		        "commit", "-am", "LibAI agent checkpoint" });
 	}
 }
 
@@ -101,8 +102,12 @@ static void infer_cmake_service(
 	for (std::sregex_iterator it(source.begin(), source.end(), target), end;
 	     it != end; ++it) {
 		const std::string name = (*it)[1];
-		if (name == "webcool_app")
-			standard = true;
+		if (name == "libai_app" || name == legacy_branding::old_identifier("libai_app")) {
+            standard=true;service_relative=".libai-build/"+name;
+#ifdef _WIN32
+            service_relative+=".exe";
+#endif
+        }
 		if (!(name == "server" || name == "http_server" ||
 		        (name.size() > 4 &&
 		            name.substr(name.size() - 4) == "_web")))
@@ -110,7 +115,7 @@ static void infer_cmake_service(
 		candidates.insert(name);
 	}
 	if (!standard && candidates.size() == 1) {
-		service_relative = ".webcool-build/" + *candidates.begin();
+		service_relative = ".libai-build/" + *candidates.begin();
 #ifdef _WIN32
 		service_relative += ".exe";
 #endif
@@ -131,7 +136,7 @@ bool discover_cmake_commands(agent_workspace_t &workspace,
 		"/opt/homebrew/bin/ctest", "/usr/local/bin/ctest" };
 	const std::string native_prefix = c_project ? "c" : "cpp";
 	std::vector<std::string> configure_args{ "-S", ".", "-B",
-		".webcool-build", "-DCMAKE_BUILD_TYPE=Debug" };
+		".libai-build", "-DCMAKE_BUILD_TYPE=Debug" };
 #ifdef __APPLE__
 	// Use installed compiler binaries directly: /usr/bin compiler/make shims
 	// invoke xcrun and attempt to write outside the private build directory.
@@ -158,12 +163,12 @@ bool discover_cmake_commands(agent_workspace_t &workspace,
 	}
 #endif
 	add_fixed_command(result, native_prefix + ".cmake.configure",
-	    administrator_executable("WEBCOOL_AI_CMAKE", cmake_paths, 3),
+	    administrator_executable("LIBAI_AI_CMAKE", cmake_paths, 3),
 	    configure_args);
 	add_fixed_command(result, native_prefix + ".cmake.build",
-	    administrator_executable("WEBCOOL_AI_CMAKE", cmake_paths, 3),
+	    administrator_executable("LIBAI_AI_CMAKE", cmake_paths, 3),
 	    std::vector<std::string>{
-	        "--build", ".webcool-build", "--parallel", "2" });
+	        "--build", ".libai-build", "--parallel", "2" });
 	for (auto &command : result.commands) {
 		if (!(command.id == native_prefix + ".cmake.configure" ||
 		        command.id == native_prefix + ".cmake.build"))
@@ -171,21 +176,21 @@ bool discover_cmake_commands(agent_workspace_t &workspace,
 		command.allow_outbound_network = policy.allow_build_network;
 	}
 	add_fixed_command(result, native_prefix + ".ctest",
-	    administrator_executable("WEBCOOL_AI_CTEST", ctest_paths, 3),
+	    administrator_executable("LIBAI_AI_CTEST", ctest_paths, 3),
 	    std::vector<std::string>{
-	        "--test-dir", ".webcool-build", "--output-on-failure" });
+	        "--test-dir", ".libai-build", "--output-on-failure" });
 	if (!http_service)
 		return true;
 #ifdef _WIN32
-	const std::string service_name = "webcool_app.exe";
+	const std::string service_name = "libai_app.exe";
 #else
-	const std::string service_name = "webcool_app";
+	const std::string service_name = "libai_app";
 #endif
-	std::string service_relative = ".webcool-build/" + service_name;
+	std::string service_relative = ".libai-build/" + service_name;
 	std::string marker, marker_error;
 	bool truncated = false;
 	const std::string prefix = normalized.empty() ? "" : normalized + "/";
-	if (workspace.read(prefix + ".webcool-http-service", marker, truncated,
+	if (workspace.read(prefix + ".libai-http-service", marker, truncated,
 	        marker_error) &&
 	    !truncated) {
 		const size_t first = marker.find_first_not_of(" \r\n\t");
@@ -226,9 +231,9 @@ void discover_make_commands(const ai_admin_policy_t &policy,
 		    std::vector<std::string>{ "-j2" });
 		if (http_service && !cmake) {
 #ifdef _WIN32
-			const std::string service_name = ".webcool-app.exe";
+			const std::string service_name = ".libai-app.exe";
 #else
-			const std::string service_name = ".webcool-app";
+			const std::string service_name = ".libai-app";
 #endif
 			const std::string service =
 			    project_root + "/" + service_name;

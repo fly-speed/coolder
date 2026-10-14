@@ -56,7 +56,8 @@ list 的 limit 默认 20；模块自身再限制可接受范围（例如 session
 | tasks.evaluate | TaskContract v1 对象 | accepted、checks、unmet；无副作用验收评估，不执行构建、不接受变更 |
 | tasks.revision | changes（可选提案数组） | artifact_revision；受限项目清单合并待确认修改后的内容指纹 |
 | tasks.describe_run | id、status、changes、validation、test_validation | 当前成果的 TaskContract；从真实命令退出状态和带身份的审核记录派生 |
-| storage.migrate | {} | 将本 scope 下旧版私有元数据转换为 JSON，返回 migrated_files，保留 .legacy 备份；宿主必须先取得数据目录锁 |
+| storage.migrate | {} | 升级本 scope 下的历史私有目录与元数据，返回 renamed_paths、migrated_files；格式转换保留 .legacy 备份，宿主必须先取得数据目录锁；冲突路径及活动执行锁会拒绝迁移 |
+| storage.canonical_path | path | 将历史保留目录名称转换为当前名称，仅返回路径，不访问文件；用于宿主读取旧引用 |
 | workspace.list / read / outline / sha256 | path | entries；content/truncated；items；sha256 |
 | workspace.search | path, query | matches/truncated |
 | workspace.create | path, content | 仅创建不存在的文件 |
@@ -191,7 +192,7 @@ Java/Python/Rust/Objective-C与C/C++共用此JSON入口，无需新增外部库�
 Windows沙箱当前仍失败关闭，尚未验证设备端命令执行。
 
 POSIX执行器现在对每个键持有进程间租约，先持久保存running元数据意图再派发，
-返回后持久保存finished元数据。记录位于root/.webcool_agent/sandbox_commands，
+返回后持久保存finished元数据。记录位于root/.libai_agent/sandbox_commands，
 使用SDK私有文件存储的版本检查、原子替换及文件/目录fsync；不保存stdout/stderr。
 已存在running或finished记录的键均拒绝执行，且在消费新计划之前拒绝，不能借
 新计划ID绕过同一执行键。sandbox.inspect只返回进程结果事实、命令/输出摘要等
@@ -199,7 +200,7 @@ POSIX执行器现在对每个键持有进程间租约，先持久保存running�
 证明外部业务成功、源码覆盖或任务验收通过。诊断需要已有安全目录，可能创建锁。
 命令级宿主确认使用sandbox.confirm，不应手工删除或修改记录解除未知状态。
 macOS helper既有规则拒绝沙箱读取/写入私有元数据；Linux helper在私有挂载命名
-空间对工作区中的.webcool_agent设置只读空遮蔽，并拒绝挂载管理系统调用，遮蔽
+空间对工作区中的.libai_agent设置只读空遮蔽，并拒绝挂载管理系统调用，遮蔽
 失败则停止派发。本阶段未运行Linux环境测试，不能据此声称其运行验收完成。
 
 sandbox.confirm只用于已鉴权、已核实效果的宿主，不得注册为模型工具。参数严格

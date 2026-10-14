@@ -48,7 +48,7 @@ namespace libai {class execution_store_t;}
 #include "../provider/ai_provider_store.h"
 #include "../agent/ai_admin_policy.h"
 #include "../project/supported_languages.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #include <openssl/rand.h>
 

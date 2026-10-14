@@ -11,7 +11,7 @@ static void workspace_transaction_leases(const std::string &root)
     workspace_change_set_preview_t preview;std::string error;std::vector<workspace_change_result_t> results;
     assert(store.create({change},preview,error));const auto id=preview.id;
     {
-        libai::file_execution_store_t lease(scope+"/.webcool_agent/change_sets",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t lease(scope+"/.libai_agent/change_sets",libai::execution_file_codec_t::plaintext());
         lease.open("workspace_transaction");
         assert(!store.apply(id,results,error)&&bytes(scope+"/one.txt")=="before");
         assert(!store.recover(error)&&bytes(scope+"/one.txt")=="before");

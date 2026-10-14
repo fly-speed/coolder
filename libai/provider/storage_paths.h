@@ -12,7 +12,7 @@ namespace storage_detail
 inline bool make_dir_recursive(const char *path)
 {
 #ifdef _WIN32
-	return webcool_make_dirs_utf8(path, 0755);
+	return libai_make_dirs_utf8(path, 0755);
 #else
 	return acl_make_dirs(path, 0755) == 0;
 #endif

@@ -350,7 +350,7 @@ public:
 };
 
 // Thin C++ adapters for supported model HTTP APIs. No vendor SDK, Python,
-// JavaScript or Java runtime is required by WebCool itself.
+// JavaScript or Java runtime is required by LibAI itself.
 class provider_client_t {
 public:
 	// Create task-scoped connection state for provider HTTP reuse.

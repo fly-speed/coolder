@@ -50,7 +50,7 @@
 | `common/platform_compat.h` | 跨平台文件和路径兼容 | 保留模块边界 |
 | `common/stdafx.h` | 公共依赖头 | 保留模块边界 |
 | `common/utf8_text.h` | UTF-8 文本处理 | 保留模块边界 |
-| `common/webcool_mutex.h` | 线程与协程锁适配 | 保留模块边界 |
+| `common/native_mutex.h` | 线程与协程锁适配 | 保留模块边界 |
 | `context/agent_context_window.h` | 上下文窗口预算 | 保留模块边界 |
 | `context/agent_read_coverage.h` | 文件读取覆盖记录 | 保留模块边界 |
 | `context/agent_staged_context.h` | 分阶段上下文组织 | 保留模块边界 |
@@ -147,14 +147,14 @@
 
 ## 后续独立 Web AI Coding 的边界
 
-当前复用单位为 libai 静态库，宿主仍须提供 HTTP 路由、鉴权、页面、配置装配和运行生命周期。独立产品可新建宿主连接 coding_runtime 接口，复用本库；前端资源与 webcool 的账户/工程适配仍需单独迁出。此次重构不把 HTTP 或 UI 合入算法和存储公共组件。
+当前复用单位为 libai 静态库，宿主仍须提供 HTTP 路由、鉴权、页面、配置装配和运行生命周期。独立产品可新建宿主连接 coding_runtime 接口，复用本库；前端资源与 libai 的账户/工程适配仍需单独迁出。此次重构不把 HTTP 或 UI 合入算法和存储公共组件。
 
 ## 验证
 
 - libai 独立 CMake 构建通过；公共组件语义测试及完整归档链接测试 2/2 通过。
-- 安装后的 `find_package(libai CONFIG REQUIRED)` 消费者与模块测试 24/24 通过（包含 Provider、工作区、审查、运行/请求/结果/会话/工作流/检查点/进度/草稿/工程存储）。助手会话测试依赖 SQLite 相对路径，设置为 webcool 工作目录后通过。
+- 安装后的 `find_package(libai CONFIG REQUIRED)` 消费者与模块测试 24/24 通过（包含 Provider、工作区、审查、运行/请求/结果/会话/工作流/检查点/进度/草稿/工程存储）。助手会话测试依赖 SQLite 相对路径，设置为 libai 工作目录后通过。
 - 独立 minimal 示例构建并运行成功，输出 coding 代理及 19 个工具。
-- webcool 严格 Make 构建通过；库与可执行文件均包含 x86_64、arm64。
+- libai 严格 Make 构建通过；库与可执行文件均包含 x86_64、arm64。
 - 认证 AI HTTP 集成、真实编译失败后的模型修复、工具批处理隔离回归均通过。
 - 公共测试覆盖二进制编码、错误输入、数值溢出、JSON 类型差异、随机 ID、差异行格式、目录权限、软链接拒绝及文件替换失败保留原目标。
 - 原有源码加新增五个公共头文件净减少 712 行；新增测试及文档不计入该数值。

@@ -150,15 +150,15 @@ static void prepare_final_change_review(
 		    previewed ? "" : preview_err, "", 0);
 		if (previewed && !inputs.empty()) {
 			output.text +=
-			    "\n\nWebCool：上述文件变更已保存到修订区，"
+			    "\n\nLibAI：上述文件变更已保存到修订区，"
 			    "接受后才会写入正式源码；拒绝不会修改项目文件。";
 		} else if (inputs.empty()) {
 			output.text +=
-			    "\n\nWebCool：本轮产生的文件修订已在推理过程中完成审查。";
+			    "\n\nLibAI：本轮产生的文件修订已在推理过程中完成审查。";
 		} else {
 			durable_result.changes_apply_error = preview_err;
 			output.text +=
-			    "\n\nWebCool：生成成果已保存，但准备修订预览失败：" +
+			    "\n\nLibAI：生成成果已保存，但准备修订预览失败：" +
 			    preview_err;
 			libai::ai::ai_log_error("agent.runtime",
 			    "prepare-change-review", preview_err);

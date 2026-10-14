@@ -45,7 +45,7 @@ final class Auth {
             ? workspace
             : data.resolve("users").resolve(Json.text(a, "id")).resolve("workspace");
     Store.privateDir(r);
-    Store.privateDir(r.resolve(".webcool_agent/attachments"));
+    Store.privateDir(r.resolve(".libai_agent/attachments"));
     return r;
   }
 

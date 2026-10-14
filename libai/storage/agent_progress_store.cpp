@@ -9,7 +9,7 @@
 #include "../sdk/file_execution_store.h"
 #include "../workspace/agent_workspace.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -69,10 +69,10 @@ bool resolve_project(const std::string &user_root,
 bool ensure_progress_directory(
     const std::string &project, std::string &directory, std::string &err)
 {
-	directory = join_path(project, ".webcool_agent");
+	directory = join_path(project, ".libai_agent");
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(directory.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(directory.c_str(), wide)) {
 		err = "cannot encode agent progress directory";
 		return false;
 	}
@@ -374,7 +374,7 @@ agent_progress_store_t::agent_progress_store_t(const std::string &user_root,
 
 std::string agent_progress_store_t::relative_path() const
 {
-	return join_path(join_path(project_path_, ".webcool_agent"),
+	return join_path(join_path(project_path_, ".libai_agent"),
 	    progress_name(session_id_));
 }
 
@@ -485,13 +485,13 @@ bool agent_progress_store_t::load_snapshot(agent_progress_t &progress,
 		return ai_error("agent.progress", "resolve-project", err);
 	}
 	const std::string path = join_path(
-	    join_path(project, ".webcool_agent"), progress_name(session_id_));
+	    join_path(project, ".libai_agent"), progress_name(session_id_));
 	std::string content;
 	{
 		std::lock_guard<libai::mutex> guard(g_progress_mutex);
 #ifndef _WIN32
         bool input_found=false;
-        if(!read_checkpoint_bytes(join_path(project,".webcool_agent"),progress_name(session_id_),content,input_found,err))return false;
+        if(!read_checkpoint_bytes(join_path(project,".libai_agent"),progress_name(session_id_),content,input_found,err))return false;
         if(!input_found)return true;
 #else
 		std::ifstream in(path.c_str(), std::ios::in | std::ios::binary);
@@ -660,10 +660,10 @@ bool agent_progress_store_t::exists(bool &found, std::string &err) const
 		    "agent.progress", "resolve-exists-project", err);
 	}
 	const std::string path = join_path(
-	    join_path(project, ".webcool_agent"), progress_name(session_id_));
+	    join_path(project, ".libai_agent"), progress_name(session_id_));
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		err = "cannot encode coding-agent progress checkpoint path";
 		return ai_error("agent.progress", "encode-exists", err);
 	}
@@ -711,10 +711,10 @@ bool agent_progress_store_t::remove(std::string &err) const
 		    "agent.progress", "resolve-remove-project", err);
 	}
 	const std::string path = join_path(
-	    join_path(project, ".webcool_agent"), progress_name(session_id_));
+	    join_path(project, ".libai_agent"), progress_name(session_id_));
 	std::lock_guard<libai::mutex> guard(g_progress_mutex);
 #ifndef _WIN32
-    const auto directory=join_path(project,".webcool_agent");
+    const auto directory=join_path(project,".libai_agent");
     struct stat metadata;
     if(::lstat(directory.c_str(),&metadata)!=0 && errno==ENOENT)return true;
     std::unique_ptr<libai::file_execution_store_t> lease;

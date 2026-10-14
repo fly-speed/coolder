@@ -143,7 +143,7 @@ struct master_key_rotation_result_t {
 
 // Encrypted provider database stored under its owning account directory. The
 // HTTP layer uses the administrator account as the installation-wide owner;
-// the installation master key remains under upload_root/webcool_auth.
+// the installation master key remains under upload_root/libai_auth.
 class provider_store_t {
 public:
 	// Bind the provider store to the supplied storage scope.

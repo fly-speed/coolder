@@ -40,21 +40,21 @@ else()
 endif()
 
 # libai locates this compatibility-named helper next to the host executable.
-add_executable(webcool-sandbox-helper
+add_executable(libai-sandbox-helper
   sandbox/sandbox_helper_main.cpp
   sandbox/sandbox_helper_linux.cpp
   sandbox/sandbox_helper_probe.cpp)
 if(WIN32)
-	target_link_libraries(webcool-sandbox-helper PRIVATE advapi32)
+	target_link_libraries(libai-sandbox-helper PRIVATE advapi32)
 endif()
 add_custom_target(coolder_frontend
   COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/bundle_frontend.cmake"
   BYPRODUCTS "${CMAKE_CURRENT_SOURCE_DIR}/html/coolder.js"
   COMMENT "Bundling coolder browser scripts"
   VERBATIM)
-add_dependencies(coolder webcool-sandbox-helper coolder_frontend)
+add_dependencies(coolder libai-sandbox-helper coolder_frontend)
 
-install(TARGETS coolder webcool-sandbox-helper RUNTIME DESTINATION bin)
+install(TARGETS coolder libai-sandbox-helper RUNTIME DESTINATION bin)
 install(DIRECTORY html/ DESTINATION share/coolder/html)
 
 enable_testing()

@@ -208,7 +208,7 @@ unsigned long rate_limit_retry_delay_seconds(
 		return std::min(8UL, 1UL << std::min(attempt, 3U));
 	return 5UL << std::min(attempt, 2U);
 	// A missing header gets a small bounded exponential backoff. Provider calls
-	// run in fibers, so this wait does not block unrelated WebCool users.
+	// run in fibers, so this wait does not block unrelated LibAI users.
 	return std::min(8UL, 1UL << std::min(attempt, 3U));
 }
 
@@ -271,7 +271,7 @@ bool wait_for_transport_retry(unsigned int attempt,
 	// A failed connect/TLS handshake benefits from a real backoff; retrying after
 	// only 250 ms repeatedly hit the same Kimi edge-node failure. Local descriptor
 	// pressure still uses the shorter delay so server resource recovery remains
-	// responsive. Fiber delays do not block other WebCool users.
+	// responsive. Fiber delays do not block other LibAI users.
 	const std::string lower = lowercase_ascii(err);
 	const bool connect_timeout = connection_phase_error(lower) &&
 	    lower.find("timed out") != std::string::npos;

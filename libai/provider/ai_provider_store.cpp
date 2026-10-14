@@ -26,7 +26,7 @@
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 namespace libai
 {
@@ -39,13 +39,13 @@ namespace provider_store_detail
 // installation master key is separate from every user's provider file, and
 // additional authenticated data binds ciphertext to username + provider ID.
 libai::mutex g_provider_store_mutex;
-const char *kAgentDir = ".webcool_agent";
+const char *kAgentDir = ".libai_agent";
 const char *kProviderFile = "providers.v1";
 const char *kProviderHealthFile = "provider_health.v1";
-const char *kMasterKeyFile = "webcool_auth/ai_master.key";
-const char *kHeader = "WEBCOOL_AI_PROVIDERS_V1";
-const char *kHealthHeader = "WEBCOOL_AI_PROVIDER_HEALTH_V1";
-const char *kMasterKeyHeader = "WEBCOOL_AI_MASTER_KEY_V2";
+const char *kMasterKeyFile = "libai_auth/ai_master.key";
+const char *kHeader = "LIBAI_AI_PROVIDERS_V1";
+const char *kHealthHeader = "LIBAI_AI_PROVIDER_HEALTH_V1";
+const char *kMasterKeyHeader = "LIBAI_AI_MASTER_KEY_V2";
 
 using ::libai::ai::record_codec::hex_encode;
 

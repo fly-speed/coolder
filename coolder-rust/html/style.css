@@ -828,7 +828,7 @@ html[data-ui-theme='ocean'] {
   color: var(--accent);
 }
 
-/* Like webcool: saved services on the left, a separate editor on the right. */
+/* Like libai: saved services on the left, a separate editor on the right. */
 #admin-content.providers-view {
   overflow: hidden;
   padding: 0;

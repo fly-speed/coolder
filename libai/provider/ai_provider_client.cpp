@@ -366,7 +366,7 @@ bool completion_call_t::recover_reasoning_budget()
 	    kimi_model_always_thinks(provider)) {
 		err +=
 		    " This Kimi coding model did not expose a supported thinking-off"
-		    " control, so WebCool skipped an identical automatic retry to avoid"
+		    " control, so LibAI skipped an identical automatic retry to avoid"
 		    " repeating the same billed reasoning pass. Resume from the saved"
 		    " checkpoint; if it recurs, raise the administrator output-token"
 		    " policy to at least 32768 for this model.";

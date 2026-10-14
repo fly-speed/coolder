@@ -176,7 +176,7 @@ pub fn patch(s: &mut State, a: &Value, b: &Value, apply: bool) -> Result<Value> 
 }
 pub fn attachments(s: &State, a: &Value, b: &Value, discard: bool) -> Result<Value> {
     let root = s.root(a)?;
-    let base = root.join(".webcool_agent/attachments");
+    let base = root.join(".libai_agent/attachments");
     private_dir(&base)?;
     let draft = text(b, "attachment_draft");
     if discard {
@@ -221,7 +221,7 @@ pub fn attachments(s: &State, a: &Value, b: &Value, discard: bool) -> Result<Val
         }
         decoded.push((name.to_string(), bytes));
     }
-    let draft = format!(".webcool_agent/attachments/{}", id());
+    let draft = format!(".libai_agent/attachments/{}", id());
     private_dir(&root.join(&draft))?;
     let mut paths = Vec::new();
     for (i, (name, bytes)) in decoded.into_iter().enumerate() {
@@ -232,7 +232,7 @@ pub fn attachments(s: &State, a: &Value, b: &Value, discard: bool) -> Result<Val
     Ok(json!({"ok":true,"attachment_draft":draft,"attachments":paths}))
 }
 pub fn valid_draft(d: &str) -> bool {
-    d.strip_prefix(".webcool_agent/attachments/")
+    d.strip_prefix(".libai_agent/attachments/")
         .map(|i| i.len() == 64 && i.bytes().all(|c| c.is_ascii_hexdigit()))
         .unwrap_or(false)
 }

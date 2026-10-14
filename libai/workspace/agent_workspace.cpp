@@ -1,3 +1,4 @@
+#include "../common/legacy_branding.h"
 #include "stdafx.h"
 #include "agent_workspace_internal.h"
 
@@ -71,7 +72,7 @@ path_component_state_t inspect_path_component(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		return PATH_COMPONENT_ERROR;
 	}
 	const DWORD attrs = GetFileAttributesW(wide.c_str());
@@ -191,7 +192,7 @@ bool agent_workspace_t::normalize_path(const std::string &input,
 
 bool agent_workspace_t::path_is_sensitive(const std::string &normalized_path)
 {
-	const std::string path = ascii_lower(normalized_path);
+	const std::string path = legacy_branding::canonical_path(ascii_lower(normalized_path));
 	if (path.empty())
 		return false;
 	if (ai_extra_sensitive_path(path))
@@ -200,7 +201,7 @@ bool agent_workspace_t::path_is_sensitive(const std::string &normalized_path)
 	// These entries commonly contain repository credentials, deployment secrets
 	// or data that should not be copied into a third-party model request.
 	if (has_path_component(path, ".mailbox") ||
-	    has_path_component(path, ".webcool_agent") ||
+	    has_path_component(path, ".libai_agent") ||
 	    has_path_component(path, ".git") ||
 	    has_path_component(path, ".hg") || has_path_component(path, ".svn"))
 		return true;
@@ -221,7 +222,7 @@ bool agent_workspace_t::path_is_sensitive(const std::string &normalized_path)
 	// Extra entries are relative path prefixes, not shell patterns. Ignoring
 	// empty/absolute/parent entries keeps a malformed environment setting from
 	// unexpectedly widening access or changing the meaning of the workspace.
-	const char *configured = getenv("WEBCOOL_AI_SENSITIVE_PATHS");
+	const char *configured = libai::ai::legacy_branding::environment("LIBAI_AI_SENSITIVE_PATHS");
 	if (configured == NULL)
 		return false;
 	const std::string value(configured);

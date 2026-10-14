@@ -37,11 +37,11 @@
 #if defined(__has_include)
 #if __has_include(<linux/landlock.h>)
 #include <linux/landlock.h>
-#define WEBCOOL_HAVE_LANDLOCK_HEADERS 1
+#define LIBAI_HAVE_LANDLOCK_HEADERS 1
 #endif
 #else
 #include <linux/landlock.h>
-#define WEBCOOL_HAVE_LANDLOCK_HEADERS 1
+#define LIBAI_HAVE_LANDLOCK_HEADERS 1
 #endif
 #include <linux/seccomp.h>
 #include <sched.h>

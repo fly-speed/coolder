@@ -375,7 +375,7 @@ void append_account(acl::json_node &node, const account_t &a)
 void accounts_init()
 {
 	for (const char *reserved :
-	    { "/auth", "/users", "/.webcool_settings" }) {
+	    { "/auth", "/users", "/.libai_settings" }) {
 		const std::string path = data_dir + reserved;
 		if (!(workspace_dir == path ||
 		        workspace_dir.compare(0, path.size() + 1, path + "/") ==

@@ -4,7 +4,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "coolder", "coolder.vcxproj", "{00AD5349-AA8E-5E34-A098-ED9CE01E6E37}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "webcool-sandbox-helper", "coolder-sandbox-helper.vcxproj", "{2CBD0E97-91D8-5CC3-A43C-4A11D4673272}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libai-sandbox-helper", "coolder-sandbox-helper.vcxproj", "{2CBD0E97-91D8-5CC3-A43C-4A11D4673272}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lib_acl", "..\third-party\acl\lib_acl\lib_acl_vc2022.vcxproj", "{B40213C2-507C-4C7F-A6E1-B850C9BDC27B}"
 EndProject

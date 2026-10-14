@@ -29,7 +29,7 @@ bool inspect_progress(const std::string &root, acl::json_node &a,
 	if (!agent_workspace_t::resolve_project_state_root(root, project, absolute, error)) return false;
 	// Same reserved lease as the real coding loop; no checkpoint mutation or
 	// model/tool callback. The file owner releases its lease on every exit.
-	libai::file_execution_store_t lease(absolute + "/.webcool_agent",
+	libai::file_execution_store_t lease(absolute + "/.libai_agent",
 	    libai::execution_file_codec_t::plaintext());
 	const auto snapshot = lease.open("coding_loop_" + session_id);
 	if (!snapshot.state_json.empty()) { error = "unexpected coding execution lease state"; return false; }
@@ -176,7 +176,7 @@ bool confirm_progress(const std::string &root, const std::string &arguments,
     if(session.project_path!=project){error="checkpoint session project mismatch";return false;}
     std::string absolute;
     if(!agent_workspace_t::resolve_project_state_root(root,project,absolute,error))return false;
-    libai::file_execution_store_t loop_lease(absolute+"/.webcool_agent",libai::execution_file_codec_t::plaintext());
+    libai::file_execution_store_t loop_lease(absolute+"/.libai_agent",libai::execution_file_codec_t::plaintext());
     if(!loop_lease.open("coding_loop_"+session_id).state_json.empty()) {error="unexpected coding execution lease state";return false;}
     agent_progress_store_t store(root,project,session_id);agent_progress_t progress;bool found=false;std::string revision;
     if(!store.load_snapshot(progress,found,revision,error))return false;

@@ -5,7 +5,7 @@
 #include "../common/record_codec.h"
 #include "agent_session_store.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -31,13 +31,13 @@ namespace
 {
 
 libai::mutex g_session_store_mutex;
-const char *kLegacyHeader = "WEBCOOL_AGENT_SESSIONS_V1";
-const char *kMessageHistoryHeader = "WEBCOOL_AGENT_SESSIONS_V2";
-const char *kReasoningHistoryHeader = "WEBCOOL_AGENT_SESSIONS_V3";
-const char *kUsageHistoryHeader = "WEBCOOL_AGENT_SESSIONS_V4";
-const char *kTitleHistoryHeader = "WEBCOOL_AGENT_SESSIONS_V5";
-const char *kHeader = "WEBCOOL_AGENT_SESSIONS_V6";
-const char *kFile = ".webcool_agent/sessions.v1";
+const char *kLegacyHeader = "LIBAI_AGENT_SESSIONS_V1";
+const char *kMessageHistoryHeader = "LIBAI_AGENT_SESSIONS_V2";
+const char *kReasoningHistoryHeader = "LIBAI_AGENT_SESSIONS_V3";
+const char *kUsageHistoryHeader = "LIBAI_AGENT_SESSIONS_V4";
+const char *kTitleHistoryHeader = "LIBAI_AGENT_SESSIONS_V5";
+const char *kHeader = "LIBAI_AGENT_SESSIONS_V6";
+const char *kFile = ".libai_agent/sessions.v1";
 const size_t kMaxSessions = 50;
 const size_t kMaxSummaryBytes = 8 * 1024;
 const size_t kMaxMessages = 80;
@@ -280,10 +280,10 @@ bool safe_record(const agent_session_record_t &record)
 
 bool ensure_directory(const std::string &user_root, std::string &err)
 {
-	const std::string directory = join_path(user_root, ".webcool_agent");
+	const std::string directory = join_path(user_root, ".libai_agent");
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(directory.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(directory.c_str(), wide)) {
 		err = "cannot validate agent session directory";
 		return false;
 	}

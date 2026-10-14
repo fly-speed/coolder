@@ -375,7 +375,7 @@ cmake --install coolder/build --prefix /absolute/coolder-install
   --html /absolute/coolder-install/share/coolder/html
 ```
 
-安装会将主程序与 `webcool-sandbox-helper` 放入同一 `bin/` 目录，并部署前端资源。运行目标项目所需的语言工具链仍需单独安装。用 `Ctrl+C` 停止前台服务；POSIX 平台也支持 `SIGTERM`。运行多个实例时使用不同端口和数据目录。
+安装会将主程序与 `libai-sandbox-helper` 放入同一 `bin/` 目录，并部署前端资源。运行目标项目所需的语言工具链仍需单独安装。用 `Ctrl+C` 停止前台服务；POSIX 平台也支持 `SIGTERM`。运行多个实例时使用不同端口和数据目录。
 
 Linux 上若使用启用了 io_uring 的 ACL 静态库，还需要对应的 liburing 开发库。可通过 `-DHAS_IO_URING=ON` 要求 CMake 检查依赖，或用 `-DAI_URING_LIBRARY=/absolute/path/to/liburing.a` 指定库。更多构建与代码规范说明见 [BUILD.md](BUILD.md)。
 
@@ -478,7 +478,7 @@ coolder/
 
 第三方 C++ APP 推荐包含 `<libai_cpp/agent.h>` / `<libai_cpp/coding.h>` 并链接 `libai::cpp`，公共头文件只暴露独立类型。其他语言使用各自绑定。原始核心的 `<libai/coding.h>` / `libai::ai` 保留为底层源码集成入口；完整桌面宿主仍须管理 ACL/fiber、鉴权、目录授权及沙盒辅助进程。
 
-库使用 `libai`（通用 SDK）、`libai::ai`（完整编程后端）和 `libai::cpp`（独立 C++ 封装）命名空间，不保留旧宿主命名空间别名。内部 `.webcool_*` 存储格式及 `webcool-sandbox-helper` 辅助程序名保持兼容；Coolder 可以独立构建和运行，无需构建 webcool 应用。
+库使用 `libai`（通用 SDK）、`libai::ai`（完整编程后端）和 `libai::cpp`（独立 C++ 封装）命名空间，不保留旧宿主命名空间别名。内部 `.libai_*` 存储格式及 `libai-sandbox-helper` 辅助程序名保持兼容；Coolder 可以独立构建和运行，无需构建 libai 应用。
 
 前端源脚本由 CMake 自动合并为 `coolder/html/coolder.js`，请修改原始脚本，不要直接编辑生成文件。详细集成方式见 [libai 文档](libai/README.md)。
 
@@ -684,7 +684,7 @@ bool ask_model(const libai::ai::provider_config_t& provider,
 
 这些文件是可参考的宿主适配实现，不需要把 Coolder 的 HTTP 路由整体复制进第三方应用。运行时包含进程级策略和任务状态；集成时应统一管理，并在同一源码版本下构建宿主与库。
 
-需要构建或运行项目时，还须部署 `webcool-sandbox-helper` 到宿主可执行文件旁，并提供相应语言工具链。该 helper 名称是兼容约定；仅安装 libai SDK 不会自动安装它。可从 Coolder 构建目标获得 helper，或参照 [helper 入口](coolder/sandbox/sandbox_helper_main.cpp) 及 [应用 CMake](coolder/CMakeLists.txt) 构建部署。
+需要构建或运行项目时，还须部署 `libai-sandbox-helper` 到宿主可执行文件旁，并提供相应语言工具链。该 helper 名称是兼容约定；仅安装 libai SDK 不会自动安装它。可从 Coolder 构建目标获得 helper，或参照 [helper 入口](coolder/sandbox/sandbox_helper_main.cpp) 及 [应用 CMake](coolder/CMakeLists.txt) 构建部署。
 
 ### 自定义工具与其他语言应用
 
@@ -1115,7 +1115,7 @@ cmake --install coolder/build --prefix /absolute/coolder-install
   --html /absolute/coolder-install/share/coolder/html
 ```
 
-Installation places the executable and `webcool-sandbox-helper` in the same `bin/` directory and deploys frontend assets. Language toolchains for target projects must still be installed separately. Use `Ctrl+C` to stop the foreground service; POSIX platforms also support `SIGTERM`. Use separate ports and data directories for multiple instances.
+Installation places the executable and `libai-sandbox-helper` in the same `bin/` directory and deploys frontend assets. Language toolchains for target projects must still be installed separately. Use `Ctrl+C` to stop the foreground service; POSIX platforms also support `SIGTERM`. Use separate ports and data directories for multiple instances.
 
 On Linux, an ACL static library built with io_uring requires the corresponding liburing development library. Use `-DHAS_IO_URING=ON` to require a CMake dependency check, or `-DAI_URING_LIBRARY=/absolute/path/to/liburing.a` to specify a library. See [BUILD.md](BUILD.md) for further build instructions and code conventions.
 
@@ -1218,7 +1218,7 @@ coolder/
 
 Third-party C++ APPs should use `<libai_cpp/agent.h>` / `<libai_cpp/coding.h>` and link `libai::cpp`, with independent public types. Other languages use their bindings. Raw `<libai/coding.h>` / `libai::ai` remain available for low-level source integration; full desktop hosts must manage ACL/fiber, authentication, path authorization, and the sandbox helper.
 
-The library uses `libai` for the portable SDK, `libai::ai` for the full coding backend, and `libai::cpp` for the independent C++ facade, without aliases for the former host namespace. Internal `.webcool_*` storage formats and the helper name `webcool-sandbox-helper` remain compatible. Coolder builds and runs independently without building the webcool application.
+The library uses `libai` for the portable SDK, `libai::ai` for the full coding backend, and `libai::cpp` for the independent C++ facade, without aliases for the former host namespace. Internal `.libai_*` storage formats and the helper name `libai-sandbox-helper` remain compatible. Coolder builds and runs independently without building the libai application.
 
 CMake bundles frontend source scripts into `coolder/html/coolder.js`. Edit the original scripts rather than the generated file. See the [libai guide](libai/README.md) for integration details.
 
@@ -1424,7 +1424,7 @@ Entry points include the synchronous `libai::ai::coding::run_coding_tool_loop(..
 
 These files are host-adapter references; third-party applications do not need to copy Coolder's HTTP routing layer. The runtime includes process-wide policy and task state, which the host should manage centrally. Build the host and library against the same source revision.
 
-Building or running projects also requires `webcool-sandbox-helper` alongside the host executable and the appropriate language toolchains. The helper name is a compatibility convention; installing the libai SDK alone does not install it. Obtain it from the Coolder build target or use the [helper entry point](coolder/sandbox/sandbox_helper_main.cpp) and [application CMake](coolder/CMakeLists.txt) as build and deployment references.
+Building or running projects also requires `libai-sandbox-helper` alongside the host executable and the appropriate language toolchains. The helper name is a compatibility convention; installing the libai SDK alone does not install it. Obtain it from the Coolder build target or use the [helper entry point](coolder/sandbox/sandbox_helper_main.cpp) and [application CMake](coolder/CMakeLists.txt) as build and deployment references.
 
 ### Custom Tools and Applications in Other Languages
 

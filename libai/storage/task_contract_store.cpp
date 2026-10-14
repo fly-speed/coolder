@@ -5,7 +5,7 @@
 #include "../common/file_ops.h"
 #include "../common/identifiers.h"
 #include "../common/json_value.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 namespace libai
 {
 namespace ai
@@ -54,7 +54,7 @@ bool begin_task_contract(const std::string &user_root,
 	        user_root, project, root, error))
 		return false;
 	const std::string directory =
-	    file_ops::join_path(root, ".webcool_agent");
+	    file_ops::join_path(root, ".libai_agent");
 	if (!file_ops::make_private_directory(directory)) {
 		error = "cannot create safe task contract directory";
 		return false;

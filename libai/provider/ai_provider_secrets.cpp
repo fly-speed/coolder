@@ -15,7 +15,7 @@ bool ensure_private_dir(const std::string &path, std::string &err)
 	}
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		err = "cannot validate AI settings directory";
 		return false;
 	}
@@ -55,7 +55,7 @@ bool write_master_key_file(const std::string &upload_root,
 		return false;
 	}
 	const std::string auth_dir =
-	    storage_detail::join_path(upload_root, "webcool_auth");
+	    storage_detail::join_path(upload_root, "libai_auth");
 	if (!ensure_private_dir(auth_dir, err))
 		return false;
 	const std::string path =
@@ -114,7 +114,7 @@ bool read_master_keyring(
     const std::string &upload_root, master_keyring_t &keyring, std::string &err)
 {
 	const std::string auth_dir =
-	    storage_detail::join_path(upload_root, "webcool_auth");
+	    storage_detail::join_path(upload_root, "libai_auth");
 	if (!ensure_private_dir(auth_dir, err))
 		return false;
 	const std::string path =

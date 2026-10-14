@@ -185,7 +185,7 @@ public:
 	// Returns true for files that must never be exposed to a model. The built-in
 	// list protects VCS metadata, environment files, private keys and local
 	// databases. Administrators may add relative prefixes with
-	// WEBCOOL_AI_SENSITIVE_PATHS (comma separated); built-ins cannot be disabled.
+	// LIBAI_AI_SENSITIVE_PATHS (comma separated); built-ins cannot be disabled.
 	static bool path_is_sensitive(const std::string &normalized_path);
 	// Compute the content digest used to bind edits to a source version.
 	static std::string content_sha256(const std::string &content);

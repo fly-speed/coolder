@@ -5,7 +5,7 @@
 #include "../common/record_codec.h"
 #include "agent_run_store.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -35,9 +35,9 @@ namespace
 // hex encoded so tabs/newlines cannot corrupt record boundaries. The entire
 // bounded file is rewritten through a 0600 temporary file and atomic rename.
 libai::mutex g_run_store_mutex;
-const char *kHeaderV1 = "WEBCOOL_AGENT_RUNS_V1";
-const char *kHeaderV2 = "WEBCOOL_AGENT_RUNS_V2";
-const char *kRunFile = ".webcool_agent/runs.v1";
+const char *kHeaderV1 = "LIBAI_AGENT_RUNS_V1";
+const char *kHeaderV2 = "LIBAI_AGENT_RUNS_V2";
+const char *kRunFile = ".libai_agent/runs.v1";
 const size_t kMaxStoredRuns = 100;
 const size_t kMaxErrorBytes = 2000;
 
@@ -89,10 +89,10 @@ bool safe_record(const agent_run_record_t &record)
 
 bool ensure_directory(const std::string &user_root, std::string &err)
 {
-	const std::string directory = join_path(user_root, ".webcool_agent");
+	const std::string directory = join_path(user_root, ".libai_agent");
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(directory.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(directory.c_str(), wide)) {
 		err = "cannot validate agent run history directory";
 		return false;
 	}
@@ -149,7 +149,7 @@ bool load_records(const std::string &user_root,
 	const std::string path = store_path(user_root);
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		err = "cannot validate agent run history";
 		return false;
 	}

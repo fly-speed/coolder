@@ -56,7 +56,7 @@ bool setup_user_and_system_namespaces(
 	return false;
 }
 
-#ifdef WEBCOOL_HAVE_LANDLOCK_HEADERS
+#ifdef LIBAI_HAVE_LANDLOCK_HEADERS
 unsigned long long landlock_access_mask()
 {
 	unsigned long long mask = LANDLOCK_ACCESS_FS_EXECUTE |
@@ -212,7 +212,7 @@ bool apply_seccomp(
 #else
 	return false;
 #endif
-#define WEBCOOL_DENY_SYSCALL(name)                              \
+#define LIBAI_DENY_SYSCALL(name)                              \
 	BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_##name, 0, 1), \
 	    BPF_STMT(BPF_RET | BPF_K,                           \
 	        SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA))
@@ -237,40 +237,40 @@ bool apply_seccomp(
 #endif
 #endif
 #ifdef __NR_ptrace
-		WEBCOOL_DENY_SYSCALL(ptrace),
+		LIBAI_DENY_SYSCALL(ptrace),
 #endif
 #ifdef __NR_bpf
-		WEBCOOL_DENY_SYSCALL(bpf),
+		LIBAI_DENY_SYSCALL(bpf),
 #endif
 #ifdef __NR_mount
-		WEBCOOL_DENY_SYSCALL(mount),
+		LIBAI_DENY_SYSCALL(mount),
 #endif
 #ifdef __NR_umount2
-		WEBCOOL_DENY_SYSCALL(umount2),
+		LIBAI_DENY_SYSCALL(umount2),
 #endif
 #ifdef __NR_move_mount
-		WEBCOOL_DENY_SYSCALL(move_mount),
+		LIBAI_DENY_SYSCALL(move_mount),
 #endif
 #ifdef __NR_open_tree
-		WEBCOOL_DENY_SYSCALL(open_tree),
+		LIBAI_DENY_SYSCALL(open_tree),
 #endif
 #ifdef __NR_mount_setattr
-		WEBCOOL_DENY_SYSCALL(mount_setattr),
+		LIBAI_DENY_SYSCALL(mount_setattr),
 #endif
 #ifdef __NR_fsopen
-		WEBCOOL_DENY_SYSCALL(fsopen),
+		LIBAI_DENY_SYSCALL(fsopen),
 #endif
 #ifdef __NR_fsconfig
-		WEBCOOL_DENY_SYSCALL(fsconfig),
+		LIBAI_DENY_SYSCALL(fsconfig),
 #endif
 #ifdef __NR_fsmount
-		WEBCOOL_DENY_SYSCALL(fsmount),
+		LIBAI_DENY_SYSCALL(fsmount),
 #endif
 #ifdef __NR_fspick
-		WEBCOOL_DENY_SYSCALL(fspick),
+		LIBAI_DENY_SYSCALL(fspick),
 #endif
 #ifdef __NR_pivot_root
-		WEBCOOL_DENY_SYSCALL(pivot_root),
+		LIBAI_DENY_SYSCALL(pivot_root),
 #endif
 #ifdef __NR_unshare
 		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_unshare, 0, 1),
@@ -280,22 +280,22 @@ bool apply_seccomp(
 		        SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)),
 #endif
 #ifdef __NR_setns
-		WEBCOOL_DENY_SYSCALL(setns),
+		LIBAI_DENY_SYSCALL(setns),
 #endif
 #ifdef __NR_open_by_handle_at
-		WEBCOOL_DENY_SYSCALL(open_by_handle_at),
+		LIBAI_DENY_SYSCALL(open_by_handle_at),
 #endif
 #ifdef __NR_perf_event_open
-		WEBCOOL_DENY_SYSCALL(perf_event_open),
+		LIBAI_DENY_SYSCALL(perf_event_open),
 #endif
 #ifdef __NR_userfaultfd
-		WEBCOOL_DENY_SYSCALL(userfaultfd),
+		LIBAI_DENY_SYSCALL(userfaultfd),
 #endif
 #ifdef __NR_process_vm_readv
-		WEBCOOL_DENY_SYSCALL(process_vm_readv),
+		LIBAI_DENY_SYSCALL(process_vm_readv),
 #endif
 #ifdef __NR_process_vm_writev
-		WEBCOOL_DENY_SYSCALL(process_vm_writev),
+		LIBAI_DENY_SYSCALL(process_vm_writev),
 #endif
 #ifdef __NR_bind
 		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_bind, 0, 1),
@@ -328,28 +328,28 @@ bool apply_seccomp(
 		        SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)),
 #endif
 #ifdef __NR_keyctl
-		WEBCOOL_DENY_SYSCALL(keyctl),
+		LIBAI_DENY_SYSCALL(keyctl),
 #endif
 #ifdef __NR_add_key
-		WEBCOOL_DENY_SYSCALL(add_key),
+		LIBAI_DENY_SYSCALL(add_key),
 #endif
 #ifdef __NR_request_key
-		WEBCOOL_DENY_SYSCALL(request_key),
+		LIBAI_DENY_SYSCALL(request_key),
 #endif
 #ifdef __NR_io_uring_setup
-		WEBCOOL_DENY_SYSCALL(io_uring_setup),
+		LIBAI_DENY_SYSCALL(io_uring_setup),
 #endif
 #ifdef __NR_init_module
-		WEBCOOL_DENY_SYSCALL(init_module),
+		LIBAI_DENY_SYSCALL(init_module),
 #endif
 #ifdef __NR_finit_module
-		WEBCOOL_DENY_SYSCALL(finit_module),
+		LIBAI_DENY_SYSCALL(finit_module),
 #endif
 #ifdef __NR_delete_module
-		WEBCOOL_DENY_SYSCALL(delete_module),
+		LIBAI_DENY_SYSCALL(delete_module),
 #endif
 		BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW) };
-#undef WEBCOOL_DENY_SYSCALL
+#undef LIBAI_DENY_SYSCALL
 	struct sock_fprog program;
 	program.len =
 	    static_cast<unsigned short>(sizeof(filter) / sizeof(filter[0]));
@@ -386,7 +386,7 @@ static void run_service_probe(const std::string &project_root,
 int run_linux_sandbox(const options_t &options, char *argv[],
     const std::string &project_root, const std::string &workdir)
 {
-	const std::string cgroup = "/sys/fs/cgroup/webcool/run-" +
+	const std::string cgroup = "/sys/fs/cgroup/libai/run-" +
 	    std::to_string(static_cast<unsigned long long>(getpid()));
 	if (mkdir(cgroup.c_str(), 0700) != 0 ||
 	    !write_text_file(cgroup + "/memory.max",
@@ -396,7 +396,7 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 	    !write_text_file(cgroup + "/cpu.max", "100000 100000\n")) {
 		(void)rmdir(cgroup.c_str());
 		fputs(
-		    "webcool-sandbox-helper: cgroup v2 delegation unavailable\n",
+		    "libai-sandbox-helper: cgroup v2 delegation unavailable\n",
 		    stderr);
 		return 125;
 	}
@@ -425,14 +425,14 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 		// Landlock grants the writable workspace subtree and cannot subtract
 		// its private metadata child. Hide it in this private mount namespace
 		// before granting workspace access; no host mount is modified.
-		const auto metadata = project_root + "/.webcool_agent";
+		const auto metadata = project_root + "/.libai_agent";
 		struct stat metadata_stat;
 		if (lstat(metadata.c_str(), &metadata_stat) == 0) {
 			if (!S_ISDIR(metadata_stat.st_mode) ||
 			    mount("tmpfs", metadata.c_str(), "tmpfs",
 			        MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC,
 			        "size=4096,mode=000") != 0) {
-				fputs("webcool-sandbox-helper: cannot isolate private metadata\n", stderr);
+				fputs("libai-sandbox-helper: cannot isolate private metadata\n", stderr);
 				_exit(125);
 			}
 		} else if (errno != ENOENT)
@@ -457,13 +457,13 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 		std::vector<std::string> runtime_values;
 		std::vector<char *> runtime_arguments;
 		if (!runtime_options.browser_node.empty() &&
-		    access((project_root + "/.webcool-http-port-env").c_str(),
+		    access((project_root + "/.libai-http-port-env").c_str(),
 		        F_OK) == 0) {
 			if (!allocate_probe_port(runtime_options.probe_port))
 				_exit(73);
 			const std::string port =
 			    std::to_string(runtime_options.probe_port);
-			if (setenv("WEBCOOL_HTTP_PORT", port.c_str(), 1) != 0)
+			if ((setenv("LIBAI_HTTP_PORT", port.c_str(), 1) != 0 || setenv("WEBCOOL_HTTP_PORT", port.c_str(), 1) != 0))
 				_exit(126);
 		}
 		for (int i = runtime_options.command_index; argv[i] != NULL;
@@ -504,7 +504,7 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 #endif
 		) {
 			fputs(
-			    "webcool-sandbox-helper: Linux isolation setup failed\n",
+			    "libai-sandbox-helper: Linux isolation setup failed\n",
 			    stderr);
 			_exit(125);
 		}
@@ -529,7 +529,7 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 			_exit(125);
 		}
 		execv(runtime_arguments[0], &runtime_arguments[0]);
-		fputs("webcool-sandbox-helper: cannot start sandbox command\n",
+		fputs("libai-sandbox-helper: cannot start sandbox command\n",
 		    stderr);
 		_exit(127);
 	}
@@ -553,7 +553,7 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 	if (synchronized)
 		return mirrored_exit_status(status);
 	fputs(
-	    "webcool-sandbox-helper: cannot enter delegated cgroup\n", stderr);
+	    "libai-sandbox-helper: cannot enter delegated cgroup\n", stderr);
 	return 125;
 }
 

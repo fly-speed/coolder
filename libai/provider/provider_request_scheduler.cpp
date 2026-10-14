@@ -5,7 +5,7 @@
 
 #include "provider_request_scheduler.h"
 
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #include <acl_cpp/lib_acl.hpp>
 

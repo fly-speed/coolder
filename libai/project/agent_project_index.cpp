@@ -8,7 +8,7 @@
 
 #include "../workspace/agent_workspace.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -35,7 +35,7 @@ namespace
 {
 
 libai::mutex g_project_index_mutex;
-const char *kHeader = "WEBCOOL_AGENT_PROJECT_INDEX_V1";
+const char *kHeader = "LIBAI_AGENT_PROJECT_INDEX_V1";
 const size_t kMaxFiles = 20000;
 const size_t kMaxDirectories = 4096;
 const size_t kMaxDepth = 32;
@@ -78,7 +78,7 @@ bool safe_text(const std::string &value, size_t limit, bool required)
 
 std::string index_directory(const std::string &user_root)
 {
-	return join_path(user_root, ".webcool_agent/indexes");
+	return join_path(user_root, ".libai_agent/indexes");
 }
 
 std::string index_path(const std::string &user_root, const std::string &id)
@@ -90,7 +90,7 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		err = "cannot validate agent project index directory";
 		return false;
 	}
@@ -129,7 +129,7 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 bool ensure_directories(const std::string &user_root, std::string &err)
 {
 	return ensure_one_directory(
-	           join_path(user_root, ".webcool_agent"), err) &&
+	           join_path(user_root, ".libai_agent"), err) &&
 	    ensure_one_directory(index_directory(user_root), err);
 }
 
@@ -710,7 +710,7 @@ std::string agent_project_index_store_t::prompt_summary(
 	if (byte_limit < 256)
 		return "";
 	std::ostringstream out;
-	out << "\n<webcool_project_index revision=\"" << snapshot.revision
+	out << "\n<libai_project_index revision=\"" << snapshot.revision
 	    << "\" files=\"" << snapshot.files.size() << "\" changed=\""
 	    << snapshot.changed_file_count << "\">\n"
 	    << (prompt_text(prompt_id::project_index, chinese));
@@ -739,7 +739,7 @@ std::string agent_project_index_store_t::prompt_summary(
 		out << "[project index truncated]\n";
 		break;
 	}
-	out << "</webcool_project_index>\n";
+	out << "</libai_project_index>\n";
 	std::string result = out.str();
 	if (!(result.size() > byte_limit))
 		return result;

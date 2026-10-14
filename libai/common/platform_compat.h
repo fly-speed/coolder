@@ -64,7 +64,7 @@ typedef intptr_t ssize_t;
 #define popen _popen
 
 // Provide the Windows UTF-8 compatibility implementation of utf8 to wide.
-inline bool webcool_utf8_to_wide(const char *text, std::wstring &out)
+inline bool libai_utf8_to_wide(const char *text, std::wstring &out)
 {
 	out.clear();
 	if (text == NULL) {
@@ -88,7 +88,7 @@ inline bool webcool_utf8_to_wide(const char *text, std::wstring &out)
 }
 
 // Provide the Windows UTF-8 compatibility implementation of wide to utf8.
-inline bool webcool_wide_to_utf8(const wchar_t *text, std::string &out)
+inline bool libai_wide_to_utf8(const wchar_t *text, std::string &out)
 {
 	out.clear();
 	if (text == NULL) {
@@ -113,7 +113,7 @@ inline bool webcool_wide_to_utf8(const wchar_t *text, std::string &out)
 
 // Provide the Windows UTF-8 compatibility implementation of is windows
 // extended path.
-inline bool webcool_is_windows_extended_path(const std::wstring &path)
+inline bool libai_is_windows_extended_path(const std::wstring &path)
 {
 	return path.compare(0, 4, L"\\\\?\\") == 0 ||
 	    path.compare(0, 4, L"\\??\\") == 0;
@@ -121,7 +121,7 @@ inline bool webcool_is_windows_extended_path(const std::wstring &path)
 
 // Provide the Windows UTF-8 compatibility implementation of is windows drive
 // absolute.
-inline bool webcool_is_windows_drive_absolute(const std::wstring &path)
+inline bool libai_is_windows_drive_absolute(const std::wstring &path)
 {
 	return path.size() >= 3 &&
 	    ((path[0] >= L'A' && path[0] <= L'Z') ||
@@ -131,9 +131,9 @@ inline bool webcool_is_windows_drive_absolute(const std::wstring &path)
 
 // Provide the Windows UTF-8 compatibility implementation of utf8 path to
 // wide.
-inline bool webcool_utf8_path_to_wide(const char *path, std::wstring &out)
+inline bool libai_utf8_path_to_wide(const char *path, std::wstring &out)
 {
-	if (!webcool_utf8_to_wide(path, out)) {
+	if (!libai_utf8_to_wide(path, out)) {
 		return false;
 	}
 	for (size_t i = 0; i < out.size(); ++i) {
@@ -141,12 +141,12 @@ inline bool webcool_utf8_path_to_wide(const char *path, std::wstring &out)
 			continue;
 		out[i] = L'\\';
 	}
-	if (out.empty() || webcool_is_windows_extended_path(out)) {
+	if (out.empty() || libai_is_windows_extended_path(out)) {
 		return true;
 	}
 
 	std::wstring full_path;
-	if (webcool_is_windows_drive_absolute(out) ||
+	if (libai_is_windows_drive_absolute(out) ||
 	    (out.size() >= 2 && out[0] == L'\\' && out[1] == L'\\')) {
 		full_path = out;
 	} else {
@@ -168,7 +168,7 @@ inline bool webcool_utf8_path_to_wide(const char *path, std::wstring &out)
 	if (full_path.size() >= 2 && full_path[0] == L'\\' &&
 	    full_path[1] == L'\\') {
 		out = L"\\\\?\\UNC\\" + full_path.substr(2);
-	} else if (webcool_is_windows_drive_absolute(full_path)) {
+	} else if (libai_is_windows_drive_absolute(full_path)) {
 		out = L"\\\\?\\" + full_path;
 	} else {
 		out = full_path;
@@ -178,7 +178,7 @@ inline bool webcool_utf8_path_to_wide(const char *path, std::wstring &out)
 
 // Provide the Windows UTF-8 compatibility implementation of strip extended
 // path prefix.
-inline void webcool_strip_extended_path_prefix(std::wstring &path)
+inline void libai_strip_extended_path_prefix(std::wstring &path)
 {
 	const std::wstring unc_prefix = L"\\\\?\\UNC\\";
 	const std::wstring drive_prefix = L"\\\\?\\";
@@ -197,37 +197,37 @@ inline void webcool_strip_extended_path_prefix(std::wstring &path)
 }
 
 // Provide the Windows UTF-8 compatibility implementation of mkdir.
-inline int webcool_mkdir(const char *path, int)
+inline int libai_mkdir(const char *path, int)
 {
 	std::wstring wpath;
-	return webcool_utf8_path_to_wide(path, wpath) ? _wmkdir(wpath.c_str()) :
+	return libai_utf8_path_to_wide(path, wpath) ? _wmkdir(wpath.c_str()) :
 	                                                -1;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of rmdir.
-inline int webcool_rmdir(const char *path)
+inline int libai_rmdir(const char *path)
 {
 	std::wstring wpath;
-	return webcool_utf8_path_to_wide(path, wpath) ? _wrmdir(wpath.c_str()) :
+	return libai_utf8_path_to_wide(path, wpath) ? _wrmdir(wpath.c_str()) :
 	                                                -1;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of unlink.
-inline int webcool_unlink(const char *path)
+inline int libai_unlink(const char *path)
 {
 	std::wstring wpath;
-	return webcool_utf8_path_to_wide(path, wpath) ?
+	return libai_utf8_path_to_wide(path, wpath) ?
 	    _wunlink(wpath.c_str()) :
 	    -1;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of rename.
-inline int webcool_rename(const char *old_path, const char *new_path)
+inline int libai_rename(const char *old_path, const char *new_path)
 {
 	std::wstring wold_path;
 	std::wstring wnew_path;
-	if (!webcool_utf8_path_to_wide(old_path, wold_path) ||
-	    !webcool_utf8_path_to_wide(new_path, wnew_path)) {
+	if (!libai_utf8_path_to_wide(old_path, wold_path) ||
+	    !libai_utf8_path_to_wide(new_path, wnew_path)) {
 		return -1;
 	}
 	if (MoveFileExW(wold_path.c_str(), wnew_path.c_str(),
@@ -251,21 +251,21 @@ inline int webcool_rename(const char *old_path, const char *new_path)
 }
 
 // Provide the Windows UTF-8 compatibility implementation of fopen.
-inline FILE *webcool_fopen(const char *path, const char *mode)
+inline FILE *libai_fopen(const char *path, const char *mode)
 {
 	std::wstring wpath;
 	std::wstring wmode;
-	if (!(!webcool_utf8_path_to_wide(path, wpath) ||
-	        !webcool_utf8_to_wide(mode, wmode)))
+	if (!(!libai_utf8_path_to_wide(path, wpath) ||
+	        !libai_utf8_to_wide(mode, wmode)))
 		return _wfopen(wpath.c_str(), wmode.c_str());
 	return NULL;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of stat.
-inline int webcool_stat(const char *path, struct stat *st)
+inline int libai_stat(const char *path, struct stat *st)
 {
 	std::wstring wpath;
-	if (st == NULL || !webcool_utf8_path_to_wide(path, wpath)) {
+	if (st == NULL || !libai_utf8_path_to_wide(path, wpath)) {
 		return -1;
 	}
 #ifdef _USE_32BIT_TIME_T
@@ -316,26 +316,26 @@ inline int webcool_stat(const char *path, struct stat *st)
 }
 
 // Provide the Windows UTF-8 compatibility implementation of access.
-inline int webcool_access(const char *path, int mode)
+inline int libai_access(const char *path, int mode)
 {
 	std::wstring wpath;
-	return webcool_utf8_path_to_wide(path, wpath) ?
+	return libai_utf8_path_to_wide(path, wpath) ?
 	    _waccess(wpath.c_str(), mode) :
 	    -1;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of chmod.
-inline int webcool_chmod(const char *path, int mode)
+inline int libai_chmod(const char *path, int mode)
 {
 	std::wstring wpath;
-	return webcool_utf8_path_to_wide(path, wpath) ?
+	return libai_utf8_path_to_wide(path, wpath) ?
 	    _wchmod(wpath.c_str(), mode) :
 	    -1;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of set errno from
 // windows error.
-inline void webcool_set_errno_from_windows_error(DWORD err)
+inline void libai_set_errno_from_windows_error(DWORD err)
 {
 	if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) {
 		errno = ENOENT;
@@ -354,25 +354,25 @@ inline void webcool_set_errno_from_windows_error(DWORD err)
 }
 
 // Provide the Windows UTF-8 compatibility implementation of copy file.
-inline bool webcool_copy_file(
+inline bool libai_copy_file(
     const char *source, const char *dest, bool overwrite)
 {
 	std::wstring wsource;
 	std::wstring wdest;
-	if (!webcool_utf8_path_to_wide(source, wsource) ||
-	    !webcool_utf8_path_to_wide(dest, wdest)) {
+	if (!libai_utf8_path_to_wide(source, wsource) ||
+	    !libai_utf8_path_to_wide(dest, wdest)) {
 		return false;
 	}
 	if (CopyFileW(
 	        wsource.c_str(), wdest.c_str(), overwrite ? FALSE : TRUE)) {
 		return true;
 	}
-	webcool_set_errno_from_windows_error(GetLastError());
+	libai_set_errno_from_windows_error(GetLastError());
 	return false;
 }
 
 // Provide the Windows UTF-8 compatibility implementation of make dirs utf8.
-inline bool webcool_make_dirs_utf8(const char *path, int mode)
+inline bool libai_make_dirs_utf8(const char *path, int mode)
 {
 	if (path == NULL || *path == '\0') {
 		errno = EINVAL;
@@ -380,7 +380,7 @@ inline bool webcool_make_dirs_utf8(const char *path, int mode)
 	}
 
 	struct stat st;
-	if (webcool_stat(path, &st) == 0) {
+	if (libai_stat(path, &st) == 0) {
 		return S_ISDIR(st.st_mode);
 	}
 
@@ -417,7 +417,7 @@ inline bool webcool_make_dirs_utf8(const char *path, int mode)
 		if (part.empty()) {
 			continue;
 		}
-		if (webcool_stat(part.c_str(), &st) == 0) {
+		if (libai_stat(part.c_str(), &st) == 0) {
 			if (S_ISDIR(st.st_mode))
 				continue;
 			errno = ENOTDIR;
@@ -425,7 +425,7 @@ inline bool webcool_make_dirs_utf8(const char *path, int mode)
 
 			continue;
 		}
-		if (!(webcool_mkdir(part.c_str(), mode) != 0 &&
+		if (!(libai_mkdir(part.c_str(), mode) != 0 &&
 		        errno != EEXIST))
 			continue;
 		return false;
@@ -474,14 +474,14 @@ inline uid_t getuid()
 }
 
 // Provide the Windows UTF-8 compatibility implementation of realpath.
-inline char *webcool_realpath(const char *path, char *resolved)
+inline char *libai_realpath(const char *path, char *resolved)
 {
 	if (path == NULL || resolved == NULL) {
 		errno = EINVAL;
 		return NULL;
 	}
 	std::wstring wpath;
-	if (!webcool_utf8_path_to_wide(path, wpath)) {
+	if (!libai_utf8_path_to_wide(path, wpath)) {
 		return NULL;
 	}
 	wchar_t wresolved[32768];
@@ -492,9 +492,9 @@ inline char *webcool_realpath(const char *path, char *resolved)
 		return NULL;
 	}
 	std::wstring display_path(wresolved);
-	webcool_strip_extended_path_prefix(display_path);
+	libai_strip_extended_path_prefix(display_path);
 	std::string utf8;
-	if (!webcool_wide_to_utf8(display_path.c_str(), utf8) ||
+	if (!libai_wide_to_utf8(display_path.c_str(), utf8) ||
 	    utf8.size() >= PATH_MAX) {
 		errno = ENAMETOOLONG;
 		return NULL;
@@ -502,7 +502,7 @@ inline char *webcool_realpath(const char *path, char *resolved)
 	strcpy(resolved, utf8.c_str());
 	return resolved;
 }
-#define realpath webcool_realpath
+#define realpath libai_realpath
 
 // Report unsupported symbolic-link reads through the compatibility API.
 inline int readlink(const char *, char *, size_t)
@@ -537,11 +537,11 @@ struct DIR {
 };
 
 // Provide the Windows UTF-8 compatibility implementation of dir pattern.
-inline std::wstring webcool_dir_pattern(const char *path)
+inline std::wstring libai_dir_pattern(const char *path)
 {
 	std::string text = path && *path ? path : ".";
 	std::wstring pattern;
-	if (!webcool_utf8_path_to_wide(text.c_str(), pattern)) {
+	if (!libai_utf8_path_to_wide(text.c_str(), pattern)) {
 		return std::wstring();
 	}
 	const wchar_t tail =
@@ -558,7 +558,7 @@ inline DIR *opendir(const char *path)
 {
 	DIR *dir = new DIR;
 	dir->first = true;
-	const std::wstring pattern = webcool_dir_pattern(path);
+	const std::wstring pattern = libai_dir_pattern(path);
 	if (pattern.empty()) {
 		delete dir;
 		return NULL;
@@ -593,7 +593,7 @@ inline struct dirent *readdir(DIR *dir)
 		dir->first = false;
 	}
 	std::string name;
-	if (!webcool_wide_to_utf8(dir->data.cFileName, name)) {
+	if (!libai_wide_to_utf8(dir->data.cFileName, name)) {
 		return NULL;
 	}
 	strncpy(dir->entry.d_name, name.c_str(), sizeof(dir->entry.d_name) - 1);
@@ -614,60 +614,60 @@ inline int closedir(DIR *dir)
 }
 
 // Argument value returned by the Windows getopt compatibility routine.
-static char *webcool_optarg = NULL;
+static char *libai_optarg = NULL;
 // Index of the next argument examined by the getopt compatibility routine.
-static int webcool_optind = 1;
+static int libai_optind = 1;
 
 // Provide the Windows UTF-8 compatibility implementation of getopt.
-inline int webcool_getopt(int argc, char *const argv[], const char *optstring)
+inline int libai_getopt(int argc, char *const argv[], const char *optstring)
 {
 	static const char *next = NULL;
 	if (next == NULL || *next == '\0') {
-		if (webcool_optind >= argc || argv[webcool_optind][0] != '-' ||
-		    argv[webcool_optind][1] == '\0') {
+		if (libai_optind >= argc || argv[libai_optind][0] != '-' ||
+		    argv[libai_optind][1] == '\0') {
 			return -1;
 		}
-		if (strcmp(argv[webcool_optind], "--") == 0) {
-			++webcool_optind;
+		if (strcmp(argv[libai_optind], "--") == 0) {
+			++libai_optind;
 			return -1;
 		}
-		next = argv[webcool_optind] + 1;
+		next = argv[libai_optind] + 1;
 	}
 	const char ch = *next++;
 	const char *pos = strchr(optstring, ch);
 	if (pos == NULL) {
 		if (!(*next == '\0'))
 			return '?';
-		++webcool_optind;
+		++libai_optind;
 
 		return '?';
 	}
 	if (pos[1] == ':') {
 		if (*next != '\0') {
-			webcool_optarg = const_cast<char *>(next);
-			++webcool_optind;
+			libai_optarg = const_cast<char *>(next);
+			++libai_optind;
 			next = NULL;
-		} else if (webcool_optind + 1 < argc) {
-			webcool_optarg = argv[++webcool_optind];
-			++webcool_optind;
+		} else if (libai_optind + 1 < argc) {
+			libai_optarg = argv[++libai_optind];
+			++libai_optind;
 			next = NULL;
 		} else {
 			return '?';
 		}
 	} else {
-		webcool_optarg = NULL;
+		libai_optarg = NULL;
 		if (*next == '\0') {
-			++webcool_optind;
+			++libai_optind;
 		}
 	}
 	return ch;
 }
 
-//#define getopt webcool_getopt
-//#define optarg webcool_optarg
-//#define optind webcool_optind
+//#define getopt libai_getopt
+//#define optarg libai_optarg
+//#define optind libai_optind
 
-inline std::string webcool_windows_home_path()
+inline std::string libai_windows_home_path()
 {
 	wchar_t path[MAX_PATH];
 	memset(path, 0, sizeof(path));
@@ -675,7 +675,7 @@ inline std::string webcool_windows_home_path()
 	        NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, path) == S_OK &&
 	    path[0] != L'\0') {
 		std::string utf8;
-		if (webcool_wide_to_utf8(path, utf8) && !utf8.empty()) {
+		if (libai_wide_to_utf8(path, utf8) && !utf8.empty()) {
 			return utf8;
 		}
 	}
@@ -689,10 +689,10 @@ inline std::string webcool_windows_home_path()
 }
 
 // Provide the Windows UTF-8 compatibility implementation of shell open.
-inline bool webcool_shell_open(const std::string &target, std::string &err)
+inline bool libai_shell_open(const std::string &target, std::string &err)
 {
 	std::wstring wtarget;
-	if (!webcool_utf8_to_wide(target.c_str(), wtarget)) {
+	if (!libai_utf8_to_wide(target.c_str(), wtarget)) {
 		err = "invalid UTF-8 path";
 		return false;
 	}
@@ -705,19 +705,19 @@ inline bool webcool_shell_open(const std::string &target, std::string &err)
 }
 
 // Provide the Windows UTF-8 compatibility implementation of shell open trash.
-inline bool webcool_shell_open_trash(std::string &err)
+inline bool libai_shell_open_trash(std::string &err)
 {
-	return webcool_shell_open("shell:RecycleBinFolder", err);
+	return libai_shell_open("shell:RecycleBinFolder", err);
 }
 
-#define access(path, mode) webcool_access(path, mode)
-#define chmod(path, mode) webcool_chmod(path, mode)
-#define fopen(path, mode) webcool_fopen(path, mode)
-#define lstat(path, st) webcool_stat(path, st)
-#define mkdir(path, mode) webcool_mkdir(path, mode)
-#define rename(old_path, new_path) webcool_rename(old_path, new_path)
-#define rmdir(path) webcool_rmdir(path)
-#define stat(path, st) webcool_stat(path, st)
-#define unlink(path) webcool_unlink(path)
+#define access(path, mode) libai_access(path, mode)
+#define chmod(path, mode) libai_chmod(path, mode)
+#define fopen(path, mode) libai_fopen(path, mode)
+#define lstat(path, st) libai_stat(path, st)
+#define mkdir(path, mode) libai_mkdir(path, mode)
+#define rename(old_path, new_path) libai_rename(old_path, new_path)
+#define rmdir(path) libai_rmdir(path)
+#define stat(path, st) libai_stat(path, st)
+#define unlink(path) libai_unlink(path)
 
 #endif // _WIN32

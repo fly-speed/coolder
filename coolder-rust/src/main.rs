@@ -141,7 +141,7 @@ impl Options {
         }
         let helper = std::env::current_exe()
             .ok()
-            .and_then(|p| p.parent().map(|p| p.join("webcool-sandbox-helper")));
+            .and_then(|p| p.parent().map(|p| p.join("libai-sandbox-helper")));
         if let Some(helper) = helper {
             result.push_str(&format!(
                 ",\"sandbox_helper\":{}",

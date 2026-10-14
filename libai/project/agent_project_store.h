@@ -92,7 +92,7 @@ public:
 	// Zero returns all registered projects; positive values select the newest N.
 	bool list(size_t limit, std::vector<agent_project_record_t> &records,
 	    std::string &err) const;
-	// Removes only WebCool's AI manifest. The workspace directory and every
+	// Removes only LibAI's AI manifest. The workspace directory and every
 	// source file beneath it are deliberately outside this operation.
 	bool remove(const std::string &id, agent_project_record_t &removed,
 	    std::string &err) const;

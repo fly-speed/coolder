@@ -1,3 +1,4 @@
+#include "../common/legacy_branding.h"
 #include "stdafx.h"
 #include "coding_runtime.h"
 #include "../coding/coding_service.h"
@@ -87,7 +88,7 @@ static void inspect_ctest_arguments(const std::vector<std::string> &args,
 				continue;
 			result.error += "CMake Error: IO test " + name +
 			    " passes bare " + key +
-			    "; use webcool_add_io_test or -D" + key +
+			    "; use libai_add_io_test or -D" + key +
 			    "=value before -P.\n";
 		}
 	}
@@ -120,10 +121,10 @@ ctest_io_contract_t inspect_ctest_io(
 		bool checker = false;
 		for (size_t i = 1; i < args.size(); ++i) {
 			if (!(args[i - 1] == "-P" &&
-			        (args[i] == "webcool_io_test.cmake" ||
+			        (args[i] == "libai_io_test.cmake" ||
 			            (args[i].size() >= 22 &&
 			                args[i].substr(args[i].size() - 22) ==
-			                    "/webcool_io_test.cmake"))))
+			                    "/libai_io_test.cmake"))))
 				continue;
 			checker = true;
 		}
@@ -396,7 +397,7 @@ static bool dispatch_validation_command(
 	if (command.id == "cpp.ctest" || command.id == "c.ctest") {
 		auto inventory_command = command;
 		inventory_command.fixed_arguments = { "--test-dir",
-			".webcool-build", "--show-only=json-v1" };
+			".libai-build", "--show-only=json-v1" };
 		libai::ai::sandbox_result_t inventory;
 		auto inventory_request = request;
 		if (!execution_key.empty())
@@ -457,13 +458,16 @@ static long long append_validation_command(acl::json &json,
 	// Keep browser assertions separately from the 4 KiB compiler diagnostic
 	// excerpt: noisy server logs must not hide the actual acceptance result.
 	if (!command.browser_probe_node.empty()) {
-		const std::string marker = "WEBCOOL_BROWSER_REPORT=";
-		const size_t begin = result.standard_output.rfind(marker);
+		const std::string marker = "LIBAI_BROWSER_REPORT=";
+		std::string diagnostic=result.standard_output;
+        const std::string old_marker=libai::ai::legacy_branding::old_label(marker);
+        for(size_t pos=0;(pos=diagnostic.find(old_marker,pos))!=std::string::npos;) {diagnostic.replace(pos,old_marker.size(),marker);pos+=marker.size();}
+		const size_t begin = diagnostic.rfind(marker);
 		if (begin != std::string::npos) {
 			const size_t end =
-			    result.standard_output.find('\n', begin);
+			    diagnostic.find('\n', begin);
 			const std::string browser_report =
-			    result.standard_output.substr(begin,
+			    diagnostic.substr(begin,
 			        end == std::string::npos ? end : end - begin);
 			item.add_text("browser_report",
 			    browser_report.substr(0, 32768).c_str());
@@ -493,16 +497,16 @@ static const char *validation_next_action(bool compile_repair_completed,
 	return compile_repair_completed ?
 	    "Compilation is confirmed. Report remaining test failures without further edits; do not expand this compile repair into project-wide repair." :
 	    browser_status == "unavailable" ?
-	    "Browser runtime is unavailable. Report pending browser acceptance and ask the administrator to install Node, Chrome and webcool/browser dependencies; do not change project code to bypass verification." :
+	    "Browser runtime is unavailable. Report pending browser acceptance and ask the administrator to install Node, Chrome and libai/browser dependencies; do not change project code to bypass verification." :
 	    browser_status == "blocked" ?
-	    "Browser did not run: the legacy fixed service port is occupied. Make the service read WEBCOOL_HTTP_PORT (default 18080 when unset), bind 127.0.0.1, and create .webcool-http-port-env. Then validate using an isolated port. Do not kill or test the existing server." :
+	    "Browser did not run: the legacy fixed service port is occupied. Make the service read LIBAI_HTTP_PORT (default 18080 when unset), bind 127.0.0.1, and create .libai-http-port-env. Then validate using an isolated port. Do not kill or test the existing server." :
 	    browser_status == "failed" ?
-	    "Browser validation failed. Inspect WEBCOOL_BROWSER_REPORT results and differences for each browser/viewport, including clipped/covered elements and screenshots. Repair cross-browser compatibility and rerun the entire matrix; never remove a failing browser or weaken an assertion. Repair the observed cause, retain requirement assertions, then validate the updated draft. Do not infer usability from HTTP 200 or compilation." :
+	    "Browser validation failed. Inspect LIBAI_BROWSER_REPORT results and differences for each browser/viewport, including clipped/covered elements and screenshots. Repair cross-browser compatibility and rerun the entire matrix; never remove a failing browser or weaken an assertion. Repair the observed cause, retain requirement assertions, then validate the updated draft. Do not infer usability from HTTP 200 or compilation." :
 	    failed_command_reason.find("Address already in use") !=
 	        std::string::npos ?
 	    "HTTP readiness is blocked by an occupied loopback port (18080). Report the port conflict; do not rewrite source or repeatedly rebuild. Retry only after the existing listener is stopped by its owner." :
 	    failed_command_id.find(".http-smoke") != std::string::npos ?
-	    "HTTP readiness failed. Inspect the failed command executable and error. For CMake, set .webcool-http-service to the project-relative built executable path (for example .webcool-build/test85_web), or build the webcool_app target. Do not repeat validation without correcting the entrypoint or the reported failure." :
+	    "HTTP readiness failed. Inspect the failed command executable and error. For CMake, set .libai-http-service to the project-relative built executable path (for example .libai-build/test85_web), or build the libai_app target. Do not repeat validation without correcting the entrypoint or the reported failure." :
 	    "repair the reported source locations, then run workspace.validate again";
 }
 

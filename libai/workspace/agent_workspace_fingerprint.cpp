@@ -173,7 +173,7 @@ inline bool fingerprint_scan_t::directory(
 		}
 		const std::string name = entry->d_name;
 		if (name == "." || name == ".." ||
-		    (relative.empty() && name == ".webcool-build"))
+		    (relative.empty() && name == ".libai-build"))
 			continue;
 		const std::string path =
 		    relative.empty() ? name : relative + "/" + name;
@@ -299,7 +299,7 @@ bool agent_workspace_t::tree_sha256(const std::string &directory,
 			    entry.path :
 			    entry.path.substr(directory.size() + 1);
 			// Private build output is disposable, never part of the source baseline.
-			if (relative == ".webcool-build")
+			if (relative == ".libai-build")
 				continue;
 			evidence += std::to_string(relative.size()) + ":" +
 			    relative + "\n";

@@ -503,7 +503,7 @@ bool stream_exchange_t::read_stream_body(acl::http_request &request)
 			// Preserve bounded transport diagnostics without exposing the endpoint,
 			// request payload, API key, or provider response content. These counters
 			// make timeout, proxy reset and truncated SSE failures distinguishable in
-			// both the ACL log and the WebCool error panel.
+			// both the ACL log and the LibAI error panel.
 			const int transport_code = acl::last_error();
 			const std::string transport_detail =
 			    bounded_transport_error(acl::last_serror(), 240);

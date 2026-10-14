@@ -1654,7 +1654,7 @@ $('provider-form').onsubmit = task(async () => {
   data.is_default = form.elements.is_default.checked;
   data.model_profile_json = saveProviderCapabilities(form);
   for (const name of ['cap_tool_calling', 'cap_multiple_tool_calls', 'cap_output_tokens', 'cap_context_bytes']) delete data[name];
-  // Match webcool's Responses compatibility flags for Qwen and stateless vendors.
+  // Match the shared Responses compatibility flags for Qwen and stateless vendors.
   if (data.protocol === 'openai_responses') {
     const stateless = /^(deepseek|kimi)/i.test(data.model);
     const qwen = !stateless && (/^qwen/i.test(data.model) || providerVendor(data) === 'qwen');

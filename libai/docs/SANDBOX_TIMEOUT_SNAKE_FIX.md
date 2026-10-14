@@ -14,19 +14,19 @@
 - 贪吃蛇正式目录中的 WebSocket 测试改为并发握手与读取，增加连接期限和清理；Ping/Pong 测试并发消费服务端响应。
 - 修复游戏其余编译及测试阻断：静态资源测试传入文件系统、WebSocket 测试预先注册房间、程序支持版本参数、按房间配置初始化和重置游戏、限制同一帧连续转向导致掉头，并修正依赖随机食物位置及空房间行为的错误测试前提。
 
-游戏目录：`webcool/uploads/共享目录/soft/deepseek/snake`。没有修改旧任务的隔离工作区或任务状态。
+游戏目录：`libai/uploads/共享目录/soft/deepseek/snake`。没有修改旧任务的隔离工作区或任务状态。
 
 ## 验证
 
 - 独立 ACL 协程复现：设置 200 毫秒期限，修复前实际耗时 5174 毫秒且未报告超时；修复后耗时 254 毫秒并正确报告超时。
 - `make -s program-sandbox-fiber-test`：通过。
-- `make -s -j6 webcool program-sandbox-test`：通过，重新生成 webcool 可执行文件。
+- `make -s -j6 libai program-sandbox-test`：通过，重新生成 libai 可执行文件。
 - 独立 libai CMake 构建及两项 CTest：通过。
 - AI HTTP 集成测试和编译失败后自动修复的 HTTP 回归：通过。
 - 游戏 `go test -count=1 -timeout=20s ./...`：全部五个包通过。
 - 游戏 `go test -race -count=1 -timeout=30s ./...`：全部五个包通过。
-- 游戏重新构建 `.webcool-go-app`，`--version` 输出 `snake dev`。
+- 游戏重新构建 `.libai-go-app`，`--version` 输出 `snake dev`。
 
 ## 生效范围
 
-当前运行中的 webcool 没有自动重启，仍加载旧代码。需要重启 webcool 并重新发起任务，才能使用修复后的超时和取消机制。正式游戏源码的修复不会同步改写旧任务已经物化的草稿工作区。上述验证不包含新的真实模型生成请求或浏览器中的完整游戏交互验收。
+当前运行中的 libai 没有自动重启，仍加载旧代码。需要重启 libai 并重新发起任务，才能使用修复后的超时和取消机制。正式游戏源码的修复不会同步改写旧任务已经物化的草稿工作区。上述验证不包含新的真实模型生成请求或浏览器中的完整游戏交互验收。

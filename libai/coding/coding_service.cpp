@@ -1,5 +1,6 @@
 #include "coding_service.h"
 #include "coding_internal.h"
+#include "../common/legacy_branding.h"
 #include "task_contract_json.h"
 #include "../agent/agent_registry.h"
 #include "../sdk/json_guard.h"
@@ -53,8 +54,8 @@ std::string coding_service_call(const std::string &root,
 			    "root must be an existing trusted directory");
 		// This bridge deliberately does not inherit account-level external mounts.
 		const auto registry =
-		    root + "/.webcool_agent/external-project-roots.v1";
-		if (stat(registry.c_str(), &info) == 0)
+		    root + "/.libai_agent/external-project-roots.v1";
+		if (operation != "storage.migrate" && stat(registry.c_str(), &info) == 0)
 			throw std::invalid_argument(
 			    "CodingService requires a scope without external project mounts");
 		if (operation != "tasks.evaluate" && (arguments.size() > (operation == "providers.complete" ?
@@ -113,7 +114,7 @@ std::string coding_service_call(const std::string &root,
 		}
 		if (operation == "capabilities") {
 			coding_detail::strings(out, "operations",
-			    { "capabilities", "tasks.evaluate", "tasks.revision", "tasks.describe_run", "progress.inspect", "progress.confirm", "storage.migrate", "agents.list", "workspace.list",
+			    { "capabilities", "tasks.evaluate", "tasks.revision", "tasks.describe_run", "progress.inspect", "progress.confirm", "storage.migrate", "storage.canonical_path", "agents.list", "workspace.list",
 			        "workspace.read", "workspace.search",
 			        "workspace.outline", "workspace.sha256",
 			        "workspace.create", "workspace.replace",
@@ -152,7 +153,9 @@ std::string coding_service_call(const std::string &root,
 			ok = coding_detail::task_contract_raw(arguments, out);
 		} else if (operation == "tasks.revision" || operation == "tasks.describe_run") {
 			ok = coding_detail::tasks(root, operation, a, out, error);
-		} else if (operation == "storage.migrate") {
+		} else if (operation == "storage.canonical_path") {
+            out.add_text("path",legacy_branding::canonical_path(coding_detail::text(a,"path")).c_str());ok=true;
+        } else if (operation == "storage.migrate") {
 			ok = coding_detail::migrate(root, a, out, error);
 		} else if (operation.compare(0, 15, "runtime.policy.") == 0) {
 			ok = coding_detail::runtime(operation, a, out, error);

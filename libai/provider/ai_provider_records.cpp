@@ -28,7 +28,7 @@ bool safe_regular_file(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide))
+	if (!libai_utf8_path_to_wide(path.c_str(), wide))
 		return false;
 	const DWORD attributes = GetFileAttributesW(wide.c_str());
 	return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -52,7 +52,7 @@ bool checkpoint_directory_has_entries(
 {
 	has_entries = false;
 	const std::string path =
-	    storage_detail::join_path(user_root, ".webcool_agent/checkpoints");
+	    storage_detail::join_path(user_root, ".libai_agent/checkpoints");
 	if (!path_entry_exists(path))
 		return true;
 	if (!safe_directory(path)) {
@@ -61,7 +61,7 @@ bool checkpoint_directory_has_entries(
 	}
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide((path + "/*").c_str(), wide)) {
+	if (!libai_utf8_path_to_wide((path + "/*").c_str(), wide)) {
 		err = "cannot validate agent checkpoint storage";
 		return false;
 	}
@@ -111,7 +111,7 @@ bool collect_rotation_users(const std::string &upload_root,
 {
 	users.clear();
 	const std::string root =
-	    storage_detail::join_path(upload_root, "webcool_users");
+	    storage_detail::join_path(upload_root, "libai_users");
 	struct stat root_stat;
 	if (stat(root.c_str(), &root_stat) != 0) {
 		if (errno == ENOENT)

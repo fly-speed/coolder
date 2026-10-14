@@ -1776,7 +1776,7 @@ $('provider-form').onsubmit = task(async () => {
   data.is_default = form.elements.is_default.checked;
   data.model_profile_json = saveProviderCapabilities(form);
   for (const name of ['cap_tool_calling', 'cap_multiple_tool_calls', 'cap_output_tokens', 'cap_context_bytes']) delete data[name];
-  // Match webcool's Responses compatibility flags for Qwen and stateless vendors.
+  // Match the shared Responses compatibility flags for Qwen and stateless vendors.
   if (data.protocol === 'openai_responses') {
     const stateless = /^(deepseek|kimi)/i.test(data.model);
     const qwen = !stateless && (/^qwen/i.test(data.model) || providerVendor(data) === 'qwen');
@@ -2372,7 +2372,7 @@ $('preferences-form').onsubmit = task(async () => {
 
 ;
 // ---- markdown-preview.js ----
-// Adapted from aicool/webcool/html/js/markdown-preview.js.
+// Adapted from aicool/libai/html/js/markdown-preview.js.
 (function () {
   function mdEscapeHtml(value) {
     return String(value == null ? '' : value)
@@ -2680,13 +2680,13 @@ $('preferences-form').onsubmit = task(async () => {
 // ---- code-editor.js ----
 'use strict';
 
-// Runtime and workers are copied from webcool's vendored Monaco 0.55.1.
+// Bundled Monaco 0.55.1 runtime and workers are served locally.
 const codeEditors = { runtime: null, viewer: null, viewModel: null, sequence: 0, editing: null };
 function loadMonaco() {
   if (codeEditors.runtime) return codeEditors.runtime;
   const root = '/vendor/monaco-editor/vs';
   const locale = { zh: 'zh-cn', ja: 'ja', ko: 'ko' }[i18n.language] || 'en';
-  window.__webcoolMonacoAmdConfig = {
+  window.__libaiMonacoAmdConfig = {
     paths: {
       vs: root,
       'vs/nls.messages.ja': root + '/nls.messages.ja.js',
@@ -4234,7 +4234,7 @@ async function init() {
 
 init();
 
-// Adapted from webcool/html/js/admin-ai-policy.js; field names and limits match webcool.
+// Administrator controls use the shared libai policy fields and limits.
 (() => {
   const api = { adminAiPolicy: '/api/v1/admin/ai-policy' };
   const fetchJson = (url, options) =>

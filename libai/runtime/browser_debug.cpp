@@ -78,8 +78,8 @@ class browser_receipt_t {
 public:
     browser_receipt_t(const std::string &owner,const std::string &project,const std::string &key,const std::string &name):key_(key),project_(project),name_(name) {
         if(key.empty())return;
-        const auto directory=owner+"/.webcool_agent/browser_commands";
-        if(!file_ops::make_private_directory(owner+"/.webcool_agent")||!file_ops::make_private_directory(directory))
+        const auto directory=owner+"/.libai_agent/browser_commands";
+        if(!file_ops::make_private_directory(owner+"/.libai_agent")||!file_ops::make_private_directory(directory))
             throw std::runtime_error("cannot prepare browser receipts");
         store_.reset(new libai::file_execution_store_t(directory,libai::execution_file_codec_t::plaintext()));
         scope_="browser_command_"+agent_workspace_t::content_sha256(key);
@@ -341,7 +341,7 @@ bool browser_debug_inspect(const std::string &owner,const std::string &key,acl::
 #if defined(__unix__) || defined(__APPLE__)
     try {
         if(key.empty()||!program_sandbox_t::valid_idempotency_key(key))throw std::invalid_argument("invalid browser inspection key");
-        const auto directory=owner+"/.webcool_agent/browser_commands";
+        const auto directory=owner+"/.libai_agent/browser_commands";
         struct stat info;
         if(stat(directory.c_str(),&info)!=0) {
             if(errno==ENOENT){out.add_bool("found",false);return true;}
@@ -368,7 +368,7 @@ bool browser_debug_lock_parent_receipts(const std::string &owner,const std::stri
 {
 #if defined(__unix__) || defined(__APPLE__)
     try {
-        const auto directory=owner+"/.webcool_agent/browser_commands";
+        const auto directory=owner+"/.libai_agent/browser_commands";
         struct stat info;
         if(stat(directory.c_str(),&info)!=0) {
             if(errno==ENOENT)return true; // Legacy parent: do not fabricate child evidence.
@@ -427,7 +427,7 @@ bool browser_debug_confirm(const std::string &owner,const std::string &arguments
             (result["image_sha256"].GetStringLength()!=0&&!hash(result["image_sha256"]))||
             !result.HasMember("callback_ok")||!result["callback_ok"].IsBool())
             throw std::invalid_argument("invalid browser confirmation result");
-        libai::file_execution_store_t store(owner+"/.webcool_agent/browser_commands",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t store(owner+"/.libai_agent/browser_commands",libai::execution_file_codec_t::plaintext());
         const auto scope="browser_command_"+agent_workspace_t::content_sha256(key);const auto snapshot=store.open(scope);
         if(snapshot.state_json.empty()||snapshot.revision!=revision)throw std::runtime_error("browser receipt revision conflict");
         validate_browser_receipt(snapshot.state_json,key);

@@ -169,15 +169,15 @@ static bool monitor_posix_sandbox(sandbox_result_t &result,
 	else if (result.exit_code == 70) {
 		result.error = "sandbox HTTP service readiness probe failed";
 	} else if (result.exit_code == 125 &&
-	    result.standard_error.find("webcool-sandbox-helper:") !=
+	    result.standard_error.find("libai-sandbox-helper:") !=
 	        std::string::npos) {
 		result.error = "sandbox platform backend is unavailable";
 	} else if (result.exit_code == 126 &&
-	    result.standard_error.find("webcool-sandbox-helper:") !=
+	    result.standard_error.find("libai-sandbox-helper:") !=
 	        std::string::npos) {
 		result.error = "sandbox helper rejected the execution policy";
 	} else if (result.exit_code == 127 &&
-	    result.standard_error.find("webcool-sandbox-helper:") !=
+	    result.standard_error.find("libai-sandbox-helper:") !=
 	        std::string::npos) {
 		result.error = "cannot start sandbox backend";
 	} else if (result.exit_code == 71 &&
@@ -514,7 +514,7 @@ bool execute_windows_sandbox(const sandbox_request_t &request,
 	    helper_executable_;
 	std::wstring helper_wide;
 	if (helper.empty() ||
-	    !webcool_utf8_path_to_wide(helper.c_str(), helper_wide)) {
+	    !libai_utf8_path_to_wide(helper.c_str(), helper_wide)) {
 		result.error =
 		    "sandbox helper is missing or has an invalid path";
 		return ai_error("program.sandbox",
@@ -563,7 +563,7 @@ bool execute_windows_sandbox(const sandbox_request_t &request,
 	std::wstring command_line;
 	for (size_t i = 0; i < values.size(); ++i) {
 		std::wstring value;
-		if (!webcool_utf8_to_wide(values[i].c_str(), value)) {
+		if (!libai_utf8_to_wide(values[i].c_str(), value)) {
 			result.error = "cannot encode sandbox helper arguments";
 			return ai_error("program.sandbox",
 			    "encode-windows-arguments", result.error);

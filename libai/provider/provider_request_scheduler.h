@@ -26,7 +26,7 @@ struct provider_request_scheduler_snapshot_t {
 	size_t in_flight = 0;
 	// Requests queued for an execution permit.
 	size_t waiting = 0;
-	// Zero means no learned limit. WebCool deliberately does not invent an RPM
+	// Zero means no learned limit. LibAI deliberately does not invent an RPM
 	// or concurrency cap when a provider (notably Kimi) reports none.
 	size_t learned_concurrency_limit = 0;
 	// Remaining provider cooldown time in milliseconds.

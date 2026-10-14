@@ -4,7 +4,7 @@
 #include "agent_request_store.h"
 #include "../workspace/agent_workspace.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -66,7 +66,7 @@ bool resolve_project(const std::string &user_root,
 bool prepare_directory(
     const std::string &project, std::string &directory, std::string &err)
 {
-	const std::string agent = join_path(project, ".webcool_agent");
+	const std::string agent = join_path(project, ".libai_agent");
 	directory = join_path(agent, "requests");
 	if (!make_directory(agent) || !make_directory(directory)) {
 		err = "cannot create AI request archive directory";
@@ -102,7 +102,7 @@ bool save_file(
     const std::string &target, const std::string &payload, std::string &err)
 {
 	const std::string temporary = target + ".tmp";
-	// fopen is mapped to the UTF-8-aware webcool_fopen on Windows.  A narrow
+	// fopen is mapped to the UTF-8-aware libai_fopen on Windows.  A narrow
 	// std::ofstream path is interpreted using the active ANSI code page and
 	// cannot reliably create archives below non-ASCII project directories.
 	FILE *out = fopen(temporary.c_str(), "wb");
@@ -172,7 +172,7 @@ bool agent_request_store_t::append(const std::string &payload,
 		}
 		relative_path = join_path(
 		    join_path(
-		        join_path(project_path_, ".webcool_agent"), "requests"),
+		        join_path(project_path_, ".libai_agent"), "requests"),
 		    name);
 		return true;
 	}
@@ -191,7 +191,7 @@ bool agent_request_store_t::operation_log(
 	if (!resolve_project(user_root_, project_path_, project, err))
 		return false;
 	std::lock_guard<libai::mutex> guard(g_request_store_mutex);
-	const std::string directory = join_path(project, ".webcool_agent");
+	const std::string directory = join_path(project, ".libai_agent");
 	if (!(write ? make_directory(directory) :
 	              normal_directory(directory))) {
 		err = "operation log directory unavailable";

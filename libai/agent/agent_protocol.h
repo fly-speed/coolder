@@ -105,7 +105,7 @@ struct agent_protocol_message_t {
 	std::vector<agent_change_proposal_t> changes;
 };
 
-// Returns false when the model did not emit the structured WebCool protocol.
+// Returns false when the model did not emit the structured LibAI protocol.
 // Callers may safely treat that output as a plain final response.
 bool parse_agent_protocol_message(
     const std::string &raw, agent_protocol_message_t &message);

@@ -26,7 +26,7 @@ pub fn normalized(p: &str, empty: bool) -> Result<()> {
                 "",
                 ".",
                 "..",
-                ".webcool_agent",
+                ".libai_agent",
                 ".git",
                 ".env",
                 "secrets",

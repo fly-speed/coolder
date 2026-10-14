@@ -8,7 +8,7 @@
 #include "agent_workspace.h"
 #include "../common/ai_error_log.h"
 #include "diff_preview.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 #include "../sdk/file_execution_store.h"
 
 #ifdef _WIN32
@@ -39,10 +39,10 @@ namespace change_set_detail
 {
 
 libai::mutex g_change_set_mutex;
-const char *kHeaderV1 = "WEBCOOL_WORKSPACE_CHANGE_SET_V1";
-const char *kHeaderV2 = "WEBCOOL_WORKSPACE_CHANGE_SET_V2";
-const char *kJournalHeaderV1 = "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V1";
-const char *kJournalHeaderV2 = "WEBCOOL_WORKSPACE_CHANGE_JOURNAL_V2";
+const char *kHeaderV1 = "LIBAI_WORKSPACE_CHANGE_SET_V1";
+const char *kHeaderV2 = "LIBAI_WORKSPACE_CHANGE_SET_V2";
+const char *kJournalHeaderV1 = "LIBAI_WORKSPACE_CHANGE_JOURNAL_V1";
+const char *kJournalHeaderV2 = "LIBAI_WORKSPACE_CHANGE_JOURNAL_V2";
 const long long kLifetimeSeconds = 30 * 60;
 const size_t kMaxItems = kMaxAgentChanges;
 const size_t kMaxItemBytes = 1024 * 1024;
@@ -70,7 +70,7 @@ bool ensure_directory(const std::string &path)
 		return true;
 #ifdef _WIN32
 	std::wstring wide;
-	return webcool_utf8_path_to_wide(path.c_str(), wide) &&
+	return libai_utf8_path_to_wide(path.c_str(), wide) &&
 	    _wmkdir(wide.c_str()) == 0 && safe_directory(path);
 #else
 	return mkdir(path.c_str(), 0700) == 0 && safe_directory(path);
@@ -82,7 +82,7 @@ using ::libai::ai::file_ops::replace_file;
 bool prepare_directory(
     const std::string &user_root, std::string &directory, std::string &err)
 {
-	const std::string agent = join_path(user_root, ".webcool_agent");
+	const std::string agent = join_path(user_root, ".libai_agent");
 	directory = join_path(agent, "change_sets");
 	if (!ensure_directory(agent) || !ensure_directory(directory)) {
 		err = "cannot create private workspace change-set directory";

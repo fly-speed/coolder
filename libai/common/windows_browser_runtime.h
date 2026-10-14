@@ -80,7 +80,7 @@ inline bool available(const std::wstring &directory, std::string &reason)
 {
 	reason.clear();
 	if (directory.empty()) {
-		reason = "cannot locate the WebCool installation directory";
+		reason = "cannot locate the LibAI installation directory";
 		return false;
 	}
 	const std::wstring browser = directory + L"/browser";
@@ -115,7 +115,7 @@ inline std::string bundled_node(const std::wstring &directory)
 		const std::wstring path = directory + relative;
 		std::string utf8;
 		if (!(readable_file(path) &&
-		        webcool_wide_to_utf8(path.c_str(), utf8)))
+		        libai_wide_to_utf8(path.c_str(), utf8)))
 			continue;
 		return utf8;
 	}

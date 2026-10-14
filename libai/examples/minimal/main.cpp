@@ -1,7 +1,7 @@
 #include <libai/coding.h>
 #include <iostream>
 
-// No webcool application headers or implementation files are needed.
+// No libai application headers or implementation files are needed.
 int main()
 {
 	const auto *coding =

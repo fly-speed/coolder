@@ -8,7 +8,7 @@
 #include "../agent/ai_admin_policy.h"
 #include "../common/ai_error_log.h"
 #include "../project/project_toolchain.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -41,10 +41,10 @@ namespace
 
 // Each user has one pending plan. pending.v1 is atomically renamed before use;
 // sandbox_runs.v1 stores only bounded start/finish metadata. A process mutex
-// protects read-modify-replace operations inside one WebCool service process.
+// protects read-modify-replace operations inside one LibAI service process.
 libai::mutex g_execution_store_mutex;
-const char *kPlanHeader = "WEBCOOL_SANDBOX_PLAN_V1";
-const char *kAuditHeader = "WEBCOOL_SANDBOX_AUDIT_V1";
+const char *kPlanHeader = "LIBAI_SANDBOX_PLAN_V1";
+const char *kAuditHeader = "LIBAI_SANDBOX_AUDIT_V1";
 const long long kPlanLifetimeSeconds = 10 * 60;
 const size_t kMaxArguments = 64;
 const size_t kMaxAuditRecords = 100;
@@ -70,7 +70,7 @@ bool ensure_directory(const std::string &path)
 		return true;
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide) ||
+	if (!libai_utf8_path_to_wide(path.c_str(), wide) ||
 	    _wmkdir(wide.c_str()) != 0)
 		return false;
 #else
@@ -87,8 +87,8 @@ bool move_file(const std::string &source, const std::string &target)
 #ifdef _WIN32
 	std::wstring source_wide;
 	std::wstring target_wide;
-	return webcool_utf8_path_to_wide(source.c_str(), source_wide) &&
-	    webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
+	return libai_utf8_path_to_wide(source.c_str(), source_wide) &&
+	    libai_utf8_path_to_wide(target.c_str(), target_wide) &&
 	    MoveFileExW(source_wide.c_str(), target_wide.c_str(),
 	        MOVEFILE_WRITE_THROUGH) != 0;
 #else
@@ -99,7 +99,7 @@ bool move_file(const std::string &source, const std::string &target)
 bool ensure_store_directory(
     const std::string &user_root, std::string &directory, std::string &err)
 {
-	const std::string agent = join_path(user_root, ".webcool_agent");
+	const std::string agent = join_path(user_root, ".libai_agent");
 	directory = join_path(agent, "sandbox_plans");
 	if (!ensure_directory(agent) || !ensure_directory(directory)) {
 		err = "cannot create a safe sandbox plan directory";
@@ -254,7 +254,7 @@ bool append_audit(const std::string &user_root,
 	if (!ensure_store_directory(user_root, directory, err))
 		return false;
 	const std::string path = join_path(
-	    join_path(user_root, ".webcool_agent"), "sandbox_runs.v1");
+	    join_path(user_root, ".libai_agent"), "sandbox_runs.v1");
 	std::vector<std::string> records;
 	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	std::string line;
@@ -523,7 +523,7 @@ bool sandbox_execution_store_t::list_history(size_t limit,
 	}
 	std::lock_guard<libai::mutex> guard(g_execution_store_mutex);
 	const std::string path = join_path(
-	    join_path(user_root_, ".webcool_agent"), "sandbox_runs.v1");
+	    join_path(user_root_, ".libai_agent"), "sandbox_runs.v1");
 	record_json::input in(path.c_str(), std::ios::in | std::ios::binary);
 	if (!in.good())
 		return true; // A user who has never run a command has no history.

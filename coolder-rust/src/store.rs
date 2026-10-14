@@ -165,7 +165,7 @@ impl State {
         }
         write(&data.join("auth/app-state.v1"), &docs)?;
         let policy = shared(
-            &data.join(".webcool_settings/ai-policy.v1"),
+            &data.join(".libai_settings/ai-policy.v1"),
             &data.join("auth/ai-policy-rust.v1"),
             &data.join("auth/ai-policy-java.v1"),
             json!({"enabled":true,"allow_users":true,"allow_users_local_projects":false,"max_active_runs_per_user":3}),
@@ -210,7 +210,7 @@ impl State {
                 .join("workspace")
         };
         private_dir(&r)?;
-        private_dir(&r.join(".webcool_agent/attachments"))?;
+        private_dir(&r.join(".libai_agent/attachments"))?;
         Ok(r)
     }
 }

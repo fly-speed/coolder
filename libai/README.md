@@ -58,15 +58,15 @@ cmake --install libai/build-sdk --prefix /absolute/path/to/libai-sdk
 工作区修改与审核、工具链、沙盒执行，以及 `runtime/` 中的编程循环、调度、暂停、取消、
 恢复和后台 worker。图片助手共用运行时，也归库所有。
 
-HTTP 路由、用户鉴权、项目目录授权和前端保留在 `webcool/action/ai/` 等宿主代码中。
-宿主鉴权后显式传入存储根目录、用户目录、模型配置和沙盒策略。库不依赖 webcool 的 HTTP 实现。
+HTTP 路由、用户鉴权、项目目录授权和前端保留在 `coolder/action/ai/` 等宿主代码中。
+宿主鉴权后显式传入存储根目录、用户目录、模型配置和沙盒策略。库不依赖 libai 的 HTTP 实现。
 完整后端的 C++ 命名空间已由历史宿主命名迁移到 `libai::ai`；通用 SDK 使用 `libai`，
 独立 C++ 封装使用 `libai::cpp`。`libai::ai::coding` 仍是内部运行时的入口别名。
 此次迁移不保留旧命名空间别名；直接使用完整后端的消费方需更新限定名并重新编译。
 持久数据格式、C ABI、JNI 和语言层公开接口不因 C++ 命名空间迁移而改名。
 
 ACL/fiber、OpenSSL 是外部依赖，不合并进归档。宿主负责 ACL/fiber 初始化和线程生命周期。
-沙盒执行仍需部署 `webcool-sandbox-helper`，并按 `sandbox/program_sandbox.h`、`agent/ai_admin_policy.h` 配置。
+沙盒执行仍需部署 `libai-sandbox-helper`，并按 `sandbox/program_sandbox.h`、`agent/ai_admin_policy.h` 配置。
 
 ## 独立构建
 
@@ -116,7 +116,7 @@ target_link_libraries(my_agent PRIVATE libai::ai)
 配置消费项目时将 `CMAKE_PREFIX_PATH` 指向 SDK 安装目录，并指定其依赖的 `ACL_PATH`、
 `OPENSSL_PATH`（必要时 `ACL_LIBRARY_DIRS`）。头文件和链接依赖通过 CMake 目标传递。
 
-`examples/minimal/` 是可独立构建的消费程序，不包含 webcool 头文件，也不编译库源码：
+`examples/minimal/` 是可独立构建的消费程序，不包含 libai 头文件，也不编译库源码：
 
 ```sh
 cmake -S libai/examples/minimal -B example-build \
@@ -128,17 +128,15 @@ cmake --build example-build
 ```
 
 在同一源码工程中也可使用 `add_subdirectory(/path/to/libai libai-build)` 后链接 `libai::ai`。
-库的全归档链接测试会强制链接每个实现对象，检查是否意外依赖 webcool 宿主符号。
+库的全归档链接测试会强制链接每个实现对象，检查是否意外依赖 libai 宿主符号。
 
-## webcool 接入
+## Coolder 接入
 
-- CMake 引入同级 `../libai` 并链接 `libai::ai`。
-- `make -C webcool ai-coding-lib` 生成 `libai/libai.a`；正常构建 webcool 自动链接该归档。
-- `webcool.sln` 通过项目引用链接 `../libai/libai.vcxproj`，不重复编译库源码。
-- webcool 及测试使用 `libai/...` 头文件引用，原 `webcool/ai/` 已移除。
-
-持久化格式、HTTP API 和权限逻辑沿用原有行为。公共平台兼容及互斥锁头文件归 libai 所有，
-webcool 原有头文件转发到库版本。
+Coolder通过同级`libai-c++`封装链接完整后端，独立运行，不要求其它宿主应用。
+CMake使用`libai::cpp`；Visual Studio使用`coolder/coolder.sln`与库项目引用。
+数据升级入口为可信宿主的`CodingService(root).call("storage.migrate", "{}")`。
+三个APP在持有数据目录服务锁后迁移数据与工作区，保留账户、密钥和执行收据。
+直接使用完整后端的其它宿主应在首次使用旧目录前显式调用此操作。
 
 ## 公共能力与模块边界
 
@@ -184,3 +182,16 @@ C ABI、Python、Rust、Java和Objective-C也已提供图句柄/对象、回调�
 检索接口，提供有界内存cosine适配器及受治理的Agent检索工具。访问范围由宿主
 指定，结果保留来源/版本/引用；不绑定数据库。SDK、独立C++、C、Java、Python、
 Rust和Objective-C均已提供接口；实际Embedding服务及持久向量数据库由宿主适配。
+
+## 源码标识符命名
+
+库内平台辅助函数使用`libai_*`前缀，例如`libai_utf8_path_to_wide`、
+`libai_copy_file`和`libai_getopt`；对应参数状态为`libai_optarg`、`libai_optind`。
+线程/协程锁适配头文件为`common/native_mutex.h`，可选标准锁宏为`LIBAI_USE_STD_MUTEX`。
+内部CMake目标为`libai_coding`、`libai_dependencies`；公开消费目标仍为`libai::ai`、
+`libai::agent`及独立封装目标。生成的CTest注册函数为`libai_add_io_test`。
+直接引用这些内部头文件、函数或构建目标的源码需要更新后重新构建。
+
+新数据目录和记录格式统一使用libai/LIBAI命名。历史名称只由兼容层读取或迁移；
+迁移拒绝冲突路径和活动执行锁，不修改冻结执行日志的内容。新环境变量优先，
+兼容层仍可读取旧变量。辅助程序和生成的CTest脚本使用新的库名称。

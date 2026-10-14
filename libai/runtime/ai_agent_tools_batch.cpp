@@ -40,8 +40,8 @@ public:
         :key_(key),project_(project) {
         if(key.empty())return; // Legacy host calls make no durable claim.
         if(!libai::ai::program_sandbox_t::valid_idempotency_key(key))throw std::invalid_argument("invalid batch execution key");
-        const auto directory=root+"/.webcool_agent/tool_batches";
-        if(!libai::ai::file_ops::make_private_directory(root+"/.webcool_agent") ||
+        const auto directory=root+"/.libai_agent/tool_batches";
+        if(!libai::ai::file_ops::make_private_directory(root+"/.libai_agent") ||
             !libai::ai::file_ops::make_private_directory(directory))throw std::runtime_error("cannot prepare batch receipts");
         store_.reset(new libai::file_execution_store_t(directory,libai::execution_file_codec_t::plaintext()));
         scope_="tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key);
@@ -425,7 +425,7 @@ bool confirm_workspace_batch_child(const std::string &root,const std::string &ar
         else if(result.MemberCount()!=2||!result.HasMember("output_sha256")||!result["output_sha256"].IsString()||
             result["output_sha256"].GetStringLength()!=64||std::string(result["output_sha256"].GetString()).find_first_not_of("0123456789abcdef")!=std::string::npos||
             !result.HasMember("callback_ok")||!result["callback_ok"].IsBool())throw std::invalid_argument("invalid batch confirmed result");
-        libai::file_execution_store_t store(root+"/.webcool_agent/tool_batches",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t store(root+"/.libai_agent/tool_batches",libai::execution_file_codec_t::plaintext());
         const auto scope="tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key);const auto snapshot=store.open(scope);
         if(snapshot.state_json.empty()||snapshot.revision!=revision)throw std::runtime_error("batch receipt revision conflict");
         validate_workspace_batch_receipt(snapshot.state_json,key);
@@ -455,7 +455,7 @@ bool lock_workspace_batch_parent_receipt(const std::string &root,const std::stri
 {
 #if defined(__unix__) || defined(__APPLE__)
     try {
-        const auto directory=root+"/.webcool_agent/tool_batches";struct stat info;
+        const auto directory=root+"/.libai_agent/tool_batches";struct stat info;
         if(stat(directory.c_str(),&info)!=0){if(errno==ENOENT)return true;throw std::runtime_error("cannot inspect batch children");}
         auto lease=std::make_shared<libai::file_execution_store_t>(directory,libai::execution_file_codec_t::plaintext());
         const auto snapshot=lease->open("tool_batch_"+libai::ai::agent_workspace_t::content_sha256(key));leases.push_back(lease);
@@ -486,7 +486,7 @@ bool inspect_workspace_batch_receipt(const std::string &root,const std::string &
     try {
         if(key.empty()||!libai::ai::program_sandbox_t::valid_idempotency_key(key))
             throw std::invalid_argument("invalid batch inspection key");
-        const auto directory=root+"/.webcool_agent/tool_batches";
+        const auto directory=root+"/.libai_agent/tool_batches";
         struct stat info;
         if(stat(directory.c_str(),&info)!=0) {
             if(errno==ENOENT){out.add_bool("found",false);return true;}

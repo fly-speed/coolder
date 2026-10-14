@@ -280,7 +280,7 @@ static void add_stateless_responses_input(const provider_config_t &provider,
 		// exchange, not only from this request's current effort switch.  A
 		// resumed/repair turn deliberately sets effort=none, but DeepSeek still
 		// requires a typed reasoning_text item before the historical function
-		// call. This also applies to the final-answer turn after WebCool removes
+		// call. This also applies to the final-answer turn after LibAI removes
 		// the current tool definitions. In either case the faithful reasoning
 		// value may be empty, but the typed item must remain present.
 		const bool reasoning_replay_required =
@@ -325,7 +325,7 @@ static void add_stateless_responses_input(const provider_config_t &provider,
 			    exchange.calls[i].id :
 			    (matching ?
 			            matching->call_id :
-			            "webcool_call_" + std::to_string(i + 1));
+			            "libai_call_" + std::to_string(i + 1));
 			call.add_text("call_id", call_id.c_str());
 			call.add_text("name",
 			    wire_tool_name(exchange.calls[i].name).c_str());
@@ -463,11 +463,11 @@ static void add_responses_payload(const provider_config_t &provider,
 		acl::json_node &metadata = json.create_node();
 		root.add_child("metadata", metadata);
 		if (!input.metadata_run_id.empty()) {
-			metadata.add_text("webcool_run_id",
+			metadata.add_text("libai_run_id",
 			    input.metadata_run_id.substr(0, 512).c_str());
 		}
 		if (!input.metadata_session_id.empty()) {
-			metadata.add_text("webcool_session_id",
+			metadata.add_text("libai_session_id",
 			    input.metadata_session_id.substr(0, 512).c_str());
 		}
 	}
@@ -565,7 +565,7 @@ static void add_anthropic_payload(const provider_config_t &provider,
 			    exchange_output(exchange, i);
 			const std::string id = !exchange.calls[i].id.empty() ?
 			    exchange.calls[i].id :
-			    (output ? output->call_id : "webcool_call");
+			    (output ? output->call_id : "libai_call");
 			use.add_text("id", id.c_str());
 			use.add_text("name",
 			    wire_tool_name(exchange.calls[i].name).c_str());
@@ -775,7 +775,7 @@ static void add_chat_payload(const provider_config_t &provider,
 			acl::json_node &call = calls.add_child(false, true);
 			call.add_text("id",
 			    (exchange.calls[i].id.empty() ?
-			            ("webcool_call_" + std::to_string(i + 1)) :
+			            ("libai_call_" + std::to_string(i + 1)) :
 			            exchange.calls[i].id)
 			        .c_str());
 			call.add_text("type", "function");

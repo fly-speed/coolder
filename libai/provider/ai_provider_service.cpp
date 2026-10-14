@@ -33,21 +33,21 @@ bool provider_client_t::test_connection(const provider_config_t &provider,
 		completion_request_t probe;
 		probe.system_prompt =
 		    "Return the required capability-probe function call.";
-		probe.user_prompt = "Run the WebCool capability probe.";
+		probe.user_prompt = "Run the LibAI capability probe.";
 		probe.max_output_tokens = 256;
 		probe.reasoning_effort = "none";
 		probe.reasoning_summary = "none";
 		probe.text_verbosity = "low";
 		probe.service_tier = provider.responses_service_tier;
 		probe.prompt_cache_ttl = provider.responses_cache_ttl;
-		probe.prompt_cache_key = "webcool-capability-probe";
-		probe.safety_identifier = "webcool-capability-probe";
+		probe.prompt_cache_key = "libai-capability-probe";
+		probe.safety_identifier = "libai-capability-probe";
 		probe.store = false;
 		probe.background = false;
 		probe.compact_context = provider.responses_compact;
 		probe.strict_tools = true;
 		probe.require_tool_call = true;
-		agent_tool_t tool("webcool.capability_probe",
+		agent_tool_t tool("libai.capability_probe",
 		    "Return a harmless acknowledgement.", false, true, false,
 		    "read");
 		tool.parameters.push_back(
@@ -63,7 +63,7 @@ bool provider_client_t::test_connection(const provider_config_t &provider,
 			return ai_error("provider.client",
 			    "test-responses-capability", err);
 		if (!completion.native_tool_call ||
-		    completion.tool_name != "webcool.capability.probe") {
+		    completion.tool_name != "libai.capability.probe") {
 			err =
 			    "AI provider Responses capability probe returned no required tool call";
 			return ai_error(

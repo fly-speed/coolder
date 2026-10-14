@@ -84,7 +84,7 @@ class VisualStudioProjectTests(unittest.TestCase):
         helper = read_project(ROOT / "coolder-sandbox-helper.vcxproj")
         self.assertEqual(
             helper.findtext("./m:PropertyGroup/m:TargetName", namespaces=NS),
-            "webcool-sandbox-helper",
+            "libai-sandbox-helper",
         )
 
     def test_libai_source_coverage_and_filters(self):

@@ -1367,7 +1367,7 @@ var define, AMDLoader;
 })(AMDLoader || (AMDLoader = {}));
 
 ;(function (root) {
-  var config = root.__webcoolMonacoAmdConfig;
+  var config = root.__libaiMonacoAmdConfig;
   if (config && root.require && typeof root.require.config === "function") {
     root.require.config(config);
   }

@@ -23,7 +23,7 @@ final class Workspace {
       if (c.isEmpty()
           || c.equals(".")
           || c.equals("..")
-          || c.equals(".webcool_agent")
+          || c.equals(".libai_agent")
           || c.equals(".git")
           || c.equals(".env")
           || c.equals("secrets")

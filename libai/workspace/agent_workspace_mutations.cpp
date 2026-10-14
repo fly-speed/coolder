@@ -57,7 +57,7 @@ bool agent_workspace_t::replace_text_if_unchanged(
 		return ai_error(
 		    "agent.workspace", "generate-temporary-id", err);
 	}
-	const std::string temporary = absolute + ".webcool-patch-" + id;
+	const std::string temporary = absolute + ".libai-patch-" + id;
 	FILE *out = fopen(temporary.c_str(), "wb");
 	if (out == NULL) {
 		err = std::string("cannot create patch temporary file: ") +
@@ -124,7 +124,7 @@ bool agent_workspace_t::create_text_if_absent(const std::string &relative_file,
 	const std::string target = join_path(parent_absolute, name);
 #ifdef _WIN32
 	std::wstring target_wide;
-	if (!webcool_utf8_path_to_wide(target.c_str(), target_wide)) {
+	if (!libai_utf8_path_to_wide(target.c_str(), target_wide)) {
 		err = "cannot validate new workspace file path";
 		return ai_error("agent.workspace", "encode-new-file-path", err);
 	}
@@ -233,7 +233,7 @@ bool agent_workspace_t::save_generated_text(const std::string &relative_file,
 	int mode = 0600;
 #ifdef _WIN32
 	std::wstring target_wide;
-	if (!webcool_utf8_path_to_wide(target.c_str(), target_wide)) {
+	if (!libai_utf8_path_to_wide(target.c_str(), target_wide)) {
 		err = "cannot validate generated file path";
 		return ai_error(
 		    "agent.workspace", "encode-generated-path", err);
@@ -325,7 +325,7 @@ bool agent_workspace_t::delete_text_if_unchanged(
 	}
 #ifdef _WIN32
 	std::wstring absolute_wide;
-	if (!webcool_utf8_path_to_wide(absolute.c_str(), absolute_wide) ||
+	if (!libai_utf8_path_to_wide(absolute.c_str(), absolute_wide) ||
 	    DeleteFileW(absolute_wide.c_str()) == 0)
 #else
 	if (unlink(absolute.c_str()) != 0)
@@ -357,7 +357,7 @@ bool agent_workspace_t::create_directory_if_absent(
 	const std::string target = join_path(parent_absolute, name);
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(target.c_str(), wide) ||
+	if (!libai_utf8_path_to_wide(target.c_str(), wide) ||
 	    _wmkdir(wide.c_str()) != 0)
 #else
 	if (mkdir(target.c_str(), 0700) != 0)
@@ -390,7 +390,7 @@ bool agent_workspace_t::delete_empty_directory(
 	}
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(absolute.c_str(), wide) ||
+	if (!libai_utf8_path_to_wide(absolute.c_str(), wide) ||
 	    _wrmdir(wide.c_str()) != 0)
 #else
 	if (rmdir(absolute.c_str()) != 0)

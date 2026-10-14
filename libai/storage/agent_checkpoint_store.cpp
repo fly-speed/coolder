@@ -6,7 +6,7 @@
 #include "agent_checkpoint_store.h"
 #include "../common/ai_error_log.h"
 #include "../provider/ai_provider_store.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -31,7 +31,7 @@ namespace
 {
 
 libai::mutex g_checkpoint_mutex;
-const char *kHeader = "WEBCOOL_AGENT_CHECKPOINT_V1";
+const char *kHeader = "LIBAI_AGENT_CHECKPOINT_V1";
 
 using ::libai::ai::file_ops::join_path;
 
@@ -143,7 +143,7 @@ bool deserialize(const std::string &value, agent_checkpoint_t &checkpoint)
 
 std::string checkpoint_dir(const std::string &user_root)
 {
-	return join_path(user_root, ".webcool_agent/checkpoints");
+	return join_path(user_root, ".libai_agent/checkpoints");
 }
 
 std::string checkpoint_path(
@@ -154,13 +154,13 @@ std::string checkpoint_path(
 
 bool ensure_directory(const std::string &user_root, std::string &err)
 {
-	const std::string agent = join_path(user_root, ".webcool_agent");
+	const std::string agent = join_path(user_root, ".libai_agent");
 	const std::string directory = checkpoint_dir(user_root);
 #ifdef _WIN32
 	std::wstring agent_wide;
 	std::wstring directory_wide;
-	if (!webcool_utf8_path_to_wide(agent.c_str(), agent_wide) ||
-	    !webcool_utf8_path_to_wide(directory.c_str(), directory_wide)) {
+	if (!libai_utf8_path_to_wide(agent.c_str(), agent_wide) ||
+	    !libai_utf8_path_to_wide(directory.c_str(), directory_wide)) {
 		err = "cannot validate agent checkpoint directory";
 		return false;
 	}

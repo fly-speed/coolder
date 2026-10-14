@@ -53,7 +53,7 @@ std::string portable_project_name(const std::string &project_path)
 		    '_';
 	}
 	if (value.empty())
-		value = "webcool_project";
+		value = "libai_project";
 	if (!std::isdigit(static_cast<unsigned char>(value[0])))
 		return value;
 	value.insert(0, "app_");
@@ -90,14 +90,14 @@ void build_cpp_or_c_files(const std::string &language,
 	      << (cpp ? "CXX" : "C") << ")\n\n";
 	if (cpp) {
 		files.push_back(scaffold_file_t(
-		    "tests/webcool_io_test.cmake", ctest_io_template()));
-		files.push_back(scaffold_file_t("tests/webcool_io_tests.cmake",
+		    "tests/libai_io_test.cmake", ctest_io_template()));
+		files.push_back(scaffold_file_t("tests/libai_io_tests.cmake",
 		    ctest_registration_template()));
 		cmake << "set(CMAKE_CXX_STANDARD 17)\n"
 		      << "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
 		      << "set(CMAKE_CXX_EXTENSIONS OFF)\n\n";
 		files.push_back(scaffold_file_t("src/stdafx.h",
-		    "#ifndef WEBCOOL_PROJECT_STDAFX_H\n#define WEBCOOL_PROJECT_STDAFX_H\n\n"
+		    "#ifndef LIBAI_PROJECT_STDAFX_H\n#define LIBAI_PROJECT_STDAFX_H\n\n"
 		    "// Common C++17 standard-library headers. Keep project headers self-contained.\n"
 		    "#include <algorithm>\n#include <array>\n#include <atomic>\n"
 		    "#include <cassert>\n#include <cctype>\n#include <cerrno>\n#include <chrono>\n"
@@ -113,7 +113,7 @@ void build_cpp_or_c_files(const std::string &language,
 		    "#include <string_view>\n#include <system_error>\n#include <thread>\n"
 		    "#include <tuple>\n#include <type_traits>\n#include <unordered_map>\n"
 		    "#include <unordered_set>\n#include <utility>\n#include <variant>\n#include <vector>\n\n"
-		    "#endif  // WEBCOOL_PROJECT_STDAFX_H\n"));
+		    "#endif  // LIBAI_PROJECT_STDAFX_H\n"));
 	} else {
 		cmake << "set(CMAKE_C_STANDARD 11)\n"
 		      << "set(CMAKE_C_STANDARD_REQUIRED ON)\n"
@@ -127,8 +127,8 @@ void build_cpp_or_c_files(const std::string &language,
 	files.push_back(scaffold_file_t("CMakeLists.txt", cmake.str()));
 	files.push_back(scaffold_file_t(cpp ? "src/main.cpp" : "src/main.c",
 	    cpp ?
-	        "#include \"stdafx.h\"\n\nint main() {\n\tstd::cout << \"Hello from WebCool!\" << std::endl;\n\treturn 0;\n}\n" :
-	        "#include <stdio.h>\n\nint main(void) {\n\tputs(\"Hello from WebCool!\");\n\treturn 0;\n}\n"));
+	        "#include \"stdafx.h\"\n\nint main() {\n\tstd::cout << \"Hello from LibAI!\" << std::endl;\n\treturn 0;\n}\n" :
+	        "#include <stdio.h>\n\nint main(void) {\n\tputs(\"Hello from LibAI!\");\n\treturn 0;\n}\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\ncmake -S . -B build\ncmake --build build\n",
 	    "#!/bin/sh\nset -eu\nexec ./build/" + project_name + " \"$@\"\n",
@@ -207,7 +207,7 @@ void build_javascript_files(const std::string &platform,
 	        << "\"test\": \"node --test\" }\n}\n";
 	files.push_back(scaffold_file_t("package.json", package.str()));
 	files.push_back(scaffold_file_t("src/main.js",
-	    "'use strict';\n\nfunction greeting() {\n  return 'Hello from WebCool!';\n}\n\n"
+	    "'use strict';\n\nfunction greeting() {\n  return 'Hello from LibAI!';\n}\n\n"
 	    "if (require.main === module) console.log(greeting());\n\n"
 	    "module.exports = { greeting };\n"));
 	files.push_back(scaffold_file_t("tests/main.test.js",
@@ -215,7 +215,7 @@ void build_javascript_files(const std::string &platform,
 	    "const assert = require('node:assert/strict');\n"
 	    "const { greeting } = require('../src/main');\n\n"
 	    "test('greeting is stable', () => {\n"
-	    "  assert.equal(greeting(), 'Hello from WebCool!');\n});\n"));
+	    "  assert.equal(greeting(), 'Hello from LibAI!');\n});\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\nnode --check src/main.js\nnode --test\n",
 	    "#!/bin/sh\nset -eu\nexec node src/main.js \"$@\"\n",
@@ -236,14 +236,14 @@ void build_python_files(const std::string &platform,
 	        << "dependencies = []\n";
 	files.push_back(scaffold_file_t("pyproject.toml", project.str()));
 	files.push_back(scaffold_file_t("src/main.py",
-	    "def greeting():\n    return \"Hello from WebCool!\"\n\n\n"
+	    "def greeting():\n    return \"Hello from LibAI!\"\n\n\n"
 	    "def main():\n    print(greeting())\n\n\n"
 	    "if __name__ == \"__main__\":\n    main()\n"));
 	files.push_back(scaffold_file_t("tests/test_main.py",
 	    "import unittest\n\nfrom src.main import greeting\n\n\n"
 	    "class GreetingTest(unittest.TestCase):\n"
 	    "    def test_greeting(self):\n"
-	    "        self.assertEqual(greeting(), \"Hello from WebCool!\")\n\n\n"
+	    "        self.assertEqual(greeting(), \"Hello from LibAI!\")\n\n\n"
 	    "if __name__ == \"__main__\":\n    unittest.main()\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\npython3 -m py_compile src/main.py\npython3 -m unittest discover -s tests\n",
@@ -263,13 +263,13 @@ void build_java_files(
 	files.push_back(scaffold_file_t("src/Main.java",
 	    "public final class Main {\n    private Main() {}\n\n"
 	    "    public static String greeting() {\n"
-	    "        return \"Hello from WebCool!\";\n    }\n\n"
+	    "        return \"Hello from LibAI!\";\n    }\n\n"
 	    "    public static void main(String[] args) {\n"
 	    "        System.out.println(greeting());\n    }\n}\n"));
 	files.push_back(scaffold_file_t("tests/MainTest.java",
 	    "public final class MainTest {\n    private MainTest() {}\n\n"
 	    "    public static void main(String[] args) {\n"
-	    "        if (!\"Hello from WebCool!\".equals(Main.greeting())) {\n"
+	    "        if (!\"Hello from LibAI!\".equals(Main.greeting())) {\n"
 	    "            throw new AssertionError(\"unexpected greeting\");\n"
 	    "        }\n    }\n}\n"));
 	add_script_files(platform,
@@ -289,11 +289,11 @@ void build_go_files(const std::string &platform,
 	    "go.mod", "module example.com/" + project_name + "\n\ngo 1.21\n"));
 	files.push_back(scaffold_file_t("src/main.go",
 	    "package main\n\nimport \"fmt\"\n\nfunc greeting() string {\n"
-	    "\treturn \"Hello from WebCool!\"\n}\n\n"
+	    "\treturn \"Hello from LibAI!\"\n}\n\n"
 	    "func main() {\n\tfmt.Println(greeting())\n}\n"));
 	files.push_back(scaffold_file_t("src/main_test.go",
 	    "package main\n\nimport \"testing\"\n\nfunc TestGreeting(t *testing.T) {\n"
-	    "\tif greeting() != \"Hello from WebCool!\" {\n"
+	    "\tif greeting() != \"Hello from LibAI!\" {\n"
 	    "\t\tt.Fatal(\"unexpected greeting\")\n\t}\n}\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\nmkdir -p build\ngo build -o build/" +
@@ -305,7 +305,7 @@ void build_go_files(const std::string &platform,
 	    "@echo off\r\nbuild\\" + project_name + ".exe %*\r\n",
 	    "@echo off\r\nif exist build rmdir /s /q build\r\n", files);
 	files.push_back(
-	    scaffold_file_t(".gitignore", "build/\n.webcool-go-app\n"));
+	    scaffold_file_t(".gitignore", "build/\n.libai-go-app\n"));
 }
 
 void build_rust_files(const std::string &platform,
@@ -316,11 +316,11 @@ void build_rust_files(const std::string &platform,
 	        "\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n"
 	        "[dependencies]\n"));
 	files.push_back(scaffold_file_t("src/main.rs",
-	    "fn greeting() -> &'static str {\n    \"Hello from WebCool!\"\n}\n\n"
+	    "fn greeting() -> &'static str {\n    \"Hello from LibAI!\"\n}\n\n"
 	    "fn main() {\n    println!(\"{}\", greeting());\n}\n\n"
 	    "#[cfg(test)]\nmod tests {\n    use super::greeting;\n\n"
 	    "    #[test]\n    fn greeting_is_stable() {\n"
-	    "        assert_eq!(greeting(), \"Hello from WebCool!\");\n    }\n}\n"));
+	    "        assert_eq!(greeting(), \"Hello from LibAI!\");\n    }\n}\n"));
 	add_script_files(platform, "#!/bin/sh\nset -eu\ncargo build\n",
 	    "#!/bin/sh\nset -eu\nexec cargo run -- \"$@\"\n",
 	    "#!/bin/sh\nset -eu\ncargo clean\n", "@echo off\r\ncargo build\r\n",
@@ -333,15 +333,15 @@ void build_objective_c_files(
     const std::string &project_name, std::vector<scaffold_file_t> &files)
 {
 	files.push_back(scaffold_file_t("src/main.m",
-	    "#import <Foundation/Foundation.h>\n\nNSString *WebCoolGreeting(void) {\n"
-	    "    return @\"Hello from WebCool!\";\n}\n\nint main(void) {\n"
-	    "    @autoreleasepool {\n        NSLog(@\"%@\", WebCoolGreeting());\n"
+	    "#import <Foundation/Foundation.h>\n\nNSString *LibAIGreeting(void) {\n"
+	    "    return @\"Hello from LibAI!\";\n}\n\nint main(void) {\n"
+	    "    @autoreleasepool {\n        NSLog(@\"%@\", LibAIGreeting());\n"
 	    "    }\n    return 0;\n}\n"));
 	files.push_back(scaffold_file_t("tests/main_test.m",
 	    "#import <Foundation/Foundation.h>\n\n"
-	    "NSString *WebCoolGreeting(void);\n\nint main(void) {\n"
+	    "NSString *LibAIGreeting(void);\n\nint main(void) {\n"
 	    "    @autoreleasepool {\n"
-	    "        if (![WebCoolGreeting() isEqualToString:@\"Hello from WebCool!\"]) return 1;\n"
+	    "        if (![LibAIGreeting() isEqualToString:@\"Hello from LibAI!\"]) return 1;\n"
 	    "    }\n    return 0;\n}\n"));
 	files.push_back(scaffold_file_t("Makefile",
 	    "APP := " + project_name +
@@ -349,7 +349,7 @@ void build_objective_c_files(
 	        "\tmkdir -p build\n\txcrun --sdk macosx clang -fobjc-arc "
 	        "-framework Foundation src/main.m -o $@\n\ntest:\n"
 	        "\tmkdir -p build\n\txcrun --sdk macosx clang -fobjc-arc "
-	        "-Dmain=WebCoolApplicationMain -c src/main.m -o build/main.o\n"
+	        "-Dmain=LibAIApplicationMain -c src/main.m -o build/main.o\n"
 	        "\txcrun --sdk macosx clang -fobjc-arc -framework Foundation "
 	        "tests/main_test.m build/main.o -o build/tests\n"
 	        "\t./build/tests\n\nclean:\n\trm -rf build\n"));
@@ -379,13 +379,13 @@ void build_swift_files(const std::string &platform,
 	        "\"], path: \"Tests\")\n    ]\n)\n"));
 	files.push_back(scaffold_file_t("src/main.swift",
 	    "import Foundation\n\npublic func greeting() -> String {\n"
-	    "    \"Hello from WebCool!\"\n}\n\nprint(greeting())\n"));
+	    "    \"Hello from LibAI!\"\n}\n\nprint(greeting())\n"));
 	files.push_back(scaffold_file_t("Tests/GreetingTests.swift",
 	    "import XCTest\n@testable import " + project_name +
 	        "\n\n"
 	        "final class GreetingTests: XCTestCase {\n"
 	        "    func testGreeting() {\n"
-	        "        XCTAssertEqual(greeting(), \"Hello from WebCool!\")\n"
+	        "        XCTAssertEqual(greeting(), \"Hello from LibAI!\")\n"
 	        "    }\n}\n"));
 	add_script_files(platform, "#!/bin/sh\nset -eu\nswift build\n",
 	    "#!/bin/sh\nset -eu\nexec swift run " + project_name + " \"$@\"\n",
@@ -408,7 +408,7 @@ void build_csharp_files(const std::string &platform,
 	files.push_back(scaffold_file_t("src/Program.cs",
 	    "Console.WriteLine(Greeting.Text);\n\n"
 	    "public static class Greeting\n{\n"
-	    "    public const string Text = \"Hello from WebCool!\";\n}\n"));
+	    "    public const string Text = \"Hello from LibAI!\";\n}\n"));
 	files.push_back(scaffold_file_t("tests/Tests.csproj",
 	    "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n"
 	    "    <OutputType>Exe</OutputType>\n"
@@ -418,7 +418,7 @@ void build_csharp_files(const std::string &platform,
 	        project_name + ".csproj\" />\n  </ItemGroup>\n</Project>\n"));
 	files.push_back(scaffold_file_t("tests/Program.cs",
 	    "using System;\n\n"
-	    "if (Greeting.Text != \"Hello from WebCool!\")\n"
+	    "if (Greeting.Text != \"Hello from LibAI!\")\n"
 	    "    throw new Exception(\"unexpected greeting\");\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\ndotnet build -o build\n",
@@ -437,12 +437,12 @@ void build_kotlin_files(
     const std::string &platform, std::vector<scaffold_file_t> &files)
 {
 	files.push_back(scaffold_file_t("src/Main.kt",
-	    "fun greeting(): String = \"Hello from WebCool!\"\n\n"
+	    "fun greeting(): String = \"Hello from LibAI!\"\n\n"
 	    "fun main() {\n    println(greeting())\n}\n"));
 	files.push_back(scaffold_file_t("tests/MainTest.kt",
 	    "object MainTest {\n    @JvmStatic\n"
 	    "    fun main(args: Array<String>) {\n"
-	    "        check(greeting() == \"Hello from WebCool!\")\n"
+	    "        check(greeting() == \"Hello from LibAI!\")\n"
 	    "    }\n}\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\nmkdir -p build\nkotlinc src/Main.kt -include-runtime -d build/app.jar\n",
@@ -452,23 +452,23 @@ void build_kotlin_files(
 	    "@echo off\r\njava -jar build\\app.jar %*\r\n",
 	    "@echo off\r\nif exist build rmdir /s /q build\r\n", files);
 	files.push_back(scaffold_file_t(
-	    ".gitignore", "build/\n*.class\n.webcool-kotlin-*.jar\n"));
+	    ".gitignore", "build/\n*.class\n.libai-kotlin-*.jar\n"));
 }
 
 void build_php_files(const std::string &platform,
     const std::string &project_name, std::vector<scaffold_file_t> &files)
 {
 	files.push_back(scaffold_file_t("composer.json",
-	    "{\n  \"name\": \"webcool/" + project_name +
+	    "{\n  \"name\": \"libai/" + project_name +
 	        "\",\n  \"type\": \"project\",\n"
 	        "  \"require\": {}\n}\n"));
 	files.push_back(scaffold_file_t("src/main.php",
 	    "<?php\n\ndeclare(strict_types=1);\n\nfunction greeting(): string\n{\n"
-	    "    return 'Hello from WebCool!';\n}\n\necho greeting(), PHP_EOL;\n"));
+	    "    return 'Hello from LibAI!';\n}\n\necho greeting(), PHP_EOL;\n"));
 	files.push_back(scaffold_file_t("tests/main_test.php",
 	    "<?php\n\ndeclare(strict_types=1);\n\nob_start();\n"
 	    "require __DIR__ . '/../src/main.php';\nob_end_clean();\n\n"
-	    "if (greeting() !== 'Hello from WebCool!') {\n"
+	    "if (greeting() !== 'Hello from LibAI!') {\n"
 	    "    throw new RuntimeException('unexpected greeting');\n}\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\nphp -l src/main.php\nphp tests/main_test.php\n",
@@ -493,11 +493,11 @@ void build_d_files(const std::string &platform, const std::string &project_name,
 	        "  \"dependencies\": {}\n}\n"));
 	files.push_back(scaffold_file_t("src/main.d",
 	    "import std.stdio;\n\nstring greeting()\n{\n"
-	    "    return \"Hello from WebCool!\";\n}\n\nvoid main()\n{\n"
+	    "    return \"Hello from LibAI!\";\n}\n\nvoid main()\n{\n"
 	    "    writeln(greeting());\n}\n"));
 	files.push_back(scaffold_file_t("tests/main.d",
 	    "module main_test;\n\nunittest\n{\n"
-	    "    assert(\"Hello from WebCool!\" == \"Hello from WebCool!\");\n}\n\n"
+	    "    assert(\"Hello from LibAI!\" == \"Hello from LibAI!\");\n}\n\n"
 	    "void main() {}\n"));
 	add_script_files(platform,
 	    "#!/bin/sh\nset -eu\ndmd -of=build-app src/main.d\ndmd -unittest -run tests/main.d\n",
@@ -508,7 +508,7 @@ void build_d_files(const std::string &platform, const std::string &project_name,
 	    "@echo off\r\nif exist build-app del /q build-app\r\nif exist build-app.exe del /q build-app.exe\r\ndel /q *.obj *.o 2>nul\r\n",
 	    files);
 	files.push_back(scaffold_file_t(".gitignore",
-	    "build-app\nbuild-app.exe\n.webcool-d-app\n.webcool-d-app.exe\n*.obj\n*.o\n"));
+	    "build-app\nbuild-app.exe\n.libai-d-app\n.libai-d-app.exe\n*.obj\n*.o\n"));
 }
 
 std::vector<scaffold_file_t> scaffold_files(const std::string &language,
@@ -543,7 +543,7 @@ std::vector<scaffold_file_t> scaffold_files(const std::string &language,
 		build_d_files(platform, project_name, files);
 	}
 	std::ostringstream readme;
-	readme << "# " << project_name << "\n\nGenerated by WebCool.\n\n"
+	readme << "# " << project_name << "\n\nGenerated by LibAI.\n\n"
 	       << "- Language: " << language << "\n- Platform: " << platform
 	       << "\n";
 	if (language == "html") {

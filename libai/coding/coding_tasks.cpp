@@ -14,7 +14,7 @@ acl::json_node *object(acl::json_node *n)
 }
 bool excluded(const std::string &path)
 {
-    const std::set<std::string> names = {".git", ".webcool_agent", ".webcool-build",
+    const std::set<std::string> names = {".git", ".libai_agent", ".libai-build",
         "build", "target", "dist", "node_modules", "var", ".env", "secrets", "private"};
     size_t begin = 0;
     while (begin < path.size()) {

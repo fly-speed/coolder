@@ -207,7 +207,7 @@ final class Runs {
     List<Object> images = new ArrayList<>();
     StringBuilder prompt = new StringBuilder(Json.text(b, "prompt"));
     if (frozen == null && !draft.isEmpty()) {
-      if (!draft.matches("\\.webcool_agent/attachments/[a-f0-9]{64}"))
+      if (!draft.matches("\\.libai_agent/attachments/[a-f0-9]{64}"))
         throw new App.Error(400, "invalid draft");
       for (Object v : attachments) {
         String rel = (String) v;

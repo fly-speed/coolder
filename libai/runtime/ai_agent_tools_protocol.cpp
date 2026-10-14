@@ -246,7 +246,7 @@ bool build_native_tool_outputs(
 	outputs.clear();
 	if (calls.size() == 1) {
 		libai::ai::completion_tool_output_t output;
-		output.call_id = calls.front().id.empty() ? "webcool_call_1" :
+		output.call_id = calls.front().id.empty() ? "libai_call_1" :
 		                                            calls.front().id;
 		output.output = combined_result;
 		outputs.push_back(output);
@@ -266,7 +266,7 @@ bool build_native_tool_outputs(
 		for (size_t i = 0; i < calls.size(); ++i) {
 			libai::ai::completion_tool_output_t output;
 			output.call_id = calls[i].id.empty() ?
-			    "webcool_call_" + std::to_string(i + 1) :
+			    "libai_call_" + std::to_string(i + 1) :
 			    calls[i].id;
 			output.output = combined_result;
 			outputs.push_back(output);
@@ -287,7 +287,7 @@ bool build_native_tool_outputs(
 		}
 		libai::ai::completion_tool_output_t output;
 		output.call_id = calls[i].id.empty() ?
-		    "webcool_call_" + std::to_string(i + 1) :
+		    "libai_call_" + std::to_string(i + 1) :
 		    calls[i].id;
 		output.output = json_text((*object)["result"]);
 		outputs.push_back(output);

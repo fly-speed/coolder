@@ -61,6 +61,8 @@ final class App implements AutoCloseable {
         Json.map(Json.parse(new CodingService(data.toString()).call("storage.migrate", "{}")));
     if (!Json.flag(migration, "ok", false))
       throw new Error(400, "JSON storage migration failed: " + Json.text(migration, "error"));
+    Map<String,Object> workspaceMigration=Json.map(Json.parse(new CodingService(workspace.toString()).call("storage.migrate","{}")));
+    if(!Json.flag(workspaceMigration,"ok",false))throw new Error(400,"workspace naming migration failed: "+Json.text(workspaceMigration,"error"));
     auth =
         new Auth(data, workspace, Paths.get(Json.text(cfg, "html")).toAbsolutePath().normalize());
     projects = new Projects(auth);
@@ -69,7 +71,7 @@ final class App implements AutoCloseable {
     policy =
         Json.map(
             Store.shared(
-                data.resolve(".webcool_settings/ai-policy.v1"),
+                data.resolve(".libai_settings/ai-policy.v1"),
                 data.resolve("auth/ai-policy-java.v1"),
                 data.resolve("auth/ai-policy-rust.v1"),
                 Json.obj(
@@ -85,7 +87,7 @@ final class App implements AutoCloseable {
     Map<String, Object> effective = runtimePolicy("runtime.policy.configure", policy);
     effective.putAll(policy);
     policy = effective;
-    Store.write(auth.data.resolve(".webcool_settings/ai-policy.v1"), policy);
+    Store.write(auth.data.resolve(".libai_settings/ai-policy.v1"), policy);
   }
 
   Map<String, Object> runtimePolicy(String operation, Map<String, Object> candidate) {
@@ -252,7 +254,7 @@ final class App implements AutoCloseable {
             candidate.putAll(b);
             validatePolicy(candidate);
             runtimePolicy("runtime.policy.validate", candidate);
-            Store.write(auth.data.resolve(".webcool_settings/ai-policy.v1"), candidate);
+            Store.write(auth.data.resolve(".libai_settings/ai-policy.v1"), candidate);
             runtimePolicy("runtime.policy.configure", candidate);
             policy = candidate;
           }

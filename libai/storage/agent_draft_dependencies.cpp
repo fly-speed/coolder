@@ -221,7 +221,7 @@ static bool build_source_dependency(const std::string &system,
 		configure.fixed_arguments.push_back(
 		    "-DCMAKE_BUILD_TYPE=" + dep.build_type);
 		configure.fixed_arguments.push_back("-DCMAKE_INSTALL_PREFIX=" +
-		    work.path + "/.webcool-build/install");
+		    work.path + "/.libai-build/install");
 		for (const auto &option : dep.definitions)
 			configure.fixed_arguments.push_back(
 			    "-D" + option.first + "=" + option.second);
@@ -229,14 +229,14 @@ static bool build_source_dependency(const std::string &system,
 		    { "--config", dep.build_type });
 		sandbox_command_t install = build;
 		install.id = "dependency.cmake.install";
-		install.fixed_arguments = { "--install", ".webcool-build",
+		install.fixed_arguments = { "--install", ".libai-build",
 			"--config", dep.build_type };
 		commands = { configure, build, install };
 		phases = { "dependency_configure", "dependency_build",
 			"dependency_install" };
 	} else {
 		build.fixed_arguments.push_back(dep.prefix_variable + "=" +
-		    work.path + "/.webcool-build/install");
+		    work.path + "/.libai-build/install");
 		sandbox_command_t install = build;
 		build.fixed_arguments.push_back(dep.make_target);
 		install.id = "dependency.make.install";
@@ -356,7 +356,7 @@ bool prepare_source_dependency(const std::string &user_root,
 	bool has_cmake = false, has_make = false;
 	for (const auto &entry : entries) {
 		const std::string relative = entry.path.substr(base.size() + 1);
-		if (relative != ".webcool-build")
+		if (relative != ".libai-build")
 			source_paths.push_back(relative);
 		if (relative == "CMakeLists.txt")
 			has_cmake = true;
@@ -484,7 +484,7 @@ bool prepare_source_dependency(const std::string &user_root,
 	// Resolve through the private workspace before treating install as a root;
 	// CMake must not trick the publisher into following an escaping symlink.
 	if (!agent_workspace_t::resolve_project_root(
-	        work.path, ".webcool-build/install", installed, err)) {
+	        work.path, ".libai-build/install", installed, err)) {
 		err = "source dependency " + dep.root +
 		    " did not produce a safe install directory: " + err;
 		std::string ignored;

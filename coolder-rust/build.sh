@@ -45,7 +45,7 @@ publish_file() {
     fi
     rmdir -- "$staging"
 }
-publish_file "$output/helper/webcool-sandbox-helper" "$dist_dir/bin"
+publish_file "$output/helper/libai-sandbox-helper" "$dist_dir/bin"
 # Package the SDK for the executable-relative RPATH.
 if [[ ! -s "$COOLDER_NATIVE_MANIFEST" ]]; then
     printf 'Cargo did not report the linked native runtime directory.\n' >&2; exit 1

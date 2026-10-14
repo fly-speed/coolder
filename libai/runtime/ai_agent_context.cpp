@@ -41,7 +41,7 @@ bool safe_git_project_directory(const std::string &physical)
 	const std::string marker = physical + "/.git";
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(marker.c_str(), wide))
+	if (!libai_utf8_path_to_wide(marker.c_str(), wide))
 		return false;
 	const DWORD attributes = GetFileAttributesW(wide.c_str());
 	return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -57,7 +57,7 @@ const size_t kMaxAttachmentCount = 8;
 const size_t kMaxAttachmentBytes = 8 * 1024 * 1024;
 const size_t kMaxAttachmentTotalBytes = 16 * 1024 * 1024;
 const size_t kMaxAttachmentTextBytes = 32 * 1024;
-const char *kAttachmentDraftPrefix = ".webcool_agent/attachments/draft-";
+const char *kAttachmentDraftPrefix = ".libai_agent/attachments/draft-";
 
 bool valid_attachment_draft(const std::string &draft)
 {
@@ -394,7 +394,7 @@ void append_project_plan_context(libai::ai::agent_workspace_t &workspace,
 		return;
 
 	std::ostringstream out;
-	out << "\n<webcool_project_plan version=\"" << project->plan_version
+	out << "\n<libai_project_plan version=\"" << project->plan_version
 	    << "\">\n"
 	    << prompt_text(prompt_id::project_plan_state, chinese)
 	    << prompt_text(prompt_id::project_plan_scope, chinese)
@@ -456,7 +456,7 @@ void append_project_plan_context(libai::ai::agent_workspace_t &workspace,
 		out << prompt_text(prompt_id::project_plan_truncated, chinese);
 		break;
 	}
-	out << "</webcool_project_plan>\n";
+	out << "</libai_project_plan>\n";
 	context += out.str();
 }
 

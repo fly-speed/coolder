@@ -117,7 +117,7 @@ bool inspect_command(const std::string &root,acl::json_node &a,acl::json_node &o
 	if(key.empty()||!program_sandbox_t::valid_idempotency_key(key)) {
 		error="invalid sandbox inspection key";return false;
 	}
-	const auto directory=root+"/.webcool_agent/sandbox_commands";
+	const auto directory=root+"/.libai_agent/sandbox_commands";
 	struct stat info;
 	if(stat(directory.c_str(),&info)!=0) {
 		if(errno==ENOENT){out.add_bool("found",false);return true;}
@@ -145,7 +145,7 @@ bool confirm_command(const std::string &root,acl::json_node &a,acl::json_node &o
 	    !input.HasMember("result") || !input["result"].IsObject()) {
 		error="invalid sandbox host confirmation";return false;
 	}
-	libai::file_execution_store_t journal(root+"/.webcool_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
+	libai::file_execution_store_t journal(root+"/.libai_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
 	const auto scope=command_scope(key);const auto snapshot=journal.open(scope);
 	if(snapshot.state_json.empty() || snapshot.revision!=expected) {error="sandbox command receipt revision conflict";return false;}
 	validate_receipt(snapshot.state_json,key);
@@ -185,11 +185,11 @@ bool execute(const std::string &root, acl::json_node &a,
 		return false;
 	}
 	const auto execution_key=supplied_key.empty()?"sandbox."+plan_id:supplied_key;
-	if(!file_ops::make_private_directory(root+"/.webcool_agent") ||
-	    !file_ops::make_private_directory(root+"/.webcool_agent/sandbox_commands")) {
+	if(!file_ops::make_private_directory(root+"/.libai_agent") ||
+	    !file_ops::make_private_directory(root+"/.libai_agent/sandbox_commands")) {
 		error="cannot prepare private sandbox receipt directory";return false;
 	}
-	libai::file_execution_store_t journal(root+"/.webcool_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
+	libai::file_execution_store_t journal(root+"/.libai_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
 	const auto scope=command_scope(execution_key);
 	const auto snapshot=journal.open(scope);
 	if(!snapshot.state_json.empty()) {
@@ -285,7 +285,7 @@ static void link_command_parent(const std::string &root,const std::string &proje
 {
     if(parent.empty())return;
     if(!program_sandbox_t::valid_idempotency_key(parent))throw std::invalid_argument("invalid command parent key");
-    libai::file_execution_store_t store(root+"/.webcool_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
+    libai::file_execution_store_t store(root+"/.libai_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
     const auto scope="command_parent_"+agent_workspace_t::content_sha256(parent);const auto snapshot=store.open(scope);
     auto children=snapshot.state_json.empty()?std::vector<std::string>():command_parent_children(snapshot.state_json,parent,project);
     if(std::find(children.begin(),children.end(),key)!=children.end())throw std::runtime_error("command parent already references this key");
@@ -301,7 +301,7 @@ bool inspect_command_parent(const std::string &root,acl::json_node &args,acl::js
     try {
         const auto key=text(args,"idempotency_key"),project=text(args,"project_path");
         if(key.empty()||!program_sandbox_t::valid_idempotency_key(key))throw std::invalid_argument("invalid command parent key");
-        const auto directory=root+"/.webcool_agent/sandbox_commands";struct stat info;
+        const auto directory=root+"/.libai_agent/sandbox_commands";struct stat info;
         if(stat(directory.c_str(),&info)!=0){if(errno==ENOENT){out.add_bool("found",false);return true;}throw std::runtime_error("cannot inspect command parent directory");}
         libai::file_execution_store_t store(directory,libai::execution_file_codec_t::plaintext());
         const auto snapshot=store.open("command_parent_"+agent_workspace_t::content_sha256(key));out.add_bool("found",!snapshot.state_json.empty());
@@ -319,7 +319,7 @@ bool lock_command_children(const std::string &root,const std::string &project,co
 {
 #if defined(__unix__) || defined(__APPLE__)
     try {
-        const auto directory=root+"/.webcool_agent/sandbox_commands";struct stat info;
+        const auto directory=root+"/.libai_agent/sandbox_commands";struct stat info;
         if(stat(directory.c_str(),&info)!=0){if(errno==ENOENT)return true;throw std::runtime_error("cannot inspect command parents");}
         auto manifest=std::make_shared<libai::file_execution_store_t>(directory,libai::execution_file_codec_t::plaintext());
         const auto snapshot=manifest->open("command_parent_"+agent_workspace_t::content_sha256(parent));leases.push_back(manifest);
@@ -350,11 +350,11 @@ bool record_command_execution(const std::string &root,const std::string &project
 		error="trusted command requires a valid execution key";return false;
 	}
 	try {
-		if(!file_ops::make_private_directory(root+"/.webcool_agent") ||
-		    !file_ops::make_private_directory(root+"/.webcool_agent/sandbox_commands")) {
+		if(!file_ops::make_private_directory(root+"/.libai_agent") ||
+		    !file_ops::make_private_directory(root+"/.libai_agent/sandbox_commands")) {
 			error="cannot prepare private command receipt directory";return false;
 		}
-		libai::file_execution_store_t journal(root+"/.webcool_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
+		libai::file_execution_store_t journal(root+"/.libai_agent/sandbox_commands",libai::execution_file_codec_t::plaintext());
 		const auto scope=command_scope(key);const auto snapshot=journal.open(scope);
 		if(!snapshot.state_json.empty()) {
 			validate_receipt(snapshot.state_json,key);

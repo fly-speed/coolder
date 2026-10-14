@@ -78,7 +78,7 @@
     <ClInclude Include="common\platform_compat.h" />
     <ClInclude Include="common\record_codec.h" />
     <ClInclude Include="common\utf8_text.h" />
-    <ClInclude Include="common\webcool_mutex.h" />
+    <ClInclude Include="common\native_mutex.h" />
     <ClInclude Include="common\windows_browser_runtime.h" />
     <ClInclude Include="context\agent_context_limits.h" />
     <ClInclude Include="context\agent_context_window.h" />

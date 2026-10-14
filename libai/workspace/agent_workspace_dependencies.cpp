@@ -136,7 +136,7 @@ static bool parse_dependency_build(acl::json_node *format,
 		    dep.definitions.size() >= 32 ||
 		    dep.definitions.count(key)) {
 			err =
-			    "invalid or reserved CMake definition (CMAKE_* is managed by WebCool)";
+			    "invalid or reserved CMake definition (CMAKE_* is managed by LibAI)";
 			return false;
 		}
 		dep.definitions[key] = value;
@@ -162,7 +162,7 @@ bool agent_workspace_t::prebuilt_dependencies(const std::string &directory,
 	std::string absolute;
 	if (!resolve_existing(directory, absolute, err))
 		return false;
-	const std::string name = ".webcool-dependencies.json";
+	const std::string name = ".libai-dependencies.json";
 	struct stat st;
 	if (lstat((absolute + "/" + name).c_str(), &st) != 0) {
 		if (errno == ENOENT)
@@ -179,7 +179,7 @@ bool agent_workspace_t::prebuilt_dependencies(const std::string &directory,
 	acl::json json(text.c_str());
 	auto fail = [&]() {
 		err +=
-		    " invalid .webcool-dependencies.json: expected prebuilt-v1/dependencies-v2, project-relative roots and artifact paths";
+		    " invalid .libai-dependencies.json: expected prebuilt-v1/dependencies-v2, project-relative roots and artifact paths";
 		return false;
 	};
 	if (!json.finish()) {
@@ -277,8 +277,8 @@ bool agent_workspace_t::copy_build_dependency(const std::string &source_file,
 	    slash == std::string::npos ? relative : relative.substr(slash + 1));
 #ifdef _WIN32
 	std::wstring source_wide, target_wide;
-	if (!webcool_utf8_path_to_wide(source.c_str(), source_wide) ||
-	    !webcool_utf8_path_to_wide(target.c_str(), target_wide)) {
+	if (!libai_utf8_path_to_wide(source.c_str(), source_wide) ||
+	    !libai_utf8_path_to_wide(target.c_str(), target_wide)) {
 		err = "cannot encode build dependency path";
 		return false;
 	}
@@ -560,7 +560,7 @@ inline bool build_tree_copy_t::directory(int source, int target,
 		}
 		const std::string name = entry->d_name;
 		if (name == "." || name == ".." ||
-		    (relative.empty() && name == ".webcool-build"))
+		    (relative.empty() && name == ".libai-build"))
 			continue;
 		const std::string path =
 		    relative.empty() ? name : relative + "/" + name;

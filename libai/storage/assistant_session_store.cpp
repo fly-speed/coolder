@@ -77,7 +77,7 @@ bool safe_database_file(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide))
+	if (!libai_utf8_path_to_wide(path.c_str(), wide))
 		return false;
 	const DWORD attr = GetFileAttributesW(wide.c_str());
 	if (attr == INVALID_FILE_ATTRIBUTES)
@@ -117,7 +117,7 @@ struct database_t {
 
 	bool open(const std::string &root, std::string &err)
 	{
-		const std::string dir = root + "/.webcool_agent";
+		const std::string dir = root + "/.libai_agent";
 		if (!make_directory(dir)) {
 			err = "cannot create assistant database directory";
 			return false;

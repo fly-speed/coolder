@@ -217,11 +217,11 @@ final class Projects {
 
   Object attachments(Map<String, Object> a, Map<String, Object> b, boolean discard)
       throws Exception {
-    Path root = auth.root(a), base = root.resolve(".webcool_agent/attachments");
+    Path root = auth.root(a), base = root.resolve(".libai_agent/attachments");
     Store.privateDir(base);
     if (discard) {
       String draft = Json.text(b, "attachment_draft");
-      if (!draft.matches("\\.webcool_agent/attachments/[a-f0-9]{64}"))
+      if (!draft.matches("\\.libai_agent/attachments/[a-f0-9]{64}"))
         throw new App.Error(400, "invalid attachment draft");
       Path p = root.resolve(draft);
       if (Files.isDirectory(p) && !Files.isSymbolicLink(p)) {
@@ -257,7 +257,7 @@ final class Projects {
       bytes.add(data);
       names.add(name);
     }
-    String draft = ".webcool_agent/attachments/" + Store.id();
+    String draft = ".libai_agent/attachments/" + Store.id();
     Store.privateDir(root.resolve(draft));
     List<Object> paths = new ArrayList<>();
     for (int i = 0; i < bytes.size(); i++) {

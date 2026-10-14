@@ -2,7 +2,7 @@
 
 #include <mutex>
 
-#if !defined(WEBCOOL_USE_STD_MUTEX)
+#if !defined(LIBAI_USE_STD_MUTEX)
 #include "fiber/lib_fiber.hpp"
 #endif
 
@@ -18,7 +18,7 @@ public:
 	// Initialize the underlying mutex used by this adapter.
 	mutex()
 	{
-#if !defined(WEBCOOL_USE_STD_MUTEX)
+#if !defined(LIBAI_USE_STD_MUTEX)
 		initialize_native_runtime();
 #endif
 	}
@@ -35,7 +35,7 @@ public:
 	// Acquire exclusive ownership of the underlying mutex.
 	void lock()
 	{
-#if defined(WEBCOOL_USE_STD_MUTEX)
+#if defined(LIBAI_USE_STD_MUTEX)
 		impl_.lock();
 #else
 		(void)impl_.lock();
@@ -45,7 +45,7 @@ public:
 	// Attempt to acquire the mutex without waiting.
 	bool try_lock()
 	{
-#if defined(WEBCOOL_USE_STD_MUTEX)
+#if defined(LIBAI_USE_STD_MUTEX)
 		return impl_.try_lock();
 #else
 		return impl_.trylock();
@@ -55,7 +55,7 @@ public:
 	// Release exclusive ownership of the underlying mutex.
 	void unlock()
 	{
-#if defined(WEBCOOL_USE_STD_MUTEX)
+#if defined(LIBAI_USE_STD_MUTEX)
 		impl_.unlock();
 #else
 		(void)impl_.unlock();
@@ -63,7 +63,7 @@ public:
 	}
 
 private:
-#if defined(WEBCOOL_USE_STD_MUTEX)
+#if defined(LIBAI_USE_STD_MUTEX)
 	// Private implementation state hidden from interface consumers.
 	std::mutex impl_;
 #else

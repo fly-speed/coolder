@@ -133,6 +133,7 @@ impl App {
             return Err(Error::bad("UI files missing"));
         }
         projects::coding(&data, "storage.migrate", &json!({}))?;
+        projects::coding(&workspace, "storage.migrate", &json!({}))?;
         let mut state = State::new(
             data,
             workspace,
@@ -150,7 +151,7 @@ impl App {
             .extend(state.policy.as_object().unwrap().clone());
         state.policy = effective;
         write(
-            &state.data.join(".webcool_settings/ai-policy.v1"),
+            &state.data.join(".libai_settings/ai-policy.v1"),
             &state.policy,
         )?;
         state.save()?;
@@ -388,7 +389,7 @@ impl App {
                 }
                 validate_policy(&policy)?;
                 projects::coding(&s.workspace, "runtime.policy.validate", &policy)?;
-                write(&s.data.join(".webcool_settings/ai-policy.v1"), &policy)?;
+                write(&s.data.join(".libai_settings/ai-policy.v1"), &policy)?;
                 projects::coding(&s.workspace, "runtime.policy.configure", &policy)?;
                 s.policy = policy;
             }

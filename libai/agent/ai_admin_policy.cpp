@@ -32,7 +32,7 @@ ai_admin_policy_t g_runtime_policy;
 
 std::string policy_directory(const std::string &root)
 {
-	return root + "/.webcool_settings";
+	return root + "/.libai_settings";
 }
 
 std::string policy_path(const std::string &root)
@@ -400,7 +400,7 @@ bool ai_admin_policy_store_t::save(
 	bool directory_ok = false;
 #ifdef _WIN32
 	std::wstring wide;
-	if (webcool_utf8_path_to_wide(directory.c_str(), wide)) {
+	if (libai_utf8_path_to_wide(directory.c_str(), wide)) {
 		const DWORD attrs = GetFileAttributesW(wide.c_str());
 		directory_ok =
 		    (attrs != INVALID_FILE_ATTRIBUTES &&
@@ -509,8 +509,8 @@ bool ai_admin_policy_store_t::save(
 	std::wstring temporary_wide;
 	std::wstring path_wide;
 	installed =
-	    webcool_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
-	    webcool_utf8_path_to_wide(path.c_str(), path_wide) &&
+	    libai_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
+	    libai_utf8_path_to_wide(path.c_str(), path_wide) &&
 	    MoveFileExW(temporary_wide.c_str(), path_wide.c_str(),
 	        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 #else

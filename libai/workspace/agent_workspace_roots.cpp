@@ -16,7 +16,7 @@ std::mutex g_project_root_registry_mutex;
 
 std::string registry_path(const std::string &user_root)
 {
-	return user_root + "/.webcool_agent/external-project-roots.v1";
+	return user_root + "/.libai_agent/external-project-roots.v1";
 }
 
 using ::libai::ai::record_codec::hex_encode;
@@ -109,7 +109,7 @@ bool make_private_directory_if_needed(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide))
+	if (!libai_utf8_path_to_wide(path.c_str(), wide))
 		return false;
 	const DWORD attrs = GetFileAttributesW(wide.c_str());
 	if (attrs != INVALID_FILE_ATTRIBUTES)
@@ -154,7 +154,7 @@ bool agent_workspace_t::register_project_root(const std::string &user_root,
 	if (!read_project_roots(user_root, roots, err))
 		return false;
 	roots[logical] = physical;
-	const std::string metadata = user_root + "/.webcool_agent";
+	const std::string metadata = user_root + "/.libai_agent";
 	if (!make_private_directory_if_needed(metadata)) {
 		err = "cannot create external project root registry directory";
 		return false;
@@ -315,7 +315,7 @@ bool agent_workspace_t::resolve_project_state_root(const std::string &user_root,
 		return true;
 	}
 	const std::string metadata =
-	    std::string(resolved_user) + "/.webcool_agent";
+	    std::string(resolved_user) + "/.libai_agent";
 	const std::string states = metadata + "/external-project-state";
 	const std::string digest = content_sha256(logical_path);
 	if (digest.empty() || !make_private_directory_if_needed(metadata) ||

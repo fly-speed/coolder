@@ -2,7 +2,7 @@
 BUILD_DIR ?= build
 CMAKE ?= cmake
 MODULE_DIRS := agent provider storage project workspace sandbox context prompt validation common runtime
-# Set by webcool's wrapper so a fresh build and cached rebuild use the same ABI.
+# Set by Coolder's wrapper so a fresh build and cached rebuild use the same ABI.
 ifeq ($(shell uname -s),Darwin)
 ifneq ($(strip $(MACOSX_DEPLOYMENT_TARGET)),)
 CMAKE_OPTIONS += -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET)
@@ -17,7 +17,7 @@ all:
 	+$(CMAKE) --build $(BUILD_DIR)
 install: all
 	$(CMAKE) --install $(BUILD_DIR) $(if $(PREFIX),--prefix "$(PREFIX)")
-# webcool's Make build writes objects beside the library sources.
+# Coolder's Make build writes objects beside the library sources.
 # Clean these even when the standalone CMake build has not been configured.
 clean:
 	$(RM) *.o *.obj *.d libai.a libai.lib $(foreach module,$(MODULE_DIRS),$(wildcard $(module)/*.o $(module)/*.obj $(module)/*.d))

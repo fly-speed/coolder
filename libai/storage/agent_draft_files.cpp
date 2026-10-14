@@ -93,8 +93,8 @@ bool rename_directory(const std::string &from, const std::string &to)
 #ifdef _WIN32
 	std::wstring from_wide;
 	std::wstring to_wide;
-	return webcool_utf8_path_to_wide(from.c_str(), from_wide) &&
-	    webcool_utf8_path_to_wide(to.c_str(), to_wide) &&
+	return libai_utf8_path_to_wide(from.c_str(), from_wide) &&
+	    libai_utf8_path_to_wide(to.c_str(), to_wide) &&
 	    MoveFileExW(from_wide.c_str(), to_wide.c_str(),
 	        MOVEFILE_WRITE_THROUGH) != 0;
 #else
@@ -124,7 +124,7 @@ bool copy_build_tree(agent_workspace_t &source, const std::string &source_dir,
 		const std::string name = slash == std::string::npos ?
 		    entries[i].path :
 		    entries[i].path.substr(slash + 1);
-		if (draft_dir.empty() && name == ".webcool-build")
+		if (draft_dir.empty() && name == ".libai-build")
 			continue;
 		const std::string target =
 		    draft_dir.empty() ? name : join_path(draft_dir, name);
@@ -393,7 +393,7 @@ bool update_verified_writes(const agent_draft_store_t &store,
 	        run + ".snapshot", "incremental-update-in-progress\n", err))
 		return false;
 	if (!remove_tree(
-	        join_path(target, ".webcool-build"), err, &phase.budget))
+	        join_path(target, ".libai-build"), err, &phase.budget))
 		return false;
 	size_t applied = 0;
 	bool ok = true;

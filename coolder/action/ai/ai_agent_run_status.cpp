@@ -375,8 +375,8 @@ bool AiAgentRunReasoningSaveAction::run(request_t &req, response_t &res)
 	root.add_text("path", relative_path.c_str());
 	root.add_text("operation_log_path",
 	    (record.project_path.empty() ?
-	            ".webcool_agent/ai-operations-" + run_id + ".jsonl" :
-	            record.project_path + "/.webcool_agent/ai-operations-" +
+	            ".libai_agent/ai-operations-" + run_id + ".jsonl" :
+	            record.project_path + "/.libai_agent/ai-operations-" +
 	                run_id + ".jsonl")
 	        .c_str());
 	root.add_number("bytes", static_cast<long long>(reasoning.size()));

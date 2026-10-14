@@ -1,3 +1,4 @@
+#include "../common/legacy_branding.h"
 #include "stdafx.h"
 #include "project_toolchain.h"
 #include "project_toolchain_internal.h"
@@ -57,7 +58,7 @@ bool has_safe_git_marker(
 	const std::string marker = root + "/.git";
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(marker.c_str(), wide))
+	if (!libai_utf8_path_to_wide(marker.c_str(), wide))
 		return false;
 	const DWORD attributes = GetFileAttributesW(wide.c_str());
 	return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -89,7 +90,7 @@ bool executable_file(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide))
+	if (!libai_utf8_path_to_wide(path.c_str(), wide))
 		return false;
 	const DWORD attributes = GetFileAttributesW(wide.c_str());
 	return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -155,7 +156,7 @@ std::string administrator_executable(
 #ifdef _WIN32
 	(void)unix_candidates;
 	(void)count;
-	const char *configured = getenv(variable);
+	const char *configured = libai::ai::legacy_branding::environment(variable);
 	if (configured == NULL || *configured == '\0')
 		return "";
 	const std::string path(configured);
@@ -163,7 +164,7 @@ std::string administrator_executable(
 	    (path[2] != '\\' && path[2] != '/'))
 		return "";
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide))
+	if (!libai_utf8_path_to_wide(path.c_str(), wide))
 		return "";
 	const DWORD attributes = GetFileAttributesW(wide.c_str());
 	return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -174,7 +175,7 @@ std::string administrator_executable(
 #else
 	// The value is controlled by the server administrator, never by a browser
 	// or model. Accept only an executable absolute path; argv remains fixed.
-	const char *configured = getenv(variable);
+	const char *configured = libai::ai::legacy_branding::environment(variable);
 	if (configured != NULL && configured[0] == '/' &&
 	    access(configured, X_OK) == 0) {
 		return configured;
@@ -185,12 +186,12 @@ std::string administrator_executable(
 
 std::string go_executable(const std::string &configured_path)
 {
-	// WebCool's persistent administrator setting has highest priority. The old
+	// LibAI's persistent administrator setting has highest priority. The old
 	// environment variable remains supported so existing deployments upgrade
 	// without breaking their startup scripts.
 	if (executable_file(configured_path))
 		return configured_path;
-	const char *legacy = getenv("WEBCOOL_AI_GO");
+	const char *legacy = libai::ai::legacy_branding::environment("LIBAI_AI_GO");
 	if (legacy != NULL && executable_file(legacy))
 		return legacy;
 
@@ -298,7 +299,7 @@ bool language_tool_enabled(const std::string &language)
 	// never enabled here. The durable policy defaults to Go and Java.
 	if (ai_language_tool_enabled(language))
 		return true;
-	const char *configured = getenv("WEBCOOL_AI_LANGUAGE_TOOLS");
+	const char *configured = libai::ai::legacy_branding::environment("LIBAI_AI_LANGUAGE_TOOLS");
 	if (configured == NULL)
 		return false;
 	const std::string value(configured);
@@ -345,7 +346,7 @@ std::string discover_language_executable(
 		const char *paths[] = { "/usr/bin/node", "/usr/local/bin/node",
 			"/opt/homebrew/bin/node" };
 		const std::string configured =
-		    administrator_executable("WEBCOOL_AI_NODE", paths, 3);
+		    administrator_executable("LIBAI_AI_NODE", paths, 3);
 		if (!configured.empty())
 			return configured;
 #ifdef _WIN32
@@ -371,53 +372,53 @@ std::string discover_language_executable(
 	if (name == "python") {
 		const char *paths[] = { "/usr/bin/python3",
 			"/usr/local/bin/python3", "/opt/homebrew/bin/python3" };
-		return administrator_executable("WEBCOOL_AI_PYTHON", paths, 3);
+		return administrator_executable("LIBAI_AI_PYTHON", paths, 3);
 	}
 	if (name == "javac") {
 		const char *paths[] = { "/usr/bin/javac",
 			"/usr/local/bin/javac", "/opt/homebrew/bin/javac" };
-		return administrator_executable("WEBCOOL_AI_JAVAC", paths, 3);
+		return administrator_executable("LIBAI_AI_JAVAC", paths, 3);
 	}
 	if (name == "java") {
 		const char *paths[] = { "/usr/bin/java", "/usr/local/bin/java",
 			"/opt/homebrew/bin/java" };
-		return administrator_executable("WEBCOOL_AI_JAVA", paths, 3);
+		return administrator_executable("LIBAI_AI_JAVA", paths, 3);
 	}
 	if (name == "cargo") {
 		const char *paths[] = { "/usr/bin/cargo",
 			"/usr/local/bin/cargo", "/opt/homebrew/bin/cargo" };
-		return administrator_executable("WEBCOOL_AI_CARGO", paths, 3);
+		return administrator_executable("LIBAI_AI_CARGO", paths, 3);
 	}
 	if (name == "make") {
 		const char *paths[] = { "/usr/bin/make" };
-		return administrator_executable("WEBCOOL_AI_MAKE", paths, 1);
+		return administrator_executable("LIBAI_AI_MAKE", paths, 1);
 	}
 	if (name == "swift") {
 		const char *paths[] = { "/usr/bin/swift",
 			"/Applications/Xcode.app/Contents/Developer/Toolchains/"
 			"XcodeDefault.xctoolchain/usr/bin/swift" };
-		return administrator_executable("WEBCOOL_AI_SWIFT", paths, 2);
+		return administrator_executable("LIBAI_AI_SWIFT", paths, 2);
 	}
 	if (name == "dotnet") {
 		const char *paths[] = { "/usr/bin/dotnet",
 			"/usr/local/share/dotnet/dotnet",
 			"/opt/homebrew/bin/dotnet" };
-		return administrator_executable("WEBCOOL_AI_DOTNET", paths, 3);
+		return administrator_executable("LIBAI_AI_DOTNET", paths, 3);
 	}
 	if (name == "kotlinc") {
 		const char *paths[] = { "/usr/bin/kotlinc",
 			"/usr/local/bin/kotlinc", "/opt/homebrew/bin/kotlinc" };
-		return administrator_executable("WEBCOOL_AI_KOTLINC", paths, 3);
+		return administrator_executable("LIBAI_AI_KOTLINC", paths, 3);
 	}
 	if (name == "php") {
 		const char *paths[] = { "/usr/bin/php", "/usr/local/bin/php",
 			"/opt/homebrew/bin/php" };
-		return administrator_executable("WEBCOOL_AI_PHP", paths, 3);
+		return administrator_executable("LIBAI_AI_PHP", paths, 3);
 	}
 	if (name == "dmd") {
 		const char *paths[] = { "/usr/bin/dmd", "/usr/local/bin/dmd",
 			"/opt/homebrew/bin/dmd" };
-		return administrator_executable("WEBCOOL_AI_DMD", paths, 3);
+		return administrator_executable("LIBAI_AI_DMD", paths, 3);
 	}
 	return "";
 }
@@ -486,7 +487,7 @@ bool project_toolchain_catalog_t::discover(const std::string &project_path,
 	}
 	const bool cmake = has_name(entries, normalized, "CMakeLists.txt");
 	const bool http_service =
-	    has_name(entries, normalized, ".webcool-http-service");
+	    has_name(entries, normalized, ".libai-http-service");
 	const bool make = has_name(entries, normalized, "Makefile") ||
 	    has_name(entries, normalized, "makefile") ||
 	    has_name(entries, normalized, "GNUmakefile");

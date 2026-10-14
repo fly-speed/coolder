@@ -160,8 +160,8 @@ bool coding_tool_loop_t::require_browser_connection()
 	if (!confirmation && !id.empty())
 		return true;
 	err = chinese ?
-	    "浏览器调试未连接到本次任务，已停止后续修改，已有修订和进度保留。请在项目的“浏览器调试”中生成配对码，打开出现问题的 Firefox 标签页，在 WebCool 扩展中粘贴并允许调试；连接成功后恢复本次任务。安装扩展不等于已连接；仅点击继续不会自动建立连接。" :
-	    "Affected browser tab is not connected to this run. Further edits stopped; existing revisions and progress are retained. Generate a pairing code in Browser Debug, pair the affected Firefox tab in the WebCool extension, then resume this task. Installing the extension or retrying alone does not establish a connection.";
+	    "浏览器调试未连接到本次任务，已停止后续修改，已有修订和进度保留。请在项目的“浏览器调试”中生成配对码，打开出现问题的 Firefox 标签页，在 LibAI 扩展中粘贴并允许调试；连接成功后恢复本次任务。安装扩展不等于已连接；仅点击继续不会自动建立连接。" :
+	    "Affected browser tab is not connected to this run. Further edits stopped; existing revisions and progress are retained. Generate a pairing code in Browser Debug, pair the affected Firefox tab in the LibAI extension, then resume this task. Installing the extension or retrying alone does not establish a connection.";
 	if (confirmation)
 		err = chinese ? "已尝试修复 " + std::to_string(retries) +
 		        " 次，问题仍未解决。是否使用浏览器调试？选择“是”后请生成配对码；选择“否”将结束本轮会话。" :

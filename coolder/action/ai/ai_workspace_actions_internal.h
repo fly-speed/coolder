@@ -5,7 +5,7 @@
 #include "ai_agent_actions_internal.h"
 #include "action/actions.h"
 #include "action/action_util.h"
-#include "common/webcool_mutex.h"
+#include "common/native_mutex.h"
 
 #include <atomic>
 #include <cstdlib>

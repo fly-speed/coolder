@@ -21,7 +21,7 @@ impl Drop for Snapshot {
         let project = self.0.join("project");
         if let Ok(entries) = fs::read_dir(&project) {
             for entry in entries.flatten() {
-                if entry.file_name() == ".webcool_agent" { continue; }
+                if entry.file_name() == ".libai_agent" { continue; }
                 let path = entry.path();
                 let result = if path.is_dir() && !path.is_symlink() { fs::remove_dir_all(&path) } else { fs::remove_file(&path) };
                 if let Err(error) = result { eprintln!("validation cleanup: {error}"); }
@@ -61,8 +61,8 @@ fn copy_tree(
             .map_err(|_| Error::bad("invalid snapshot filename"))?;
         if [
             ".git",
-            ".webcool_agent",
-            ".webcool-build",
+            ".libai_agent",
+            ".libai-build",
             "build",
             "target",
             "dist",
@@ -197,7 +197,7 @@ fn check(
     }
     let parent = invocation.idempotency_key();
     if parent.is_empty() { return Err(Error::bad("validation invocation has no execution key")); }
-    let directory = j.root.join(".webcool_agent/validation_runs");
+    let directory = j.root.join(".libai_agent/validation_runs");
     private_dir(&directory)?;
     let base = directory.join(hash(parent.as_bytes()));
     fs::create_dir(&base)?;
@@ -331,8 +331,8 @@ pub enum CompletionGate {
 fn verify_receipts(project: &Path, report: &Value) -> Result<()> {
     let parent = text(report, "parent_idempotency_key");
     if parent.is_empty() { return Err(Error::bad("编译收据缺少父执行键")); }
-    let expected = project.join(".webcool_agent/validation_runs").join(hash(parent.as_bytes())).join("project");
-    if expected.canonicalize()? != Path::new(text(report,"receipt_root")).canonicalize()? {
+    let expected = project.join(".libai_agent/validation_runs").join(hash(parent.as_bytes())).join("project");
+    if expected.canonicalize()? != Path::new(text(&projects::coding(project,"storage.canonical_path",&json!({"path":text(report,"receipt_root")}))?,"path")).canonicalize()? {
         return Err(Error::bad("编译收据目录不匹配"));
     }
     let ownership = projects::coding(&expected,"sandbox.parent.inspect",&json!({"idempotency_key":parent,"project_path":""}))?;
@@ -430,7 +430,7 @@ pub fn validate(app: &App, j: &Job, invocation: &libai::Invocation<'_>) -> Value
         }
     }
     if !invocation.idempotency_key().is_empty() {
-        result["receipt_root"] = json!(j.root.join(".webcool_agent/validation_runs").join(hash(invocation.idempotency_key().as_bytes())).join("project").to_string_lossy());
+        result["receipt_root"] = json!(j.root.join(".libai_agent/validation_runs").join(hash(invocation.idempotency_key().as_bytes())).join("project").to_string_lossy());
         result["parent_idempotency_key"] = json!(invocation.idempotency_key());
     }
     result["checked_at"] = json!(now());

@@ -4,7 +4,7 @@
 #include "../common/record_codec.h"
 #include "agent_workflow_store.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -28,7 +28,7 @@ namespace
 {
 
 libai::mutex g_workflow_mutex;
-const char *kHeader = "WEBCOOL_AGENT_WORKFLOW_V1";
+const char *kHeader = "LIBAI_AGENT_WORKFLOW_V1";
 
 using ::libai::ai::file_ops::join_path;
 
@@ -115,7 +115,7 @@ bool valid_checkpoint(const agent_workflow_checkpoint_t &value)
 
 std::string directory_path(const std::string &root)
 {
-	return join_path(root, ".webcool_agent/workflows");
+	return join_path(root, ".libai_agent/workflows");
 }
 
 std::string checkpoint_path(const std::string &root, const std::string &project,
@@ -129,7 +129,7 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(path.c_str(), wide)) {
 		err = "cannot validate workflow checkpoint directory";
 		return false;
 	}
@@ -167,7 +167,7 @@ bool ensure_one_directory(const std::string &path, std::string &err)
 
 bool ensure_directories(const std::string &root, std::string &err)
 {
-	return ensure_one_directory(join_path(root, ".webcool_agent"), err) &&
+	return ensure_one_directory(join_path(root, ".libai_agent"), err) &&
 	    ensure_one_directory(directory_path(root), err);
 }
 
@@ -180,7 +180,7 @@ bool remove_matching_files(const std::string &directory,
 	removed = 0;
 #ifdef _WIN32
 	std::wstring directory_wide;
-	if (!webcool_utf8_path_to_wide(directory.c_str(), directory_wide)) {
+	if (!libai_utf8_path_to_wide(directory.c_str(), directory_wide)) {
 		err = "cannot encode workflow checkpoint directory";
 		return false;
 	}
@@ -192,7 +192,7 @@ bool remove_matching_files(const std::string &directory,
 	}
 	do {
 		std::string name;
-		if (!webcool_wide_to_utf8(data.cFileName, name) ||
+		if (!libai_wide_to_utf8(data.cFileName, name) ||
 		    (data.dwFileAttributes &
 		        (FILE_ATTRIBUTE_DIRECTORY |
 		            FILE_ATTRIBUTE_REPARSE_POINT)) != 0)

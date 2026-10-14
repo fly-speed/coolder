@@ -63,7 +63,7 @@ std::string agent_draft_store_t::root_path() const
 	        user_root_, project_path_, project_root, ignored))
 		return join_path(
 		    join_path(
-		        join_path(project_root, ".webcool_agent"), "worktrees"),
+		        join_path(project_root, ".libai_agent"), "worktrees"),
 		    run_id_);
 	return "";
 }
@@ -110,7 +110,7 @@ bool agent_draft_store_t::readonly_dependencies(
 	        user_root_, project_path_, project_root, err))
 		return false;
 	const std::string prefix =
-	    project_root + "/.webcool_agent/dependencies/";
+	    project_root + "/.libai_agent/dependencies/";
 	for (const auto &dep : deps) {
 		char target[4096];
 		const ssize_t size =
@@ -241,7 +241,7 @@ bool agent_draft_store_t::materialize(
 	if (!agent_workspace_t::resolve_project_state_root(
 	        user_root_, project_path_, project_root, err))
 		return false;
-	const std::string metadata = join_path(project_root, ".webcool_agent");
+	const std::string metadata = join_path(project_root, ".libai_agent");
 	const std::string worktrees = join_path(metadata, "worktrees");
 	const std::string target = root_path();
 	const std::string next = target + ".next";
@@ -503,7 +503,7 @@ bool agent_draft_store_t::cleanup_stale(
 	        user_root_, project_path_, project_root, err))
 		return false;
 	const std::string worktrees = join_path(
-	    join_path(join_path(project_root, ".webcool_agent"), "worktrees"),
+	    join_path(join_path(project_root, ".libai_agent"), "worktrees"),
 	    "");
 	DIR *directory = opendir(worktrees.c_str());
 	if (directory == NULL) {

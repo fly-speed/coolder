@@ -1,4 +1,4 @@
-// Adapted from aicool/webcool/html/js/markdown-preview.js.
+// Adapted from aicool/libai/html/js/markdown-preview.js.
 (function () {
   function mdEscapeHtml(value) {
     return String(value == null ? '' : value)

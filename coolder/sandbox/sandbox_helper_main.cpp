@@ -107,7 +107,7 @@ int run_windows_sandbox(const options_t &options, int argc, char *argv[],
     const std::wstring &project_root, const std::wstring &workdir)
 {
 	if (!directory_owned_by_current_user(project_root)) {
-		fputs("webcool-sandbox-helper: project ACL owner mismatch\n",
+		fputs("libai-sandbox-helper: project ACL owner mismatch\n",
 		    stderr);
 		return 125;
 	}
@@ -137,7 +137,7 @@ int run_windows_sandbox(const options_t &options, int argc, char *argv[],
 	        &restricted_token)) {
 		if (process_token)
 			CloseHandle(process_token);
-		fputs("webcool-sandbox-helper: restricted token setup failed\n",
+		fputs("libai-sandbox-helper: restricted token setup failed\n",
 		    stderr);
 		return 125;
 	}
@@ -161,7 +161,7 @@ int run_windows_sandbox(const options_t &options, int argc, char *argv[],
 		if (job)
 			CloseHandle(job);
 		CloseHandle(restricted_token);
-		fputs("webcool-sandbox-helper: Job Object setup failed\n",
+		fputs("libai-sandbox-helper: Job Object setup failed\n",
 		    stderr);
 		return 125;
 	}
@@ -173,7 +173,7 @@ int run_windows_sandbox(const options_t &options, int argc, char *argv[],
 	std::vector<wchar_t> mutable_command(
 	    command_line.begin(), command_line.end());
 	mutable_command.push_back(L'\0');
-	// Do not forward WebCool service environment variables to project code.
+	// Do not forward LibAI service environment variables to project code.
 	// The double-null-terminated block contains only fixed system search paths
 	// and project-local home/temp locations.
 	std::wstring environment;
@@ -202,7 +202,7 @@ int run_windows_sandbox(const options_t &options, int argc, char *argv[],
 		}
 		CloseHandle(job);
 		fputs(
-		    "webcool-sandbox-helper: restricted process launch failed\n",
+		    "libai-sandbox-helper: restricted process launch failed\n",
 		    stderr);
 		return 125;
 	}
@@ -382,7 +382,7 @@ bool set_limit(int resource, rlim_t value, const char *name)
 	struct rlimit limit;
 	if (getrlimit(resource, &limit) != 0) {
 		fprintf(stderr,
-		    "webcool-sandbox-helper: cannot read %s limit: %s\n", name,
+		    "libai-sandbox-helper: cannot read %s limit: %s\n", name,
 		    strerror(errno));
 		return false;
 	}
@@ -397,7 +397,7 @@ bool set_limit(int resource, rlim_t value, const char *name)
 	limit.rlim_max = selected;
 	if (setrlimit(resource, &limit) == 0)
 		return true;
-	fprintf(stderr, "webcool-sandbox-helper: cannot set %s limit: %s\n",
+	fprintf(stderr, "libai-sandbox-helper: cannot set %s limit: %s\n",
 	    name, strerror(errno));
 	return false;
 }
@@ -526,10 +526,10 @@ std::string macos_profile(const std::string &user_root,
 	    toolchain_alias_ancestors + dependency_rules +
 	    macos_metadata_ancestor_rules(project_root) +
 	    "(allow file-read* (subpath \"" + root + "\"))" +
-	    "(deny file-read* (subpath \"" + user + "/.webcool_agent\"))" +
+	    "(deny file-read* (subpath \"" + user + "/.libai_agent\"))" +
 	    "(allow file-write* (literal \"/dev/null\"))" +
 	    "(allow file-write* (subpath \"" + root + "\"))" +
-	    "(deny file-write* (subpath \"" + user + "/.webcool_agent\"))" +
+	    "(deny file-write* (subpath \"" + user + "/.libai_agent\"))" +
 	    (outbound_network ? "(allow network-outbound)" : "") +
 	    (loopback_network ?
 	            "(allow network-inbound (local ip \"localhost:*\"))"
@@ -585,21 +585,21 @@ static int run_macos_sandbox(options_t &options, int argc, char **argv,
 	                static_cast<rlim_t>(options.file_size), "file-size") ||
 	            !set_limit(RLIMIT_NOFILE,
 	                static_cast<rlim_t>(options.files), "open-files")))) {
-		fputs("webcool-sandbox-helper: resource limit setup failed\n",
+		fputs("libai-sandbox-helper: resource limit setup failed\n",
 		    stderr);
 		return 126;
 	}
 
-	// Explicit project contract: the service reads WEBCOOL_HTTP_PORT.
+	// Explicit project contract: the service reads LIBAI_HTTP_PORT.
 	// Preserve compatibility with legacy fixed-port projects.
 	const bool dynamic_browser_port = !options.browser_node.empty() &&
-	    access((project_root + "/.webcool-http-port-env").c_str(), F_OK) ==
+	    access((project_root + "/.libai-http-port-env").c_str(), F_OK) ==
 	        0;
 	if (dynamic_browser_port) {
 		if (!allocate_probe_port(options.probe_port))
 			return 73;
 		const std::string port = std::to_string(options.probe_port);
-		if (setenv("WEBCOOL_HTTP_PORT", port.c_str(), 1) != 0)
+		if ((setenv("LIBAI_HTTP_PORT", port.c_str(), 1) != 0 || setenv("WEBCOOL_HTTP_PORT", port.c_str(), 1) != 0))
 			return 126;
 	}
 	std::vector<std::string> values;
@@ -647,7 +647,7 @@ static int run_macos_sandbox(options_t &options, int argc, char **argv,
 		(void)setpgid(0, 0);
 	}
 	execv("/usr/bin/sandbox-exec", &arguments[0]);
-	fputs("webcool-sandbox-helper: cannot start macOS sandbox\n", stderr);
+	fputs("libai-sandbox-helper: cannot start macOS sandbox\n", stderr);
 	return 127;
 }
 #endif
@@ -659,7 +659,7 @@ int main(int argc, char *argv[])
 #endif
 	options_t options;
 	if (!parse_options(argc, argv, options)) {
-		fputs("webcool-sandbox-helper: invalid invocation\n", stderr);
+		fputs("libai-sandbox-helper: invalid invocation\n", stderr);
 		return 126;
 	}
 #ifdef _WIN32
@@ -671,7 +671,7 @@ int main(int argc, char *argv[])
 	    !canonical_windows_directory(options.workdir, workdir) ||
 	    !windows_path_within(user_root, project_root) ||
 	    !windows_path_within(project_root, workdir)) {
-		fputs("webcool-sandbox-helper: directory policy rejected\n",
+		fputs("libai-sandbox-helper: directory policy rejected\n",
 		    stderr);
 		return 126;
 	}
@@ -686,7 +686,7 @@ int main(int argc, char *argv[])
 	    !canonical_directory(options.workdir, workdir) ||
 	    !path_is_within(user_root, project_root) ||
 	    !path_is_within(project_root, workdir)) {
-		fputs("webcool-sandbox-helper: directory policy rejected\n",
+		fputs("libai-sandbox-helper: directory policy rejected\n",
 		    stderr);
 		return 126;
 	}
@@ -699,7 +699,7 @@ int main(int argc, char *argv[])
 		    path_is_within(project_root, canonical) ||
 		    path_is_within(canonical, project_root)) {
 			fputs(
-			    "webcool-sandbox-helper: invalid read-only dependency root\n",
+			    "libai-sandbox-helper: invalid read-only dependency root\n",
 			    stderr);
 			return 126;
 		}
@@ -709,7 +709,7 @@ int main(int argc, char *argv[])
 	if (!options.browser_node.empty()) {
 		if (access(options.browser_node.c_str(), X_OK) != 0) {
 			fputs(
-			    "webcool-sandbox-helper: browser runtime unavailable; check Node installation\n",
+			    "libai-sandbox-helper: browser runtime unavailable; check Node installation\n",
 			    stderr);
 			return 78;
 		}
@@ -726,7 +726,7 @@ int main(int argc, char *argv[])
 		    stat(runner_path, &runner_st) != 0 ||
 		    !S_ISREG(runner_st.st_mode) || helper_size <= 0) {
 			fputs(
-			    "webcool-sandbox-helper: browser runtime path rejected\n",
+			    "libai-sandbox-helper: browser runtime path rejected\n",
 			    stderr);
 			return 126;
 		}
@@ -742,7 +742,7 @@ int main(int argc, char *argv[])
 		if (realpath(expected.c_str(), expected_runner) == NULL ||
 		    strcmp(expected_runner, runner_path) != 0) {
 			fputs(
-			    "webcool-sandbox-helper: browser runner is not deployment-owned\n",
+			    "libai-sandbox-helper: browser runner is not deployment-owned\n",
 			    stderr);
 			return 126;
 		}
@@ -754,7 +754,7 @@ int main(int argc, char *argv[])
 			        options.browser_evidence_root, evidence) ||
 			    !path_is_within(user_root, evidence)) {
 				fputs(
-				    "webcool-sandbox-helper: browser evidence path rejected\n",
+				    "libai-sandbox-helper: browser evidence path rejected\n",
 				    stderr);
 				return 126;
 			}
@@ -772,7 +772,7 @@ int main(int argc, char *argv[])
 	    stat(canonical_executable, &executable_st) != 0 ||
 	    !S_ISREG(executable_st.st_mode) ||
 	    access(canonical_executable, X_OK) != 0) {
-		fputs("webcool-sandbox-helper: executable policy rejected\n",
+		fputs("libai-sandbox-helper: executable policy rejected\n",
 		    stderr);
 		return 126;
 	}
@@ -785,7 +785,7 @@ int main(int argc, char *argv[])
 #if defined(__linux__)
 	return run_linux_sandbox(options, argv, project_root, workdir);
 #elif !defined(__APPLE__)
-	fputs("webcool-sandbox-helper: platform backend unavailable\n", stderr);
+	fputs("libai-sandbox-helper: platform backend unavailable\n", stderr);
 	return 125;
 #else
 	return run_macos_sandbox(options, argc, argv, user_root, project_root,

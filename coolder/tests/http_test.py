@@ -315,7 +315,7 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         )
         image_file = attachment('screenshot.png', png)
         call('/api/v1/ai/attachments', {'files': [text_file]}, status=401, auth=False)
-        drafts = data / 'workspace/.webcool_agent/attachments'
+        drafts = data / 'workspace/.libai_agent/attachments'
         for invalid in [
             [],
             [attachment('../escape.txt', b'test')],

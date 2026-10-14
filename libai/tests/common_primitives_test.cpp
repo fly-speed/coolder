@@ -245,7 +245,7 @@ static void test_primitives()
 	assert(!begin_task_contract(root, "private", "", second,
 	    std::string(65537, 'x'), false, contract, contract_error));
 	const std::string contract_file =
-	    dir + "/.webcool_agent/task-contract-" + first + ".json";
+	    dir + "/.libai_agent/task-contract-" + first + ".json";
 	{
 		std::ofstream f(contract_file.c_str());
 		f << "corrupt";
@@ -259,7 +259,7 @@ static void test_primitives()
 		assert(value == "corrupt");
 	}
 	assert(unlink(contract_file.c_str()) == 0);
-	assert(rmdir((dir + "/.webcool_agent").c_str()) == 0);
+	assert(rmdir((dir + "/.libai_agent").c_str()) == 0);
 	assert(unlink(to.c_str()) == 0 && rmdir(dir.c_str()) == 0);
 	assert(file_ops::path_entry_exists(link));
 	assert(unlink(link.c_str()) == 0 && rmdir(root) == 0);

@@ -1,6 +1,6 @@
 # coolder
 
-`aicool` 下独立的浏览器 AI 编程应用。后端为 C++17 + ACL 协程 HTTP 服务，仅链接同级 `libai-c++` 完整封装；前端为无 npm 依赖的 HTML/CSS/JavaScript。无需运行或构建 webcool。
+`aicool` 下独立的浏览器 AI 编程应用。后端为 C++17 + ACL 协程 HTTP 服务，仅链接同级 `libai-c++` 完整封装；前端为无 npm 依赖的 HTML/CSS/JavaScript。无需运行或构建 libai。
 
 ## 构建与启动
 
@@ -36,7 +36,7 @@ Linux 上，libai 自动查找并链接 liburing（优先 `uring-ffi`，其次 `
 
 ## Windows / Visual Studio 2022
 
-直接打开本目录的 `coolder.sln`，将 `coolder` 设为启动项目。工程沿用 webcool 的 v143 工具集和同级依赖工程，无需编译 webcool 主程序。
+直接打开本目录的 `coolder.sln`，将 `coolder` 设为启动项目。工程沿用 libai 的 v143 工具集和同级依赖工程，无需编译 libai 主程序。
 
 1. 安装 Visual Studio 2022 的“使用 C++ 的桌面开发”、Windows SDK 和“用于 Windows 的 C++ CMake 工具”（用于合并前端脚本）。如选择 ARM64 / ARM64EC，需要安装相应的 MSVC 编译工具。
 2. 保持 `aicool/coolder`、`aicool/libai-c++`、`aicool/libai`、`aicool/third-party/acl` 和 `aicool/third-party/zlib-1.2.11` 的目录结构。解决方案会自动构建 libai-c++、ACL、ACL 协程库及 zlib。
@@ -51,7 +51,7 @@ cd bin\x64\Release
 coolder.exe --html html --data "..\..\..\var"
 ```
 
-输出位于 `bin/<平台>/<配置>/`，包含 `coolder.exe`、`webcool-sandbox-helper.exe`、前端 `html/`、zlib DLL 及找到的 OpenSSL DLL。前端脚本在构建时自动合并。VS 调试默认使用上述输出目录和本项目的 `var/` 数据目录；辅助程序名称与 libai 的查找约定保持一致。
+输出位于 `bin/<平台>/<配置>/`，包含 `coolder.exe`、`libai-sandbox-helper.exe`、前端 `html/`、zlib DLL 及找到的 OpenSSL DLL。前端脚本在构建时自动合并。VS 调试默认使用上述输出目录和本项目的 `var/` 数据目录；辅助程序名称与 libai 的查找约定保持一致。
 
 `coolder.windows.props` 提供共享设置。若 OpenSSL 库按平台/配置分别存放，可创建不纳入版本控制的 `coolder.local.props`：
 
@@ -86,15 +86,15 @@ coolder.exe --html html --data "..\..\..\var"
 - `main.cpp`：独立入口、数据目录、账户和策略初始化、ACL accept 协程与每连接协程、退出处理。
 - `server/host.*`：账户身份/工作目录适配、Host/Origin 校验、静态资源白名单、角色策略校验和 HTTP 分发。
 - `server/auth.*`：管理员初始化、用户管理、密码哈希、登录会话、账户持久化。
-- `server/ai_policy.cpp`：从 webcool 管理模块适配的智能体设置接口，使用 libai 策略存储。
+- `server/ai_policy.cpp`：从 libai 管理模块适配的智能体设置接口，使用 libai 策略存储。
 - `server/routes.inc`：明确注册的 AI 路由，沿用 `/api/v1/ai/` 协议。
-- `action/ai/`：从 `webcool/action/ai` 复制并适配的 Provider、项目、会话、工作区、任务和审核模块；移除图片助手/标签模块和网盘备份回调。禁用 HTTP 请求自行指定外部目录，统一使用启动时授权的工作区。
-- `action/actions.h`、`action/action_util.h`：独立宿主适配接口，不依赖 webcool 的用户数据库或其他业务模块。
+- `action/ai/`：从 `libai/action/ai` 复制并适配的 Provider、项目、会话、工作区、任务和审核模块；移除图片助手/标签模块和网盘备份回调。禁用 HTTP 请求自行指定外部目录，统一使用启动时授权的工作区。
+- `action/actions.h`、`action/action_util.h`：独立宿主适配接口，不依赖 libai 的用户数据库或其他业务模块。
 - `html/`：独立工作台。
-- `sandbox/sandbox_helper_main.cpp`：从 webcool 复制的沙盒辅助进程。二进制名保留 `webcool-sandbox-helper`，因为 libai 按此名称寻找相邻 helper。主程序仍为 `coolder`。
+- `sandbox/sandbox_helper_main.cpp`：从 libai 复制的沙盒辅助进程。二进制名保留 `libai-sandbox-helper`，因为 libai 按此名称寻找相邻 helper。主程序仍为 `coolder`。
 - `tests/http_test.py`、`tests/accounts_test.py`：本地模拟模型、多用户隔离、并发任务和账户生命周期的真实 HTTP 集成测试。
 
-libai 的通用 SDK 使用 `libai`，完整编程后端使用 `libai::ai`；Coolder 通过独立封装 `libai::cpp` 访问库能力。旧宿主命名空间不再保留别名，直接使用旧后端类型的 C++ 消费方需更新限定名并重新编译。内部 `.webcool_*` 持久化格式及辅助程序名称保持兼容，不代表依赖 webcool 应用。
+libai 的通用 SDK 使用 `libai`，完整编程后端使用 `libai::ai`；Coolder 通过独立封装 `libai::cpp` 访问库能力。旧宿主命名空间不再保留别名，直接使用旧后端类型的 C++ 消费方需更新限定名并重新编译。内部 `.libai_*` 持久化格式及辅助程序名称保持兼容，不代表依赖 libai 应用。
 
 ## 服务范围与配置
 
@@ -128,7 +128,7 @@ cmake --install build --prefix /absolute/install
 
 已在本机 macOS 完成编译和本地模型 HTTP 集成测试，覆盖未授权请求、Host/Origin 校验、路径越界/符号链接、模型密钥不回传、项目创建、真实 libai 工具读取/文件提案、逐版本审核、文件补丁、暂停/取消及重启持久化。本次新增测试覆盖首次管理员创建竞争、普通用户越权拒绝、同名项目/任务隔离、多用户并发、退出与停用后的会话撤销、密码修改/重置、策略持久化、旧数据免令牌初始化及账户库损坏时拒绝启动。浏览器验收覆盖首次初始化页、管理员/普通用户登录、管理控制台、智能体设置、厂商表单和退出登录。
 
-测试使用临时目录和本地模拟模型，不读取用户原有 webcool 数据，也不需要真实 API Key。**尚未调用真实外部模型，也未在 Linux/Windows 上构建验证**；这些平台使用同一 CMake/libai 依赖配置，需在目标环境继续验证。
+测试使用临时目录和本地模拟模型，不读取用户原有 libai 数据，也不需要真实 API Key。**尚未调用真实外部模型，也未在 Linux/Windows 上构建验证**；这些平台使用同一 CMake/libai 依赖配置，需在目标环境继续验证。
 
 ## 账户与管理 API
 
@@ -144,14 +144,14 @@ cmake --install build --prefix /absolute/install
 
 账户的创建/更新通过原子替换账户文件保存；同时启动两个服务访问同一数据目录会被进程锁拒绝。应备份整个数据目录及管理员外置工作区，包括 libai 的加密密钥文件。
 
-智能体设置界面的字段、语言工具选项和输入范围与 `webcool/html/main.html`、`webcool/html/js/admin-ai-policy.js` 对齐，支持单项保存及批量保存修改项。可执行文件路径会显示自动检测结果；留空使用自动查找。敏感路径、各模式额度、模型超时、读取限制及沙盒资源限制由 libai 保存和校验。单项保存不会覆盖其他未提交的编辑。
+智能体设置界面的字段、语言工具选项和输入范围与当前前端及 libai 策略接口对齐，支持单项保存及批量保存修改项。可执行文件路径会显示自动检测结果；留空使用自动查找。敏感路径、各模式额度、模型超时、读取限制及沙盒资源限制由 libai 保存和校验。单项保存不会覆盖其他未提交的编辑。
 
 共享目录、本地磁盘、浏览器调试以及加密主密钥轮换入口保留在设置界面，但因 coolder 尚未接入相应宿主模块而禁用，并显示原因；它们不会显示保存成功却不生效。共享目录、本地磁盘及浏览器调试权限提交为启用时，后端明确拒绝。
 
 
 ### Monaco 代码编辑器
 
-代码查看与编辑使用从 webcool 复制的 Monaco Editor 0.55.1（`html/vendor/monaco-editor`），保留上游 LICENSE。所有编辑器资源与语言分析 Worker 均由本机服务提供，无需 CDN 或运行时 npm 安装。
+代码查看与编辑使用项目随附的 Monaco Editor 0.55.1（`html/vendor/monaco-editor`），保留上游 LICENSE。所有编辑器资源与语言分析 Worker 均由本机服务提供，无需 CDN 或运行时 npm 安装。
 
 文件预览支持语法高亮、行号、折叠和查找。点击“编辑文件”打开编辑窗口，支持自动补全、搜索替换、自动换行、撤销/重做及最大化；语言服务能力随文件类型而定，未接入外部 LSP。Ctrl/Cmd+S 生成差异预览，确认后才保存。窗口关闭会提示未保存的修改；截断文件禁止编辑。保存仍使用服务端补丁预览/应用接口，校验文件版本，避免覆盖其他任务的修改。
 

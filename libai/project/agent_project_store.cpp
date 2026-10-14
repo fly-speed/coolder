@@ -5,7 +5,7 @@
 #include "../common/record_codec.h"
 #include "agent_project_store.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -33,8 +33,8 @@ namespace
 {
 
 libai::mutex g_project_store_mutex;
-const char *kHeader = "WEBCOOL_AGENT_PROJECTS_V1";
-const char *kFile = ".webcool_agent/projects.v1";
+const char *kHeader = "LIBAI_AGENT_PROJECTS_V1";
+const char *kFile = ".libai_agent/projects.v1";
 const size_t kMaxModules = 64;
 const size_t kMaxTasks = 500;
 
@@ -158,10 +158,10 @@ using ::libai::ai::identifiers::new_id;
 
 bool ensure_directory(const std::string &user_root, std::string &err)
 {
-	const std::string directory = join_path(user_root, ".webcool_agent");
+	const std::string directory = join_path(user_root, ".libai_agent");
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(directory.c_str(), wide)) {
+	if (!libai_utf8_path_to_wide(directory.c_str(), wide)) {
 		err = "cannot validate agent project directory";
 		return false;
 	}

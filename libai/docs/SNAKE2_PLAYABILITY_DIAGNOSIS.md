@@ -1,6 +1,6 @@
 # snake2 不可玩诊断（2026-09-23）
 
-项目：`webcool/uploads/共享目录/soft/deepseek/snake2`。本轮只分析；原项目、游戏状态与运行服务均未修改。复现代码在 Codex 工作目录的隔离副本中执行。
+项目：`libai/uploads/共享目录/soft/deepseek/snake2`。本轮只分析；原项目、游戏状态与运行服务均未修改。复现代码在 Codex 工作目录的隔离副本中执行。
 
 ## 确认的主要问题
 

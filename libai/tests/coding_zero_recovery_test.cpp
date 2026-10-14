@@ -133,7 +133,7 @@ static void browser_execution_keys(const std::string &root,const char *executabl
     };
     const std::string first="browser-fixture.0";auto pending=begin(first);const auto id=poll(first);
     auto raw=[&](const std::string &key){
-        const auto path=owner+"/.webcool_agent/browser_commands/browser_command_"+agent_workspace_t::content_sha256(key)+".state";
+        const auto path=owner+"/.libai_agent/browser_commands/browser_command_"+agent_workspace_t::content_sha256(key)+".state";
         const auto wire=bytes(path);libai_schema_json::Document envelope;envelope.Parse(wire.c_str());assert(!envelope.HasParseError());
         std::string payload;assert(record_codec::hex_decode(envelope["payload"].GetString(),payload));return payload;
     };
@@ -167,7 +167,7 @@ static void browser_execution_keys(const std::string &root,const char *executabl
 #if defined(__unix__) || defined(__APPLE__)
     {
         const auto scope="browser_command_"+agent_workspace_t::content_sha256(first);
-        libai::file_execution_store_t store(owner+"/.webcool_agent/browser_commands",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t store(owner+"/.libai_agent/browser_commands",libai::execution_file_codec_t::plaintext());
         auto snapshot=store.open(scope);
         libai_schema_json::Document forged;forged.Parse(snapshot.state_json.c_str());
         const auto wrong_digest=std::string(64,'0');forged["output_sha256"].SetString(wrong_digest.c_str(),forged.GetAllocator());
@@ -240,7 +240,7 @@ static void browser_execution_keys(const std::string &root,const char *executabl
     }
     {
         const auto scope="browser_command_"+agent_workspace_t::content_sha256(first);
-        libai::file_execution_store_t store(owner+"/.webcool_agent/browser_commands",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t store(owner+"/.libai_agent/browser_commands",libai::execution_file_codec_t::plaintext());
         const auto snapshot=store.open(scope);
         libai_schema_json::Document pending;pending.Parse(snapshot.state_json.c_str());
         const std::string output=pending["output_sha256"].GetString();
@@ -275,7 +275,7 @@ static void trusted_command_receipts(const std::string &root)
     };
     auto raw=[&](const std::string &key) {
         const auto name="sandbox_command_"+agent_workspace_t::content_sha256(key);
-        return bytes(scope_root+"/.webcool_agent/sandbox_commands/"+name+".state");
+        return bytes(scope_root+"/.libai_agent/sandbox_commands/"+name+".state");
     };
     // A successful previous test invocation must not substitute a cached result.
     const auto key="trusted-fixture."+std::to_string(static_cast<long long>(time(NULL)))+"."+std::to_string(getpid());
@@ -356,7 +356,7 @@ static void batch_child_receipts(const std::string &root)
     acl::json unchanged(coding_service_call(root,"batches.inspect",args).c_str());
     assert(unchanged.finish()&&json_text(unchanged["receipt_json"])==original);
     const auto scope="tool_batch_"+agent_workspace_t::content_sha256(key);
-    libai::file_execution_store_t store(root+"/.webcool_agent/tool_batches",libai::execution_file_codec_t::plaintext());
+    libai::file_execution_store_t store(root+"/.libai_agent/tool_batches",libai::execution_file_codec_t::plaintext());
     const auto snapshot=store.open(scope);
     acl::json busy(coding_service_call(root,"batches.inspect",args).c_str());assert(busy.finish()&&!json_bool(busy["ok"],false));
     const auto broken=store.commit(scope,snapshot.revision,"{}");store.close(scope);
@@ -391,7 +391,7 @@ static void result_review_transactions(const std::string &root)
         change.review_status="pending";change.creates_file=true;original.changes.push_back(change);
     }
     std::string error;assert(store.save(original,error));
-    const auto directory=scope+"/project/.webcool_agent/results";
+    const auto directory=scope+"/project/.libai_agent/results";
     const auto path=scope+"/"+store.relative_path(original.run_id);const auto before=bytes(path);
     agent_change_review_t first;first.path=original.changes[0].path;first.generation=1;first.draft_hash=original.changes[0].draft_hash;first.decision="accepted";
     {
@@ -515,10 +515,10 @@ int main(int argc,char **argv)
         assert(history[0].status=="completed");
         const auto legacy_root=root+"/legacy-key-audit";
         assert(file_ops::make_private_directory(legacy_root));
-        assert(file_ops::make_private_directory(legacy_root+"/.webcool_agent"));
-        const auto legacy_file=legacy_root+"/.webcool_agent/sandbox_runs.v1";
+        assert(file_ops::make_private_directory(legacy_root+"/.libai_agent"));
+        const auto legacy_file=legacy_root+"/.libai_agent/sandbox_runs.v1";
         std::ofstream(legacy_file.c_str()) <<
-            "{\"version\":1,\"format\":\"WEBCOOL_SANDBOX_AUDIT_V1\",\"records\":["
+            "{\"version\":1,\"format\":\"LIBAI_SANDBOX_AUDIT_V1\",\"records\":["
             "{\"fields\":[\"1\",\"started\",\"dddddddddddddddddddddddddddddddd\",\"70726f6a656374\",\"66697874757265\",\"-1\",\"0\",\"0\",\"0\",\"0\",\"\"]},"
             "{\"fields\":[\"2\",\"finished\",\"dddddddddddddddddddddddddddddddd\",\"70726f6a656374\",\"66697874757265\",\"0\",\"0\",\"1\",\"0\",\"0\",\"\",\"0\"]}]}";
         assert(sandbox_execution_store_t(legacy_root).list_history(10,history,audit_error)&&history.size()==1);
@@ -610,13 +610,13 @@ int main(int argc,char **argv)
             const auto child=fork();assert(child>=0);
             if(child==0) {
                 try {
-                    libai::file_execution_store_t other(root+"/project/.webcool_agent",libai::execution_file_codec_t::plaintext());
+                    libai::file_execution_store_t other(root+"/project/.libai_agent",libai::execution_file_codec_t::plaintext());
                     other.open("coding_loop_"+task->session_id);_exit(1);
                 } catch(const std::exception &) {_exit(0);}
             }
             int status=0;assert(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==0);
             worker.reset();assert(!task->retain_coding_worker_lease&&!task->coding_worker_lease);
-            libai::file_execution_store_t released(root+"/project/.webcool_agent",libai::execution_file_codec_t::plaintext());
+            libai::file_execution_store_t released(root+"/project/.libai_agent",libai::execution_file_codec_t::plaintext());
             const auto scope="coding_loop_"+task->session_id;assert(released.open(scope).state_json.empty());released.close(scope);
         }
 #endif
@@ -665,7 +665,7 @@ int main(int argc,char **argv)
         assert(::mkfifo(path.c_str(),0600)==0);refused();assert(::unlink(path.c_str())==0);
         assert(::mkdir(path.c_str(),0700)==0);refused();assert(::rmdir(path.c_str())==0);
         assert(::rename((path+".saved").c_str(),path.c_str())==0);
-        const auto directory=root+"/"+project+"/.webcool_agent";
+        const auto directory=root+"/"+project+"/.libai_agent";
         assert(::chmod(directory.c_str(),0755)==0);refused();assert(::chmod(directory.c_str(),0700)==0);
         assert(bytes(path)==original_bytes);
         const auto reply=inspect(true,"resume_checkpoint");
@@ -708,7 +708,7 @@ int main(int argc,char **argv)
     const auto child=fork();assert(child>=0);
     if(child==0){
         close(ready[0]);close(release[1]);
-        libai::file_execution_store_t owner(root+"/"+project+"/.webcool_agent",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t owner(root+"/"+project+"/.libai_agent",libai::execution_file_codec_t::plaintext());
         owner.open("coding_progress_"+session_id);
         assert(write(ready[1],"r",1)==1);char signal=0;assert(read(release[0],&signal,1)==1);
         // Kernel release after an ungraceful exit, without owner.close().
@@ -728,7 +728,7 @@ int main(int argc,char **argv)
     assert(pipe(ready)==0&&pipe(release)==0);const auto loop_child=fork();assert(loop_child>=0);
     if(loop_child==0){
         close(ready[0]);close(release[1]);
-        libai::file_execution_store_t owner(root+"/"+project+"/.webcool_agent",libai::execution_file_codec_t::plaintext());
+        libai::file_execution_store_t owner(root+"/"+project+"/.libai_agent",libai::execution_file_codec_t::plaintext());
         owner.open("coding_loop_"+session_id);assert(write(ready[1],"r",1)==1);
         char signal=0;assert(read(release[0],&signal,1)==1);_exit(0);
     }
@@ -859,7 +859,7 @@ int main(int argc,char **argv)
     {
         int ready[2],release[2];assert(pipe(ready)==0&&pipe(release)==0);const auto child=fork();assert(child>=0);
         if(!child){
-            close(ready[0]);close(release[1]);libai::file_execution_store_t lease(root+"/"+project+"/.webcool_agent",libai::execution_file_codec_t::plaintext());
+            close(ready[0]);close(release[1]);libai::file_execution_store_t lease(root+"/"+project+"/.libai_agent",libai::execution_file_codec_t::plaintext());
             lease.open("coding_loop_"+session_id);assert(write(ready[1],"r",1)==1);char signal=0;assert(read(release[0],&signal,1)==1);_exit(0);
         }
         close(ready[1]);close(release[0]);char signal=0;assert(read(ready[0],&signal,1)==1);

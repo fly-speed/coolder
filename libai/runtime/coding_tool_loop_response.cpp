@@ -633,18 +633,18 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 		if (compile_completed ||
 		    validation.find("\"validation_passed\":true") !=
 		        std::string::npos) {
-			final_output.text += "\n\nWebCool：" +
+			final_output.text += "\n\nLibAI：" +
 			    successful_validation_summary(validation, chinese) +
 			    "。";
 		} else if (checks_failed) {
 			final_output.text +=
-			    "\n\nWebCool：构建、测试或功能验收失败，尚未完成验收。";
+			    "\n\nLibAI：构建、测试或功能验收失败，尚未完成验收。";
 		} else if(validation.find("tool_budget_exhausted")!=std::string::npos) {
-			final_output.text += chinese ? "\n\nWebCool：工具额度已用尽，未启动自动验证，尚未完成验收。" :
-			    "\n\nWebCool: tool budget exhausted; automatic validation was not started and acceptance remains pending.";
+			final_output.text += chinese ? "\n\nLibAI：工具额度已用尽，未启动自动验证，尚未完成验收。" :
+			    "\n\nLibAI: tool budget exhausted; automatic validation was not started and acceptance remains pending.";
 		} else {
 			final_output.text +=
-			    "\n\nWebCool：当前环境没有可执行的固定验证命令，"
+			    "\n\nLibAI：当前环境没有可执行的固定验证命令，"
 			    "本次修订尚未经过自动构建。";
 		}
 	}

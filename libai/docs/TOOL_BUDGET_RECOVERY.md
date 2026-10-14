@@ -17,7 +17,7 @@
 
 ## 验证
 
-`webcool/tests/compile_repair_http_test.py` 使用临时项目和本地模拟 AI 服务：
+`libai/tests/compile_repair_http_test.py` 使用临时项目和本地模拟 AI 服务：
 
 - `--investigation-checkpoint`：24 次调查后补读、修改及验证，共计 27 次工具调用。
 - `--budget-rejected`：增加一次策略拒绝，模型请求日志中的额度保持不变，最终仍为 27 次。
@@ -26,4 +26,4 @@
 - 自动编译脚本、有/无脚本回退、Go 编译修复、完整验收、批量结束及仅验证模式回归。
 - `ai_repair_scope` 覆盖诊断路径唯一匹配、同名歧义和缺失情况；Go HTTP 回归确认测试诊断映射至 `src/main_test.go`。
 
-构建同时验证 Make 的 webcool 集成与 CMake 的独立静态库和链接测试。没有修改用户已有贪吃蛇源码或恢复断点，也不自动重启运行中的 webcool。重启新编译程序后生效；旧断点累计数保持原值，继续任务仍获得新的运行额度。
+构建同时验证 Make 的 libai 集成与 CMake 的独立静态库和链接测试。没有修改用户已有贪吃蛇源码或恢复断点，也不自动重启运行中的 libai。重启新编译程序后生效；旧断点累计数保持原值，继续任务仍获得新的运行额度。

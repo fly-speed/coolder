@@ -3,7 +3,7 @@
 #include "ai_provider_client_internal.h"
 #include "../common/ai_error_log.h"
 #include "provider_output_limit_cache.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #include <algorithm>
 #include <ctime>

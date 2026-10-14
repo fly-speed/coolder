@@ -6,7 +6,7 @@
 #include "agent_result_store.h"
 #include "../workspace/agent_workspace.h"
 #include "../common/ai_error_log.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 #include "../sdk/file_execution_store.h"
 
 #ifdef _WIN32
@@ -73,7 +73,7 @@ bool resolve_project(const std::string &user_root,
 bool prepare_directory(
     const std::string &project, std::string &directory, std::string &err)
 {
-	const std::string agent = join_path(project, ".webcool_agent");
+	const std::string agent = join_path(project, ".libai_agent");
 	directory = join_path(agent, "results");
 	if (!make_directory(agent) || !make_directory(directory)) {
 		err = "cannot create coding-agent result directory";
@@ -407,7 +407,7 @@ bool result_names(const std::string &directory, std::vector<std::string> &names,
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(directory.c_str(), wide))
+	if (!libai_utf8_path_to_wide(directory.c_str(), wide))
 		return false;
 	WIN32_FIND_DATAW data;
 	HANDLE search =
@@ -419,7 +419,7 @@ bool result_names(const std::string &directory, std::vector<std::string> &names,
 		if (!((data.dwFileAttributes &
 		          (FILE_ATTRIBUTE_DIRECTORY |
 		              FILE_ATTRIBUTE_REPARSE_POINT)) == 0 &&
-		        webcool_wide_to_utf8(data.cFileName, name)))
+		        libai_wide_to_utf8(data.cFileName, name)))
 			continue;
 		names.push_back(name);
 	} while (FindNextFileW(search, &data));
@@ -587,7 +587,7 @@ agent_result_store_t::agent_result_store_t(
 std::string agent_result_store_t::relative_path(const std::string &run_id) const
 {
 	return join_path(
-	    join_path(join_path(project_path_, ".webcool_agent"), "results"),
+	    join_path(join_path(project_path_, ".libai_agent"), "results"),
 	    result_name(run_id));
 }
 
@@ -646,7 +646,7 @@ bool agent_result_store_t::load(const std::string &run_id,
 		return ai_error("agent.result", "resolve-load-project", err);
 	}
 	const std::string path = join_path(
-	    join_path(join_path(project, ".webcool_agent"), "results"),
+	    join_path(join_path(project, ".libai_agent"), "results"),
 	    result_name(run_id));
 	std::string content;
 	{
@@ -665,7 +665,7 @@ bool agent_result_store_t::load(const std::string &run_id,
 	{
 		std::lock_guard<libai::mutex> guard(g_result_mutex);
 		mark_superseded_reviews(
-		    join_path(join_path(project, ".webcool_agent"), "results"),
+		    join_path(join_path(project, ".libai_agent"), "results"),
 		    result);
 	}
 	found = true;
@@ -683,7 +683,7 @@ bool agent_result_store_t::list_pending(const std::string &session_id,
 	std::string project;
 	if (!resolve_project(user_root_, project_path_, project, err))
 		return false;
-	const std::string agent = join_path(project, ".webcool_agent");
+	const std::string agent = join_path(project, ".libai_agent");
 	const std::string directory = join_path(agent, "results");
 	if (!normal_directory(agent) || !normal_directory(directory))
 		return true;

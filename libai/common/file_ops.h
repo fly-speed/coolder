@@ -28,7 +28,7 @@ inline bool safe_directory(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide))
+	if (!libai_utf8_path_to_wide(path.c_str(), wide))
 		return false;
 	const DWORD attributes = GetFileAttributesW(wide.c_str());
 	return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -47,7 +47,7 @@ inline bool make_private_directory(const std::string &path)
 		return true;
 #ifdef _WIN32
 	std::wstring wide;
-	return webcool_utf8_path_to_wide(path.c_str(), wide) &&
+	return libai_utf8_path_to_wide(path.c_str(), wide) &&
 	    _wmkdir(wide.c_str()) == 0 && safe_directory(path);
 #else
 	return mkdir(path.c_str(), 0700) == 0 && safe_directory(path);
@@ -58,7 +58,7 @@ inline bool path_entry_exists(const std::string &path)
 {
 #ifdef _WIN32
 	std::wstring wide;
-	return webcool_utf8_path_to_wide(path.c_str(), wide) &&
+	return libai_utf8_path_to_wide(path.c_str(), wide) &&
 	    GetFileAttributesW(wide.c_str()) != INVALID_FILE_ATTRIBUTES;
 #else
 	struct stat st;
@@ -72,8 +72,8 @@ inline bool replace_file(
 {
 #ifdef _WIN32
 	std::wstring temporary_wide, target_wide;
-	return webcool_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
-	    webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
+	return libai_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
+	    libai_utf8_path_to_wide(target.c_str(), target_wide) &&
 	    MoveFileExW(temporary_wide.c_str(), target_wide.c_str(),
 	        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 #else

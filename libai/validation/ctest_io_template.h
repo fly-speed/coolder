@@ -6,22 +6,22 @@ namespace ai
 // Return the CMake helper used to register generated I/O tests.
 inline const char *ctest_registration_template()
 {
-	return R"WEBCOOL(# Fixed registration for webcool_io_test.cmake. Requires CMake 3.16.
+	return R"LIBAI(# Fixed registration for libai_io_test.cmake. Requires CMake 3.16.
 include_guard(GLOBAL)
-set(_WEBCOOL_IO_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/webcool_io_test.cmake")
-function(webcool_add_io_test)
+set(_LIBAI_IO_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/libai_io_test.cmake")
+function(libai_add_io_test)
     cmake_parse_arguments(PARSE_ARGV 0 IO "STRIP_PROMPTS"
         "NAME;TARGET;INPUT_FILE;EXPECTED_FILE;EXPECTED_EXIT;EXPECTED_STDERR_FILE" "APP_ARGS")
     if(IO_UNPARSED_ARGUMENTS OR IO_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR "webcool_add_io_test(${IO_NAME}): unknown arguments=[${IO_UNPARSED_ARGUMENTS}]; missing values for=[${IO_KEYWORDS_MISSING_VALUES}]. STRIP_PROMPTS is a flag: write STRIP_PROMPTS without ON/OFF. Named values such as EXPECTED_EXIT require a value; APP_ARGS must contain only application arguments.")
+        message(FATAL_ERROR "libai_add_io_test(${IO_NAME}): unknown arguments=[${IO_UNPARSED_ARGUMENTS}]; missing values for=[${IO_KEYWORDS_MISSING_VALUES}]. STRIP_PROMPTS is a flag: write STRIP_PROMPTS without ON/OFF. Named values such as EXPECTED_EXIT require a value; APP_ARGS must contain only application arguments.")
     endif()
     foreach(key NAME TARGET INPUT_FILE EXPECTED_FILE)
         if(NOT DEFINED IO_${key})
-            message(FATAL_ERROR "webcool_add_io_test requires ${key}")
+            message(FATAL_ERROR "libai_add_io_test requires ${key}")
         endif()
     endforeach()
     if(NOT TARGET "${IO_TARGET}")
-        message(FATAL_ERROR "webcool_add_io_test: unknown target ${IO_TARGET}")
+        message(FATAL_ERROR "libai_add_io_test: unknown target ${IO_TARGET}")
     endif()
     if(NOT DEFINED IO_EXPECTED_EXIT)
         set(IO_EXPECTED_EXIT 0)
@@ -36,19 +36,19 @@ function(webcool_add_io_test)
     # Keep the entire application argv list in one -D argument.
     add_test(NAME "${IO_NAME}" COMMAND "${CMAKE_COMMAND}"
         "-DAPP=$<TARGET_FILE:${IO_TARGET}>" "-DAPP_ARGS=${IO_APP_ARGS}"
-        ${options} -P "${_WEBCOOL_IO_SCRIPT}")
+        ${options} -P "${_LIBAI_IO_SCRIPT}")
 endfunction()
-)WEBCOOL";
+)LIBAI";
 }
 // Return the CMake script used to verify generated I/O test results.
 inline const char *ctest_io_template()
 {
-	return R"WEBCOOL(# Reusable CTest stdin/stdout check; no shell or nested CMake process.
+	return R"LIBAI(# Reusable CTest stdin/stdout check; no shell or nested CMake process.
 # add_test(NAME cli_io COMMAND "${CMAKE_COMMAND}"
 #   "-DAPP=$<TARGET_FILE:your_target>"
 #   "-DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/input.txt"
 #   "-DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/expected.txt"
-#   -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/webcool_io_test.cmake")
+#   -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/libai_io_test.cmake")
 # Optional: APP_ARGS (CMake list), EXPECTED_EXIT (default 0),
 # EXPECTED_STDERR_FILE, STRIP_PROMPTS (default OFF; strips leading > only).
 # Prefer a quiet/noninteractive CLI for automated tests. Expected output is
@@ -64,7 +64,7 @@ if(NOT DEFINED EXPECTED_EXIT)
 endif()
 # Offsets refer to compared bytes after CRLF normalization / optional prompt
 # stripping. Hex context makes spaces, prompts and final newlines unambiguous.
-function(webcool_output_difference label expected actual expected_file)
+function(libai_output_difference label expected actual expected_file)
     string(LENGTH "${expected}" expected_bytes)
     string(LENGTH "${actual}" actual_bytes)
     set(low 0)
@@ -117,7 +117,7 @@ if(STRIP_PROMPTS)
     string(REGEX REPLACE "(^|\n)([ \t]*>[ \t]*)+" "\\1" actual "${actual}")
 endif()
 if(NOT "${actual}" STREQUAL "${expected}")
-    webcool_output_difference("Stdout" "${expected}" "${actual}" "${EXPECTED_FILE}")
+    libai_output_difference("Stdout" "${expected}" "${actual}" "${EXPECTED_FILE}")
     set(verification_failed TRUE)
     message(STATUS "Stdout mismatch\nexpected=[${expected}]\nactual=[${actual}]\nstderr=[${actual_stderr}]")
 endif()
@@ -126,7 +126,7 @@ if(DEFINED EXPECTED_STDERR_FILE)
     string(REPLACE "\r\n" "\n" actual_stderr "${actual_stderr}")
     string(REPLACE "\r\n" "\n" expected_stderr "${expected_stderr}")
     if(NOT "${actual_stderr}" STREQUAL "${expected_stderr}")
-        webcool_output_difference("Stderr" "${expected_stderr}" "${actual_stderr}" "${EXPECTED_STDERR_FILE}")
+        libai_output_difference("Stderr" "${expected_stderr}" "${actual_stderr}" "${EXPECTED_STDERR_FILE}")
         set(verification_failed TRUE)
         message(STATUS "Stderr mismatch\nexpected=[${expected_stderr}]\nactual=[${actual_stderr}]")
     endif()
@@ -134,7 +134,7 @@ endif()
 if(verification_failed)
     message(FATAL_ERROR "CLI validation failed: inspect all exit/stdout/stderr mismatches above, then fix the related contract together.")
 endif()
-)WEBCOOL";
+)LIBAI";
 }
 }
 }

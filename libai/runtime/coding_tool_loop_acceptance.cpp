@@ -78,7 +78,7 @@ bool coding_tool_loop_t::run()
     if(!runtime_task->text_preview && !runtime_task->assistant_chat) {
         std::string project;
         if(!libai::ai::agent_workspace_t::resolve_project_state_root(runtime_task->user_root,project_path,project,err))return false;
-        const auto directory=libai::ai::file_ops::join_path(project,".webcool_agent");
+        const auto directory=libai::ai::file_ops::join_path(project,".libai_agent");
         if(!libai::ai::file_ops::make_private_directory(directory)) {
             err="cannot prepare coding execution lease directory";return false;
         }
@@ -275,7 +275,7 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 	    "requirement_progress_json", requirement_progress_json.c_str());
 	if (completed) {
 		final_output.text =
-		    "WebCool：" + summary + "\n\n" + final_output.text;
+		    "LibAI：" + summary + "\n\n" + final_output.text;
 		std::vector<std::pair<std::string, std::string>> edits;
 		for (const auto &change : changes) {
 			// Proposal reasons are model-authored. Operation/path are the

@@ -278,16 +278,16 @@ void discover_rust_commands(const std::string &normalized,
 			    "cargo", policy.cargo_executable_path);
 			add_fixed_command(result, "rust.build", cargo,
 			    std::vector<std::string>{ "build", "--offline",
-			        "--target-dir", ".webcool-build/rust" });
+			        "--target-dir", ".libai-build/rust" });
 			add_fixed_command(result, "rust.test", cargo,
 			    std::vector<std::string>{ "test", "--offline",
-			        "--target-dir", ".webcool-build/rust" });
+			        "--target-dir", ".libai-build/rust" });
 			if (http_service) {
 				add_http_service_command(result,
 				    "rust.http-smoke", cargo,
 				    std::vector<std::string>{ "run",
 				        "--offline", "--target-dir",
-				        ".webcool-build/rust" });
+				        ".libai-build/rust" });
 			}
 		} else
 			result.unavailable_tools.push_back(
@@ -325,7 +325,7 @@ void discover_d_commands(agent_workspace_t &workspace,
 			if (!entrypoint.empty()) {
 				add_fixed_command(result, "d.build", dmd,
 				    std::vector<std::string>{
-				        "-of=.webcool-d-app", entrypoint });
+				        "-of=.libai-d-app", entrypoint });
 			} else
 				result.unavailable_tools.push_back(
 				    "d.no-fixed-entrypoint");
@@ -340,10 +340,10 @@ void discover_d_commands(agent_workspace_t &workspace,
 			if (http_service && !entrypoint.empty()) {
 #ifdef _WIN32
 				const std::string service_name =
-				    ".webcool-d-app.exe";
+				    ".libai-d-app.exe";
 #else
 				const std::string service_name =
-				    ".webcool-d-app";
+				    ".libai-d-app";
 #endif
 				const std::string service =
 				    project_root + "/" + service_name;
@@ -371,13 +371,13 @@ void discover_go_commands(const std::string &normalized,
 			// executable named "src", which collides with the source directory.
 			add_fixed_command(result, "go.build", go_program,
 			    std::vector<std::string>{
-			        "build", "-o", ".webcool-go-app", "./src" });
+			        "build", "-o", ".libai-go-app", "./src" });
 			add_fixed_command(result, "go.test", go_program,
 			    std::vector<std::string>{
 			        "test", "-count=1", "./..." });
 			if (http_service) {
 				const std::string service =
-				    project_root + "/.webcool-go-app";
+				    project_root + "/.libai-go-app";
 				add_http_service_command(result,
 				    "go.http-smoke", service,
 				    std::vector<std::string>());
@@ -400,16 +400,16 @@ void discover_swift_commands(const std::string &normalized,
 			    "swift", policy.swift_executable_path);
 			add_fixed_command(result, "swift.build", swift,
 			    std::vector<std::string>{ "build", "--scratch-path",
-			        ".webcool-build/swift" });
+			        ".libai-build/swift" });
 			add_fixed_command(result, "swift.test", swift,
 			    std::vector<std::string>{ "test", "--scratch-path",
-			        ".webcool-build/swift" });
+			        ".libai-build/swift" });
 			if (http_service) {
 				add_http_service_command(result,
 				    "swift.http-smoke", swift,
 				    std::vector<std::string>{ "run",
 				        "--skip-build", "--scratch-path",
-				        ".webcool-build/swift" });
+				        ".libai-build/swift" });
 			}
 		} else
 			result.unavailable_tools.push_back(
@@ -443,8 +443,8 @@ void discover_csharp_commands(agent_workspace_t &workspace,
 			    "dotnet", policy.dotnet_executable_path);
 			add_fixed_command(result, "csharp.build", dotnet,
 			    std::vector<std::string>{ "build", csharp_project,
-			        "-o", ".webcool-build/dotnet",
-			        "-p:AssemblyName=webcool_app" });
+			        "-o", ".libai-build/dotnet",
+			        "-p:AssemblyName=libai_app" });
 			if (has_relative_file(
 			        workspace, normalized, "tests/Tests.csproj")) {
 				add_fixed_command(result, "csharp.test", dotnet,
@@ -458,7 +458,7 @@ void discover_csharp_commands(agent_workspace_t &workspace,
 				add_http_service_command(result,
 				    "csharp.http-smoke", dotnet,
 				    std::vector<std::string>{
-				        ".webcool-build/dotnet/webcool_app.dll" });
+				        ".libai-build/dotnet/libai_app.dll" });
 			}
 		} else
 			result.unavailable_tools.push_back(
@@ -478,7 +478,7 @@ void discover_kotlin_commands(agent_workspace_t &workspace,
 			        "kotlinc", policy.kotlinc_executable_path),
 			    std::vector<std::string>{ "src/Main.kt",
 			        "-include-runtime", "-d",
-			        ".webcool-kotlin-main.jar" });
+			        ".libai-kotlin-main.jar" });
 			if (has_relative_file(
 			        workspace, normalized, "tests/MainTest.kt")) {
 				add_fixed_command(result,
@@ -487,12 +487,12 @@ void discover_kotlin_commands(agent_workspace_t &workspace,
 				        policy.kotlinc_executable_path),
 				    std::vector<std::string>{ "src/Main.kt",
 				        "tests/MainTest.kt", "-include-runtime",
-				        "-d", ".webcool-kotlin-tests.jar" });
+				        "-d", ".libai-kotlin-tests.jar" });
 				add_fixed_command(result, "kotlin.test",
 				    discover_language_executable(
 				        "java", policy.java_executable_path),
 				    std::vector<std::string>{ "-cp",
-				        ".webcool-kotlin-tests.jar",
+				        ".libai-kotlin-tests.jar",
 				        "MainTest" });
 			} else
 				result.unavailable_tools.push_back(
@@ -503,7 +503,7 @@ void discover_kotlin_commands(agent_workspace_t &workspace,
 				    discover_language_executable(
 				        "java", policy.java_executable_path),
 				    std::vector<std::string>{
-				        "-jar", ".webcool-kotlin-main.jar" });
+				        "-jar", ".libai-kotlin-main.jar" });
 			}
 		} else
 			result.unavailable_tools.push_back(
@@ -526,7 +526,7 @@ void discover_objective_c_commands(const ai_admin_policy_t &policy,
 			    std::vector<std::string>{ "test" });
 			if (http_service) {
 				const std::string service =
-				    project_root + "/.webcool-objc-app";
+				    project_root + "/.libai-objc-app";
 				add_http_service_command(result,
 				    "objective-c.http-smoke", service,
 				    std::vector<std::string>());

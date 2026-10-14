@@ -263,7 +263,7 @@ async function init() {
 
 init();
 
-// Adapted from webcool/html/js/admin-ai-policy.js; field names and limits match webcool.
+// Administrator controls use the shared libai policy fields and limits.
 (() => {
   const api = { adminAiPolicy: '/api/v1/admin/ai-policy' };
   const fetchJson = (url, options) =>

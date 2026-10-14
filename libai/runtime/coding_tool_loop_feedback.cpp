@@ -438,7 +438,7 @@ bool coding_tool_loop_t::finish_budget_boundary()
 		}
 		final_output.text =
 		    "本轮已达到工具调用额度；现有待审查修订已完整保存。"
-		    " WebCool 已在额度边界正常结束本轮，不需要从头重新执行。";
+		    " LibAI 已在额度边界正常结束本轮，不需要从头重新执行。";
 		final_output.text += " 当前状态：" + validation_state + "。";
 		final_output.reasoning = accumulated_reasoning;
 		final_output.input_tokens = total_input_tokens;

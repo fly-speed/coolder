@@ -7,7 +7,7 @@
 #include "agent_workspace.h"
 #include "../common/ai_error_log.h"
 #include "diff_preview.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"
@@ -40,7 +40,7 @@ namespace
 // in a later request. It is private to the current user, bounded to 1 MiB and
 // removed after successful application or expiry.
 libai::mutex g_patch_store_mutex;
-const char *kPatchHeader = "WEBCOOL_WORKSPACE_PATCH_V1";
+const char *kPatchHeader = "LIBAI_WORKSPACE_PATCH_V1";
 const long long kPatchLifetimeSeconds = 30 * 60;
 const size_t kMaxPatchBytes = 1024 * 1024;
 const size_t kMaxPreviewLinesPerSide = 120;
@@ -77,7 +77,7 @@ bool ensure_directory(const std::string &path)
 		return true;
 #ifdef _WIN32
 	std::wstring wide;
-	if (!webcool_utf8_path_to_wide(path.c_str(), wide) ||
+	if (!libai_utf8_path_to_wide(path.c_str(), wide) ||
 	    _wmkdir(wide.c_str()) != 0)
 		return false;
 #else
@@ -95,7 +95,7 @@ bool replace_plan_file(const std::string &temporary, const std::string &target)
 bool ensure_plan_directory(
     const std::string &user_root, std::string &directory, std::string &err)
 {
-	const std::string agent = join_path(user_root, ".webcool_agent");
+	const std::string agent = join_path(user_root, ".libai_agent");
 	directory = join_path(agent, "patches");
 	if (!ensure_directory(agent) || !ensure_directory(directory)) {
 		err = "cannot create a safe workspace patch directory";

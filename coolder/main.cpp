@@ -265,6 +265,9 @@ int main(int argc, char **argv)
 		acl::json migrated(migration.c_str());
 		if (!migrated.finish() || !migrated["ok"] || !migrated["ok"]->get_bool() || !*migrated["ok"]->get_bool())
 			throw std::runtime_error("JSON storage migration failed: " + migration);
+		const auto workspace_migration=libai::cpp::CodingService(coolder::workspace_dir).call("storage.migrate");
+        acl::json workspace_migrated(workspace_migration.c_str());
+        if(!workspace_migrated.finish()||!workspace_migrated["ok"]||!workspace_migrated["ok"]->get_bool()||!*workspace_migrated["ok"]->get_bool())throw std::runtime_error("workspace naming migration failed: "+workspace_migration);
 		libai::cpp::coding::ai_admin_policy_t policy;
 		policy.language_tools = "python,javascript,go,java,rust,swift";
 		policy.allow_browser_debug = false;
@@ -272,7 +275,7 @@ int main(int argc, char **argv)
 		    coolder::data_dir);
 		std::string policy_error;
 		if (fs::exists(coolder::data_dir +
-		        "/.webcool_settings/ai-policy.v1")) {
+		        "/.libai_settings/ai-policy.v1")) {
 			if (!policy_store.load(policy, policy_error)) {
 				throw std::runtime_error(policy_error);
 			}

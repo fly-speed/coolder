@@ -61,7 +61,7 @@ bool probe_port_available(unsigned short port)
 	if (available)
 		return available;
 	fputs(
-	    "webcool-sandbox-helper: validation blocked: service port already occupied; refusing to test an existing server\n",
+	    "libai-sandbox-helper: validation blocked: service port already occupied; refusing to test an existing server\n",
 	    stderr);
 	return available;
 }
@@ -74,7 +74,7 @@ int run_browser_probe(const options_t &options)
 	if (access(options.browser_node.c_str(), X_OK) != 0 ||
 	    access(options.browser_runner.c_str(), R_OK) != 0) {
 		fputs(
-		    "webcool-sandbox-helper: browser runtime unavailable; check Node and deployed browser runner\n",
+		    "libai-sandbox-helper: browser runtime unavailable; check Node and deployed browser runner\n",
 		    stderr);
 		return 78;
 	}
@@ -83,11 +83,11 @@ int run_browser_probe(const options_t &options)
 	    options.probe_path;
 #ifdef __linux__
 	// Chromium's own namespace sandbox cannot create nested namespaces after
-	// WebCool applies seccomp. The browser still runs inside WebCool's private
+	// LibAI applies seccomp. The browser still runs inside LibAI's private
 	// user, mount, PID, IPC, UTS and network namespaces, Landlock rules and
 	// delegated cgroup, so tell the trusted runner to disable only that nested
 	// Chromium layer.
-	if (setenv("WEBCOOL_BROWSER_OUTER_SANDBOX", "linux", 1) != 0)
+	if (setenv("LIBAI_BROWSER_OUTER_SANDBOX", "linux", 1) != 0)
 		return 126;
 	if (setenv("MOZ_DISABLE_CONTENT_SANDBOX", "1", 1) != 0 ||
 	    setenv("MOZ_DISABLE_RDD_SANDBOX", "1", 1) != 0 ||
@@ -109,7 +109,7 @@ int run_browser_probe(const options_t &options)
 		        .c_str(),
 		    static_cast<char *>(NULL));
 		fputs(
-		    "webcool-sandbox-helper: browser runtime unavailable; install browser dependencies and Node\n",
+		    "libai-sandbox-helper: browser runtime unavailable; install browser dependencies and Node\n",
 		    stderr);
 		_exit(78);
 	}
@@ -179,7 +179,7 @@ int probe_http_service(pid_t child, unsigned short port,
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 	fputs(
-	    "webcool-sandbox-helper: HTTP service readiness probe timed out\n",
+	    "libai-sandbox-helper: HTTP service readiness probe timed out\n",
 	    stderr);
 	return terminate_service(child, 70);
 }

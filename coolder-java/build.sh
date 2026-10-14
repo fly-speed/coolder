@@ -49,7 +49,7 @@ with zipfile.ZipFile(sys.argv[2], 'w', zipfile.ZIP_DEFLATED) as jar:
     for path in sorted(classes.rglob('*.class')):
         jar.write(path, path.relative_to(classes).as_posix())
 PACKAGE
-cp "$output/helper/webcool-sandbox-helper" "$dist_dir/bin/"
+cp "$output/helper/libai-sandbox-helper" "$dist_dir/bin/"
 cp "$output/native/"*ai_jni.* "$dist_dir/lib/"
 # Locate this APP's root html directory, also for a custom DIST_DIR.
 printf '#!/usr/bin/env bash\ndefault_html=%q\n' "$source_dir/html" > "$dist_dir/bin/coolder-java"
@@ -59,7 +59,7 @@ app_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 html_dir="$app_dir/../html"
 if [[ ! -f "$html_dir/index.html" ]]; then html_dir=$default_html; fi
 exec "${JAVA:-${JAVA_HOME:+$JAVA_HOME/bin/}java}" -Djava.library.path="$app_dir/lib" \
-    -Dcoolder.html="$html_dir" -Dcoolder.helper="$app_dir/bin/webcool-sandbox-helper" -cp "$app_dir/lib/coolder-java.jar" io.coolder.app.Main "$@"
+    -Dcoolder.html="$html_dir" -Dcoolder.helper="$app_dir/bin/libai-sandbox-helper" -cp "$app_dir/lib/coolder-java.jar" io.coolder.app.Main "$@"
 LAUNCH
 chmod +x "$dist_dir/bin/coolder-java"
 printf 'Build cache: %s\nRun: %s/bin/coolder-java\n' "$output" "$dist_dir"

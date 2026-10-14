@@ -42,8 +42,8 @@ bool install_new_file(const std::string &temporary, const std::string &target)
 #ifdef _WIN32
 	std::wstring temporary_wide;
 	std::wstring target_wide;
-	return webcool_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
-	    webcool_utf8_path_to_wide(target.c_str(), target_wide) &&
+	return libai_utf8_path_to_wide(temporary.c_str(), temporary_wide) &&
+	    libai_utf8_path_to_wide(target.c_str(), target_wide) &&
 	    MoveFileExW(temporary_wide.c_str(), target_wide.c_str(),
 	        MOVEFILE_WRITE_THROUGH) != 0;
 #else
@@ -63,7 +63,7 @@ bool write_temporary_text(const std::string &target, const std::string &content,
 		err = "cannot create workspace temporary file";
 		return false;
 	}
-	temporary = target + ".webcool-patch-" + id;
+	temporary = target + ".libai-patch-" + id;
 	FILE *out = fopen(temporary.c_str(), "wb");
 	if (out == NULL) {
 		err = std::string("cannot create workspace temporary file: ") +

@@ -8,7 +8,7 @@
 #include "agent_workspace.h"
 #include "../common/ai_error_log.h"
 #include "diff_preview.h"
-#include "../common/webcool_mutex.h"
+#include "../common/native_mutex.h"
 
 #ifdef _WIN32
 #include "../common/platform_compat.h"

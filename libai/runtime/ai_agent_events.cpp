@@ -10,8 +10,8 @@ std::string operation_log_path(
 {
 	const std::string filename = "ai-operations-" + task->id + ".jsonl";
 	return task->project_path.empty() ?
-	    ".webcool_agent/" + filename :
-	    task->project_path + "/.webcool_agent/" + filename;
+	    ".libai_agent/" + filename :
+	    task->project_path + "/.libai_agent/" + filename;
 }
 
 std::string sanitize_operation_detail(const std::string &input)
