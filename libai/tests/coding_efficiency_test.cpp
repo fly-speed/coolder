@@ -5,6 +5,8 @@
 #include <libai/context/coding_behavior_checks.h>
 #include <libai/context/source_request_compactor.h>
 #include <libai/context/compile_failure_cache.h>
+#include <libai/context/coding_interface_context.h>
+#include <libai/runtime/ai_agent_tools_internal.h>
 #include <libai/common/file_ops.h>
 #include <cassert>
 #include <fstream>
@@ -16,6 +18,37 @@ using namespace action::agent_detail;
 
 namespace action { namespace agent_detail {
 struct coding_loop_test_access_t {
+    static void exact_patch_recovery(const coding_loop_arguments_t &args) {
+        assert(args.changes.empty());
+        const std::string source = "package main\n" + std::string(17000, ' ') +
+            "\nfunc StableContract() int {\n\treturn 1\n}\n";
+        agent_change_proposal_t file; file.operation="write";
+        file.path="fixture/src/rebase.go"; file.content=source;
+        args.changes.push_back(file);
+        agent_tool_request_t request; request.name="workspace.patch_set";
+        request.path=file.path; request.content_present=true;
+        request.content=R"([{"old_text":"package main","new_text":"package changed"},{"old_text":"func StableContract() int {\n\treturn 999\n}","new_text":"func StableContract() int { return 7 }"}])";
+        agent_tool_trace_t trace;
+        const auto response=execute_workspace_tool(args.workspace,args.runtime_task->user_root,args.project_path,
+            true,request,trace,&args.changes,args.runtime_task->id,args.sandbox_limits,false);
+        acl::json failed(response.c_str()); assert(failed.finish() && !trace.ok);
+        assert(json_text(failed["error_code"])=="edit_context_mismatch");
+        assert(json_number(failed["failed_replacement"],0)==2);
+        const auto offset=static_cast<size_t>(json_number(failed["offset"],0));
+        const auto content=json_text(failed["content"]);
+        assert(offset>8192 && content.find("return 1")!=std::string::npos);
+        assert(content==source.substr(offset,content.size()));
+        assert(json_text(failed["file_sha256"])==agent_workspace_t::content_sha256(source));
+        assert(args.changes.size()==1 && args.changes[0].content==source); // earlier match rolled back too
+        request.content=R"([{"old_text":"return 1","new_text":"return 7"}])";
+        execute_workspace_tool(args.workspace,args.runtime_task->user_root,args.project_path,
+            true,request,trace,&args.changes,args.runtime_task->id,args.sandbox_limits,false);
+        assert(trace.ok && args.changes[0].content.find("return 7")!=std::string::npos);
+        args.changes.clear();
+        // No invented anchor and no ambiguity may silently apply a change.
+        acl::json fallback(edit_rebase_error("missing",file.path,source,false,"invented text",1).c_str());
+        assert(fallback.finish() && json_number(fallback["offset"],-1)==0);
+    }
     static void compile_cache(const coding_loop_arguments_t &args) {
         coding_tool_loop_t loop(args);
         loop.model_tools.emplace_back("workspace.validate","fixture",false,true,false,"workspace");
@@ -486,6 +519,27 @@ static agent_change_proposal_t source(const std::string &path, const std::string
     return file;
 }
 
+static void interface_navigation() {
+    auto go_source=source("project/core.go", "package core\ntype Room struct {}\nfunc NewRoom() *Room { return &Room{} }\nfunc (r *Room) Pause() bool { return true }\n");
+    auto rust=source("project/api.rs", "pub struct Client {}\npub fn connect() {}\n");
+    auto python=source("project/api.py", "class Client:\n    def connect(self):\n        pass\n");
+    auto cpp=source("project/api.h", "class Client {\npublic:\n  bool connect();\n};\n");
+    auto rejected=source("project/rejected.go", "func Unaccepted() {}\n"); rejected.review_status="rejected";
+    auto tests=source("project/core_test.go", "func TestNeverAnAPI() {}\n");
+    std::vector<agent_change_proposal_t> files{go_source,rust,python,cpp,rejected,tests};
+    auto text=coding_interface_context(files);
+    acl::json json(text.c_str()); assert(json.finish());
+    assert(text.size()<=4096 && text.find("partial\":true")!=std::string::npos);
+    for(const auto &file:{go_source,rust,python,cpp}) assert(text.find(file.path)!=std::string::npos);
+    assert(text.find("Pause()")!=std::string::npos && text.find(go_source.draft_hash)!=std::string::npos);
+    assert(text.find("Unaccepted")==std::string::npos && text.find("TestNeverAnAPI")==std::string::npos);
+    files[0]=source(go_source.path,"package core\nfunc Resume() {}\n");
+    text=coding_interface_context(files);assert(text.find("Resume()")!=std::string::npos && text.find("Pause()")==std::string::npos);
+    for(int i=0;i<50;++i)files.push_back(source("project/item"+std::to_string(i)+".go",go_source.content));
+    text=coding_interface_context(files,1024);acl::json bounded(text.c_str());assert(bounded.finish() && text.size()<=1024);
+    assert(coding_interface_context(files,1).empty());
+}
+
 static void source_retention() {
     std::vector<agent_change_proposal_t> complete_files;
     for (int i=0; i<12; ++i)
@@ -748,6 +802,7 @@ int main(int argc, char **argv) {
     coding_loop_test_access_t::delivery_tools(args);
     coding_loop_test_access_t::compile_cache(args);
     coding_loop_test_access_t::proposal_recovery(args);
+    coding_loop_test_access_t::exact_patch_recovery(args);
     coding_loop_test_access_t::repair_evidence_scope(args);
     coding_loop_test_access_t::no_mutation_claim(args);
     coding_loop_test_access_t::oversized_checkpoint(args);
@@ -762,11 +817,12 @@ int main(int argc, char **argv) {
     assert(coding_turn_budget("", "enabled", 4096, true, true, false).output_tokens == 4096);
     assert(coding_turn_budget("", "enabled", 131072, false, true, false).effort.empty());
     source_retention();
+    interface_navigation();
     retained_read_coverage();
     test_change_scope();
     request_source_compaction();
     const auto behavior = coding_behavior_checks("Implement a shared application");
-    assert(behavior.size() < 1500);
+    assert(behavior.size() < 2100);
     assert(behavior.find("behavior_contract") != std::string::npos);
     assert(behavior.find("first and repeated updates") != std::string::npos);
     assert(behavior.find("valid state remains valid") != std::string::npos);

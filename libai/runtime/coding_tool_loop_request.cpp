@@ -9,6 +9,7 @@
 #include "../provider/glm_reasoning.h"
 #include "../context/coding_behavior_checks.h"
 #include "../context/source_request_compactor.h"
+#include "../context/coding_interface_context.h"
 
 namespace action
 {
@@ -73,7 +74,7 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
     if (repair_full_validation_pending && pending_test_failure_report.empty())
         runtime_guidance += "\n<repair_session>{\"resolved\":true,\"state\":\"focused_tests_passed\",\"requires_full_validation\":true}</repair_session>\n"
             "The known test failures passed their targeted rerun. Do not repair or reread the old diagnostics. "
-            "Complete any still-missing implementation and run one full validation. This is not final acceptance.\n";
+            "The host schedules one full validation before the next model request when budget permits. This focused result is not final acceptance.\n";
 	if (!pending_test_failure_report.empty()) {
 		acl::json report(pending_test_failure_report.c_str());
 		acl::json session_json;
@@ -90,7 +91,7 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 		runtime_guidance += "\n<repair_session>" + serialize_json(session) +
 		    "</repair_session>\nA passing intermediate build does not resolve these test failures. "
 		    "Use the exact current supplied implementation and failing tests. Correct the root cause with a small related patch; "
-		    "the runtime retests known failing Go packages after an edit, or all configured checks when package mapping is ambiguous. A focused pass still requires one full validation. "
+		    "the runtime retests known failing Go packages after an edit, or all configured checks when package mapping is ambiguous. After the known failures pass, it automatically runs full validation before asking you again. "
 		    "Keep the user's thinking choice unchanged. Before changing code, trace the failing test's actual entry point, "
         "setup and lifecycle (whether the worker/event loop was launched), then input and expected state; "
 		    "never weaken a requirement to obtain a pass. State only a concise evidence-based repair decision, not speculative rewrites.\n";
@@ -601,6 +602,16 @@ void coding_tool_loop_t::select_request_tools(coding_turn_t &turn)
 
 void coding_tool_loop_t::restore_request_evidence(coding_turn_t &turn)
 {
+	if (!runtime_task->text_preview && !runtime_task->assistant_chat &&
+	    !libai::ai::read_only_analysis_task(original_prompt) &&
+	    !libai::ai::verification_only_task(original_prompt) && !current_full_validation_passed()) {
+		const auto interfaces = libai::ai::coding_interface_context(changes);
+		if (!interfaces.empty())
+			turn.input.turn_instructions += "\n<current_draft_interfaces>" + interfaces +
+			    "</current_draft_interfaces>\nPartial lexical navigation from current draft bytes, not a complete API or new requirements. "
+			    "Reuse these declarations and the retained exact source when writing dependent files; absence from this index is not absence from source. "
+			    "Do not invent a missing method or reopen design. Add a necessary definition and its callers in the same related batch.\n";
+	}
 	// Reinsert bounded unresolved evidence after compaction/request assembly.
 	// It is historical evidence, never an authoritative replacement for source.
 	if (!unresolved_repair_contract.empty() &&

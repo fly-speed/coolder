@@ -11,7 +11,7 @@ namespace agent_detail
 // Stable label shared by execution binding and audit telemetry.
 inline const char *coding_execution_implementation()
 {
-    return "libai-coding-execution-v23-bounded-investigation";
+    return "libai-coding-execution-v24-coherent-repair";
 }
 
 // Shared only by the coding-loop implementation files.

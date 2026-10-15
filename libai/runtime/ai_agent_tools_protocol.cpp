@@ -33,23 +33,43 @@ std::string tool_error_json(const std::string &error)
 }
 
 std::string edit_rebase_error(const std::string &error, const std::string &path,
-    const std::string &source, bool chinese)
+    const std::string &source, bool chinese, const std::string &old_text,
+    size_t failed_replacement)
 {
 	acl::json json;
 	acl::json_node &root = json.create_node();
 	root.add_bool("ok", false);
 	root.add_text("error", error.c_str());
+	root.add_text("error_code", "edit_context_mismatch");
+	root.add_bool("applied", false);
+	if (failed_replacement) root.add_number("failed_replacement", failed_replacement);
 	root.add_text("path", path.c_str());
 	root.add_text("file_sha256",
 	    libai::ai::agent_workspace_t::content_sha256(source).c_str());
-	const std::string page = libai::ai::utf8_prefix(source, 8192);
-	root.add_text("content", page.c_str());
-	root.add_number("offset", 0);
-	root.add_number("next_offset", static_cast<long long>(page.size()));
+	// Locate evidence only. Never fuzzy-apply a replacement: the next edit must
+	// still match exact bytes, and patch_set remains atomic after partial matches.
+	size_t at = 0, best = 0, scanned = 0;
+	std::istringstream lines(old_text);
+	std::string line;
+	while (std::getline(lines, line) && ++scanned <= 64) {
+		const auto first = line.find_first_not_of(" \t\r");
+		if (first == std::string::npos) continue;
+		line = line.substr(first);
+		if (line.size() < 12 || line.size() <= best) continue;
+		const auto found = source.find(line);
+		if (found == std::string::npos || source.find(line, found + line.size()) != std::string::npos) continue;
+		at = found; best = line.size();
+	}
+	const auto excerpt = libai::ai::edit_excerpt(source, at, 8192);
+	root.add_text("content", excerpt.content.c_str());
+	root.add_number("offset", excerpt.offset);
+	root.add_number("next_offset", excerpt.offset + excerpt.content.size());
 	root.add_number("total_bytes", static_cast<long long>(source.size()));
-	root.add_bool("eof", page.size() == source.size());
-	root.add_text(
-	    "next_action", prompt_text(prompt_id::edit_rebase_hint, chinese));
+	root.add_bool("eof", excerpt.offset + excerpt.content.size() == source.size());
+	root.add_text("context_selection", best ? "unique_exact_line_anchor; not an applicable patch" : "file_prefix; no unique anchor");
+	root.add_text("next_action", (std::string(prompt_text(prompt_id::edit_rebase_hint, chinese)) +
+	    (chinese ? " 本次原子修改整体未应用。failed_replacement 从 1 开始；源码窗口来自修改前版本。只修正失败片段并重新提交相关补丁；不要整文件重写或重建无关文件。窗口中的声明与上下文是证据，不是自动匹配建议。" :
+	    " The atomic edit was not applied. failed_replacement is one-based; the window is from the pre-edit version. Correct the failed fragment and resubmit related patches, including earlier rolled-back replacements. Do not regenerate whole working files. The window is evidence, not an automatically applicable match.")).c_str());
 	return serialize_json(root);
 }
 

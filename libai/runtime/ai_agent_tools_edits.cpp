@@ -83,12 +83,13 @@ std::string execute_workspace_patch_set(workspace_tool_context_t &context)
 		if (first == std::string::npos) {
 			return edit_rebase_error(
 			    "patch_set old_text does not match current content",
-			    context.path, unmodified_source, context.chinese);
+			    context.path, unmodified_source, context.chinese, old_text, replacement_count);
 		}
 		if (current.find(old_text, first + old_text.size()) !=
 		    std::string::npos) {
-			return tool_error_json(
-			    "patch_set old_text is ambiguous; include more context");
+			return edit_rebase_error(
+			    "patch_set old_text is ambiguous; include more context",
+			    context.path, unmodified_source, context.chinese, old_text, replacement_count);
 		}
 		current.replace(first, old_text.size(), new_text);
 		if (!(current.size() > 1024 * 1024))
@@ -195,14 +196,15 @@ std::string execute_workspace_replace(workspace_tool_context_t &context)
 	if (first == std::string::npos) {
 		return edit_rebase_error(
 		    "old_text does not match the current staged or formal file; "
-		    "read this file again and rebase the edit. A matching new fragment "
+		    "use current source evidence to rebase the edit. A matching new fragment "
 		    "elsewhere is not evidence that this edit was applied.",
-		    context.path, current, context.chinese);
+		    context.path, current, context.chinese, context.request.old_text);
 	}
 	if (current.find(context.request.old_text,
 	        first + context.request.old_text.size()) != std::string::npos) {
-		return tool_error_json(
-		    "old_text is ambiguous; include more surrounding context");
+		return edit_rebase_error(
+		    "old_text is ambiguous; include more surrounding context",
+		    context.path, current, context.chinese, context.request.old_text);
 	}
 	current.replace(
 	    first, context.request.old_text.size(), context.request.content);

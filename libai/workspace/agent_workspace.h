@@ -69,6 +69,11 @@ struct workspace_outline_item_t {
 	std::string text;
 };
 
+// The same bounded lexical navigation used by workspace.outline, for an exact
+// in-memory draft. Not an AST or proof that an unlisted declaration is absent.
+void source_outline(const std::string &content,
+    std::vector<workspace_outline_item_t> &items, bool &truncated);
+
 // Filesystem capability restricted to one authenticated user's storage tree.
 // Every operation normalizes the relative input, rejects internal metadata and
 // verifies the resolved path again so symlinks cannot escape the user root.

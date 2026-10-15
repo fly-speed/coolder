@@ -7,7 +7,8 @@ namespace agent_detail
 {
 // Describe why an edit no longer matches the source version it was based on.
 std::string edit_rebase_error(const std::string &error, const std::string &path,
-    const std::string &source, bool chinese);
+    const std::string &source, bool chinese, const std::string &old_text = "",
+    size_t failed_replacement = 0);
 
 // Serialize proposal-validation failures for model and browser feedback.
 std::string proposal_error_json(

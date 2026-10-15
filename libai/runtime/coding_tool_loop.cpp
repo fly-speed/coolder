@@ -69,6 +69,16 @@ bool coding_tool_loop_t::run_impl()
 		}
 		if (!require_browser_connection())
 			return false;
+		if (repair_full_validation_pending && pending_test_failure_report.empty() &&
+		    executed_tool_calls < effective_tool_call_limit && !changes.empty() &&
+		    !runtime_task->text_preview && !runtime_task->assistant_chat &&
+		    !libai::ai::focused_compile_repair(original_prompt) &&
+		    !libai::ai::read_only_analysis_task(original_prompt) &&
+		    !libai::ai::verification_only_task(original_prompt)) {
+			const auto followup = continue_repair_validation();
+			if (followup == step_t::failed) return false;
+			if (followup == step_t::completed) return true;
+		}
 		if (executed_tool_calls >= model_tool_call_limit() &&
             model_tool_call_limit() < effective_tool_call_limit)
             return finish_budget_boundary();

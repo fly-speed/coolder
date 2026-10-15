@@ -166,7 +166,8 @@ bool safe_progress(const agent_progress_t &progress)
 		if(!owner || (owner->state!="done"&&owner->state!="confirmed_applied") ||
 		    owner->output_sha256!=agent_workspace_t::content_sha256(receipt.report_json))return false;
 		if(owner->name!="coding.final_validation" && owner->name!="coding.recovery_validation" &&
-		    owner->name!="coding.budget_validation" && owner->name!="coding.admission_validation")return false;
+		    owner->name!="coding.budget_validation" && owner->name!="coding.admission_validation" &&
+		    owner->name!="coding.repair_full_validation")return false;
 		try {
 			namespace json=libai::governance_detail::json;
 			json::Document report;libai::governance_detail::parse_json_bounded(receipt.report_json,report,512*1024);

@@ -412,7 +412,17 @@ bool agent_workspace_t::outline(const std::string &relative_file,
 	std::string content;
 	if (!read(relative_file, content, truncated, err))
 		return false;
+	bool outline_truncated = false;
+	source_outline(content, items, outline_truncated);
+	truncated = truncated || outline_truncated;
+	return true;
+}
+
+void source_outline(const std::string &content,
+    std::vector<workspace_outline_item_t> &items, bool &truncated)
+{
 	items.clear();
+	truncated = false;
 	std::istringstream input(content);
 	std::string line;
 	unsigned long line_number = 0;
@@ -432,7 +442,6 @@ bool agent_workspace_t::outline(const std::string &relative_file,
 		truncated = true;
 		break;
 	}
-	return true;
 }
 
 }

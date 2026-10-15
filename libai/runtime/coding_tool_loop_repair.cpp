@@ -9,6 +9,34 @@ namespace action
 namespace agent_detail
 {
 
+coding_tool_loop_t::step_t coding_tool_loop_t::continue_repair_validation()
+{
+	// Called between turns, after the mutation's durable effect is settled.
+	// Starting a second effect inside finish_validated_result would leave the
+	// original edit unconfirmed across cancellation or restart.
+	coding_turn_t followup;
+	followup.call = executed_tool_calls;
+	followup.message.tool.name = "workspace.validate";
+	followup.message.tool.path = project_path;
+	followup.trace.name = "workspace.validate";
+	followup.trace.path = project_path;
+	followup.staged_fingerprint_after = staged_change_fingerprint(changes);
+	if (!run_automatic_validation("coding.repair_full_validation", followup.trace, followup.tool_result))
+		return step_t::failed;
+	repair_full_validation_pending = false;
+	traces.push_back(followup.trace);
+	complete_runtime_tool(runtime_task, followup.trace, executed_tool_calls);
+	track_repair_failures(followup);
+	const auto result = finish_validated_result(followup);
+	if (result != step_t::proceed) return result;
+	const std::string evidence = "\n<automatic_full_validation>" + followup.tool_result +
+	    "</automatic_full_validation>\nThe host ran full validation immediately after the known failing packages passed. "
+	    "Use this report for the current revision; repair remaining failures or finish the existing acceptance review.\n";
+	next_tool_guidance += evidence;
+	build_tool_feedback(followup);
+	return compact_and_checkpoint(followup) ? step_t::proceed : step_t::failed;
+}
+
 bool coding_tool_loop_t::current_cached_compile_failure()
 {
 	if (!libai::ai::deterministic_compile_failure(validation_cache.report) ||
@@ -97,7 +125,7 @@ void coding_tool_loop_t::build_repair_focus(coding_turn_t &turn)
 				record.add_child("diagnostics",focus_json.duplicate_node(*diagnostics));
 		}
 	}
-	focus.add_text("repair_scope","Check failing fixture preconditions and assertion polarity against user requirements first; correct a demonstrably invalid test with evidence while retaining the behavior coverage. Repair the reported errors together with their required imports, definitions and callers in one related edit. These are observed diagnostics, not proof that later compilation has no additional errors.");
+	focus.add_text("repair_scope","Trace the exact failing assertion, initial state, entry point and lifecycle against user requirements before editing. Keep an established behavior contract unless evidence requires changing it; then reconcile related callers and test setup across layers in the same patch. Correct a demonstrably invalid test with evidence while retaining observable behavior assertions. Repair diagnostics with the smallest related definitions/imports/callers change. Do not rewrite unrelated files or regenerate whole working files after a rejected patch. These diagnostics do not prove later compilation has no other errors.");
 	acl::json_node &edits = focus_json.create_array();
 	focus.add_child("last_edits", edits);
 	auto add_failures = [&](const char *name,
@@ -574,7 +602,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		append_runtime_operation_event(runtime_task, node);
 		const std::string build_feedback = "\n<automatic_build>" +
 		    completion_validation +
-		    (full_repair_probe ? "\nThis is full validation because pending test failures could not be safely mapped to packages. Judge the actual test results, not compilation alone. " : repair_probe ? "\nThis is a focused repair test, not full validation. If it passes, finish with one full workspace.validate. " :
+		    (full_repair_probe ? "\nThis is full validation because pending test failures could not be safely mapped to packages. Judge the actual test results, not compilation alone. " : repair_probe ? "\nThis is a focused repair test, not full validation. Once all known failing packages pass, the host automatically runs one full validation before the next model request. " :
 		    "\nThis is an intermediate build-only gate. test_status=not-run is expected here. ") +
 		    "workspace.validate independently runs configured tests (including go.test); do not add test invocations "
 		    "to build scripts merely to change this status. "

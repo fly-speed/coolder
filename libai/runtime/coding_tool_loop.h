@@ -136,6 +136,9 @@ private:
 
 	// proceed advances to the next phase; next_turn skips the rest of this turn.
 	enum class step_t { proceed, next_turn, completed, failed };
+	// After settling the edit, promote a passing focused repair to full validation
+	// without another provider request. Uses its own durable effect and budget.
+	step_t continue_repair_validation();
 	// Reject an edit that lacks the required browser observation
 	// evidence.
 	step_t reject_browser_edit();

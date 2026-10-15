@@ -793,10 +793,14 @@ int main(int argc,char **argv)
         effect.output_sha256=agent_workspace_t::content_sha256(receipt.report_json);
         assert(store.save(fixture,error));agent_progress_t loaded;bool found=false;
         assert(store.load(loaded,found,error)&&found&&loaded.validation_receipt.report_json==receipt.report_json);
+        effect.name="coding.repair_full_validation";
+        assert(store.save(fixture,error));
+        assert(store.load(loaded,found,error)&&found&&loaded.tool_effects.back().name==effect.name);
         const auto checkpoint=bytes(root+"/"+store.relative_path());
         auto invalid=fixture;invalid.validation_receipt.execution_revision=std::string(64,'e');assert(!store.save(invalid,error));
         invalid=fixture;invalid.validation_receipt.effect_key="missing";assert(!store.save(invalid,error));
         invalid=fixture;invalid.validation_receipt.report_json="{}";assert(!store.save(invalid,error));
+        invalid=fixture;invalid.tool_effects.back().name="coding.unrecognized_validation";assert(!store.save(invalid,error));
         invalid=fixture;invalid.tool_effects.back().state="running";invalid.tool_effects.back().reference.clear();invalid.tool_effects.back().completed_after=0;assert(!store.save(invalid,error));
         assert(bytes(root+"/"+store.relative_path())==checkpoint);assert(store.save(progress,error));
     }
