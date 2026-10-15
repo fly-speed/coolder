@@ -606,6 +606,9 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 			++final_validation_repair_attempts;
 			provider_response_id.clear();
 			provider_tool_outputs.clear();
+			turn.staged_fingerprint_after = final_fingerprint;
+			review_validation_failure(turn, validation);
+			if (turn.reconsider_repair) supply_repair_review_sources(turn);
 			const std::string guidance =
 			    "\n\n<draft_validation>\n" + validation +
 			    prompt_text(
@@ -613,6 +616,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 			    validation_repair_context(runtime_task->user_root,
 			        project_path, runtime_task->id, changes,
 			        validation, 48 * 1024) +
+			    next_tool_guidance +
 			    "\n<read_working_set>" + read_context.records() +
 			    "</read_working_set>\n";
 			supplementary_read_calls = 0;

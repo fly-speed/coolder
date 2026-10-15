@@ -456,9 +456,10 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 		options_t runtime_options = options;
 		std::vector<std::string> runtime_values;
 		std::vector<char *> runtime_arguments;
-		if (!runtime_options.browser_node.empty() &&
+		const bool dynamic_http_port = runtime_options.probe_port != 0 &&
 		    access((project_root + "/.libai-http-port-env").c_str(),
-		        F_OK) == 0) {
+		        F_OK) == 0;
+		if (dynamic_http_port) {
 			if (!allocate_probe_port(runtime_options.probe_port))
 				_exit(73);
 			const std::string port =
@@ -470,10 +471,7 @@ int run_linux_sandbox(const options_t &options, char *argv[],
 		     ++i) {
 			const std::string argument = argv[i];
 			runtime_values.push_back(
-			    !runtime_options.browser_node.empty() &&
-			            runtime_options.probe_port !=
-			                options.probe_port &&
-			            argument == "127.0.0.1:18080" ?
+			    dynamic_http_port && argument == "127.0.0.1:18080" ?
 			        "127.0.0.1:" +
 			            std::to_string(runtime_options.probe_port) :
 			        argument);

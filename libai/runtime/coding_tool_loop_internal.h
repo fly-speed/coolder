@@ -19,6 +19,7 @@ struct coding_turn_t {
 	bool budget_delivery_turn{};
 	// Provider-neutral request prepared for the current model turn.
 	libai::ai::completion_request_t input{};
+	std::string reasoning_policy;
 	// Normalized provider completion for the current model turn.
 	libai::ai::completion_result_t output{};
 	// Per-attempt telemetry before retry usage is merged into billable totals.
@@ -74,6 +75,8 @@ struct coding_turn_t {
 	bool repeated_proposal_failure{};
 	// Bounded diagnostic context identifying the current repair target.
 	std::string repair_focus{};
+	// Actual automatic/explicit validation report, separate from proposal output.
+	std::string repair_report{};
 	// Whether current evidence requires revisiting the repair strategy.
 	bool reconsider_repair{};
 	// Text to append to the transcript after this tool turn.
@@ -105,7 +108,8 @@ bool save_coding_progress(libai::ai::agent_progress_store_t &store,
 std::string compact_coding_transcript(const std::string &original_prompt,
     const std::vector<agent_change_proposal_t> &changes,
     const std::vector<agent_tool_trace_t> &traces,
-    const std::string &latest_exchange, bool chinese);
+    const std::string &latest_exchange, bool chinese,
+    const libai::ai::agent_read_context_t *reads = NULL);
 
 } // namespace coding_loop_detail
 

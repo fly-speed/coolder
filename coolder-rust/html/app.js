@@ -596,22 +596,27 @@ async function selectSession(s) {
   clearComposerAttachments();
   resetRun();
   state.session = s.session_id;
+  const epoch = state.epoch;
+  const projectId = state.project.id;
   const data = await api(
     '/sessions?project_id=' +
-      encodeURIComponent(state.project.id) +
+      encodeURIComponent(projectId) +
       '&session_id=' +
       encodeURIComponent(s.session_id)
   );
+  if (epoch !== state.epoch || state.session !== s.session_id) return;
   const item = (data.sessions || []).find(x => x.session_id === s.session_id);
+  if (!item) throw new Error(t('服务返回无效响应'));
   $('messages').replaceChildren();
   for (const m of item?.messages || [])
     message(m.role, m.content || m.text || '', m.sent_at ?? m.created_at,
       m.role === 'assistant' ? m : undefined);
+  if (!item.messages?.length)
+    message('assistant', t('项目已就绪。你希望实现什么？'));
+  state.run = item.active_run_id || item.last_run_id || '';
   await sessions();
-  if (item?.last_run_id) {
-    state.run = item.last_run_id;
-    await poll(state.epoch);
-  }
+  if (epoch !== state.epoch || state.session !== s.session_id) return;
+  if (state.run) await poll(epoch);
 }
 
 const fileTree = { root: null, generation: 0, expanded: new Set() };

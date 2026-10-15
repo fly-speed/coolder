@@ -20,11 +20,17 @@ public:
 	// the project-relative path of the committed JSON document.
 	bool append(const std::string &payload, std::string &relative_path,
 	    std::string &err) const;
+	// Preserve a JSON-wrapped model response artifact separately from outbound
+	// requests. The wrapper can retain an unparsed content string exactly.
+	bool append_response(const std::string &payload, std::string &relative_path,
+	    std::string &err) const;
 	// Return the retained operation-log snapshot for this task.
 	bool operation_log(
 	    std::string &content, bool write, std::string &err) const;
 
 private:
+	bool append_archive(const std::string &payload, const std::string &kind,
+	    std::string &relative_path, std::string &err) const;
 	// Filesystem root belonging to the authenticated user.
 	std::string user_root_;
 	// Logical path identifying the selected project.

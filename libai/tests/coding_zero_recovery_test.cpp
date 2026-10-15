@@ -448,6 +448,21 @@ int main(int argc,char **argv)
         return 0;
     }
     assert(argc==2);
+    {
+        agent_tool_request_t batch; batch.name="workspace.execute_batch";
+        batch.content=R"([{"name":"workspace.patch_set"},{"name":"workspace.replace"}])";
+        assert(!coding_tool_requires_confirmation(batch));
+        batch.content=R"([{"name":"workspace.list"},{"name":"workspace.read"}])";
+        assert(!coding_tool_requires_confirmation(batch));
+        batch.content=R"([{"name":"workspace.patch_set"},{"name":"workspace.validate"}])";
+        assert(coding_tool_requires_confirmation(batch));
+        batch.content=R"([{"name":"workspace.patch_set"},{"name":"browser.interact"}])";
+        assert(coding_tool_requires_confirmation(batch));
+        batch.content=R"([{"name":"unknown.command","side_effect_free":true}])";
+        assert(coding_tool_requires_confirmation(batch));
+        batch.content="[]";
+        assert(coding_tool_requires_confirmation(batch));
+    }
     // A concurrent review cannot grant permission to replay external effects.
     // Mixed batches retain uncertainty even when their private draft rolls back.
     for(const auto &name:std::vector<std::string>{"browser.interact","browser.patch_style",

@@ -304,6 +304,11 @@ pub fn start(app: &App, s: &mut State, a: &Value, b: &Value) -> Result<Value> {
     if !text(&args, "session_id").is_empty() {
         let mut session = s.get("sessions", a, text(&args, "session_id"))?;
         session["last_run_id"] = json!(id);
+        // Save the visible submission with the run before starting model I/O.
+        session["messages"].as_array_mut().unwrap().push(json!({
+            "role":"user", "text":text(&args,"prompt"), "run_id":id,
+            "sent_at":r["started_at"], "state":"sent"
+        }));
         r["session_id"] = session["id"].clone();
         let row=s.rows("sessions",a).iter_mut().find(|row|row["id"]==session["id"])
             .ok_or_else(||Error::bad("session missing"))?;
@@ -592,7 +597,11 @@ fn execute(app: &App, j: Arc<Job>, input: &str) {
             ] {
                 reply[k] = r[k].clone();
             }
-            session["messages"].as_array_mut().unwrap().push(json!({"role":"user","text":text(&j.args,"prompt"),"sent_at":sent_at,"run_id":j.id}));
+            // Older sessions may lack the start-time submission; add it only once.
+            let messages = session["messages"].as_array_mut().unwrap();
+            if !messages.iter().any(|m| text(m,"role")=="user" && text(m,"run_id")==j.id) {
+                messages.push(json!({"role":"user","text":text(&j.args,"prompt"),"sent_at":sent_at,"run_id":j.id}));
+            }
             session["messages"].as_array_mut().unwrap().push(reply);
             session["last_run_id"] = json!(j.id);
             session["transcript"] = r.get("transcript").cloned().unwrap_or(json!([]));

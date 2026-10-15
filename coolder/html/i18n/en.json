@@ -434,5 +434,7 @@
   "请求大小上限（字节）": "Request size limit (bytes)",
   "模型能力配置无效": "Invalid model capability configuration",
   "模型能力上限必须是 1 到 1073741824 的整数": "Model limits must be integers between 1 and 1073741824",
-  "上限留空时使用运行预算；多个调用不代表工具并发执行。": "Leave limits blank to use run budgets; multiple calls do not imply concurrent execution."
+  "上限留空时使用运行预算；多个调用不代表工具并发执行。": "Leave limits blank to use run budgets; multiple calls do not imply concurrent execution.",
+  "启用推理": "Enable reasoning",
+  "自适应推理": "Adaptive reasoning"
 }

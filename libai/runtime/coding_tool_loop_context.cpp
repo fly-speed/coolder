@@ -275,12 +275,18 @@ bool save_coding_progress(libai::ai::agent_progress_store_t &store,
 std::string compact_coding_transcript(const std::string &original_prompt,
     const std::vector<agent_change_proposal_t> &changes,
     const std::vector<agent_tool_trace_t> &traces,
-    const std::string &latest_exchange, bool chinese)
+    const std::string &latest_exchange, bool chinese,
+    const libai::ai::agent_read_context_t *reads)
 {
 	// Reserve current draft source separately so old history cannot evict newly
 	// generated interfaces. Rebuild it on every compaction from current changes.
+	std::set<std::string> retained_prefixes;
+	if (reads)
+		for (const auto &change : changes)
+			if (reads->contains(change.path, change.draft_hash, 0))
+				retained_prefixes.insert(change.path);
 	const std::string records =
-	    libai::ai::staged_source_records(changes, 32 * 1024);
+	    libai::ai::staged_source_records(changes, 64 * 1024, retained_prefixes);
 	const std::string staged = records == "[]" ?
 	    "" :
 	    std::string(prompt_text(prompt_id::staged_source_pages, chinese)) +

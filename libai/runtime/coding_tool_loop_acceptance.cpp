@@ -60,8 +60,21 @@ void coding_tool_loop_t::record_acceptance_evidence(const std::string &report)
 {
 	// Capture each trusted validator result, including auto-build, final and
 	// budget-boundary paths. Never extract evidence from model prose.
-	acceptance_report = report;
 	acl::json evidence(report.c_str());
+	if (evidence.finish()) {
+		const auto scope = json_text(evidence["validation_scope"]);
+		const bool passed = json_bool(evidence["validation_passed"], false);
+		if (!passed && (json_text(evidence["test_status"]) == "failed" ||
+		        libai::ai::is_test_command(json_text(evidence["failed_command_id"]))))
+			pending_test_failure_report = report;
+		if (scope == "targeted-tests") return; // Never promote a partial check to final evidence.
+		if (scope == "build-only" && passed && !pending_test_failure_report.empty()) return;
+		if (passed && scope != "build-only" && json_text(evidence["test_status"]) == "passed") {
+			pending_test_failure_report.clear();
+			repair_failures.clear();
+		}
+	}
+	acceptance_report = report;
 	acceptance_draft =
 	    evidence.finish() ? json_text(evidence["proposal_sha256"]) : "";
 	acceptance_baseline = evidence.finish() ?

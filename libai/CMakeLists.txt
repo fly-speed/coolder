@@ -182,6 +182,14 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libaiConfig.cmake"
 
 # Common portable tests are registered above; add only full-backend checks here.
 if(AI_CODING_BUILD_TESTS)
+ add_executable(ai_completed_batch_compat_test tests/completed_batch_compat_test.cpp)
+ target_link_libraries(ai_completed_batch_compat_test PRIVATE libai::ai)
+ target_compile_options(ai_completed_batch_compat_test PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
+ add_test(NAME ai_completed_batch_compat COMMAND ai_completed_batch_compat_test "${CMAKE_CURRENT_BINARY_DIR}/completed-batch-compat")
+ add_executable(ai_coding_efficiency_test tests/coding_efficiency_test.cpp)
+ target_link_libraries(ai_coding_efficiency_test PRIVATE libai::ai)
+ target_compile_options(ai_coding_efficiency_test PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
+ add_test(NAME ai_coding_efficiency COMMAND ai_coding_efficiency_test "${CMAKE_CURRENT_BINARY_DIR}/coding-efficiency")
  if(UNIX)
   add_executable(ai_durable_record_writer_test tests/durable_record_writer_test.cpp)
   target_link_libraries(ai_durable_record_writer_test PRIVATE libai::ai)

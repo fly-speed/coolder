@@ -354,6 +354,81 @@ void append_project_context(libai::ai::agent_workspace_t &workspace,
 		    prompt_text(prompt_id::provider_content_disabled, chinese);
 		return;
 	}
+	// Inspect only the root and two conventional scaffold directories. This
+	// avoids a repository walk while exposing entry-point/test dependencies
+	// before the first implementation request.
+	std::vector<libai::ai::workspace_entry_t> bootstrap = entries;
+	std::string directory_snapshot = "[";
+	for (const char *directory : {"src", "tests"}) {
+		const std::string path = join_relative(project_path, directory);
+		if (std::none_of(entries.begin(), entries.end(), [&path](const libai::ai::workspace_entry_t &e) {
+			return e.directory && e.path == path;
+		})) continue;
+		std::vector<libai::ai::workspace_entry_t> children;
+		std::string ignored;
+		if (!workspace.list(path, children, ignored)) continue;
+		// Include the observation we already made, not just selected file contents.
+		// A directory name at the root does not establish what is inside it.
+		acl::json listing;
+		auto &record = listing.create_node();
+		record.add_text("path", path.c_str());
+		record.add_text("source_view", "project_baseline");
+		record.add_number("entry_count", children.size());
+		auto &items = listing.create_array();
+		record.add_child("entries", items);
+		size_t listed = 0, listing_bytes = 0;
+		for (const auto &child : children) {
+			acl::json encoded;
+			auto &item = encoded.create_node();
+			item.add_text("path", child.path.c_str());
+			item.add_bool("directory", child.directory);
+			item.add_number("size", child.size);
+			const size_t bytes = item.to_string().length();
+			if (listed >= 64 || listing_bytes + bytes > 3 * 1024) break;
+			auto &saved = items.add_child(false, true);
+			saved.add_text("path", child.path.c_str());
+			saved.add_bool("directory", child.directory);
+			saved.add_number("size", child.size);
+			listing_bytes += bytes;
+			++listed;
+		}
+		record.add_bool("complete", listed == children.size());
+		if (directory_snapshot.size() > 1) directory_snapshot += ",";
+		directory_snapshot += record.to_string().c_str();
+		bootstrap.insert(bootstrap.end(), children.begin(),
+		    children.begin() + std::min<size_t>(children.size(), 64));
+	}
+	if (directory_snapshot.size() > 1)
+		context += "\n<bootstrap_directories>" + directory_snapshot +
+		    "]</bootstrap_directories>\nImmediate children only, not a recursive scan. Reuse complete listings; complete=false leaves entries omitted.\n";
+	std::vector<agent_change_proposal_t> scaffold;
+	for (const auto &entry : bootstrap) {
+		if (entry.directory || entry.size > 64 * 1024 || scaffold.size() >= 16) continue;
+		const std::string name = entry.path.substr(entry.path.find_last_of('/') + 1);
+		const bool script = name == "build.sh" || name == "run.sh" ||
+		    name == "build.bat" || name == "run.bat";
+		const bool root_ignore = entry.path == join_relative(project_path, ".gitignore");
+		const bool source = name.find("main.") == 0 || name.find("main_test.") == 0 ||
+		    name.find("server.") == 0 || name.find("test_") == 0 ||
+		    name.find("_test.") != std::string::npos || name.find(".test.") != std::string::npos;
+		if (!script && !source && !root_ignore) continue;
+		std::string content, ignored;
+		bool truncated = false;
+		if (!workspace.read(entry.path, content, truncated, ignored) || truncated ||
+		    content.find('\0') != std::string::npos) continue;
+		agent_change_proposal_t file;
+		file.operation = "write";
+		file.path = entry.path;
+		file.content = content;
+		file.draft_hash = libai::ai::agent_workspace_t::content_sha256(content);
+		scaffold.push_back(file);
+	}
+	if (!scaffold.empty()) {
+		context += "\n<bootstrap_source>" +
+		    libai::ai::staged_source_records(scaffold, 16 * 1024, {}, "project_baseline") +
+		    "</bootstrap_source>\nThese are existing project files, not proposed edits. Reuse exact pages; eof=false requires only missing bytes. "
+		    "Inspect entry-point dependencies in existing tests before replacing scaffold code.\n";
+	}
 
 	const char *candidates[] = { "AGENTS.md", "README.md", "README",
 		"CMakeLists.txt", "Makefile", "Cargo.toml", "go.mod",

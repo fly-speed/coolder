@@ -17,10 +17,15 @@ inline std::set<std::string> repair_failure_signatures(
 	std::string line;
 	const std::regex ctest(
 	    R"(Test\s+#\d+:\s+([^\s]+).*\*\*\*(Failed|Timeout|Exception))");
+	const std::regex go_test(R"(^--- FAIL: ([^\s]+))");
 	const std::regex assertion_line(R"(FAIL\s*\(line\s+\d+\))");
 	const std::regex source_line(R"(:\d+(?::\d+)?)");
 	while (std::getline(lines, line)) {
 		std::smatch match;
+		if (std::regex_search(line, match, go_test)) {
+			if (tests.size() < 128) tests.insert("go-test:" + match[1].str());
+			continue; // Duration/line changes do not create a new failure identity.
+		}
 		if (tests.size() < 128 && std::regex_search(line, match, ctest))
 			tests.insert(
 			    "ctest:" + match[1].str() + ":" + match[2].str());

@@ -122,7 +122,8 @@ static bool append_session_message(
 bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 {
 	std::string user_root;
-	if (!current_user_root(req, res, user_root))
+	std::string username;
+	if (!current_user_root(req, res, user_root, &username))
 		return true;
 	std::string requested_path;
 	std::string path_err;
@@ -159,6 +160,41 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 	std::vector<libai::cpp::coding::agent_run_record_t> runs;
 	std::string run_err;
 	run_store.list(100, runs, run_err);
+	// A new conversation has no completed messages or last_run_id yet. Resolve
+	// its exact running task so reopening it can reconnect before completion.
+	struct active_session_run_t {
+		std::string id;
+		std::string prompt;
+		long long started_at = 0;
+	};
+	std::map<std::string, active_session_run_t> active_runs;
+	libai::cpp::coding::agent_checkpoint_store_t checkpoints(
+	    runtime_upload_dir_get(), user_root, username);
+	for (const auto &run : runs) {
+		if (run.status != "running" ||
+		    ((!requested_path.empty()) && run.project_path != requested_path))
+			continue;
+		std::string session_id, prompt;
+		const auto task = find_runtime_task(user_root, run.id);
+		if (task && task->project_path == run.project_path) {
+			session_id = task->session_id;
+			prompt = task->original_prompt;
+		} else {
+			// Inspect ownership without starting recovery during a list request.
+			libai::cpp::coding::agent_checkpoint_t checkpoint;
+			std::string checkpoint_err;
+			if (!checkpoints.exists(run.id) ||
+			    !checkpoints.load(run.id, checkpoint, checkpoint_err) ||
+			    checkpoint.run_id != run.id ||
+			    checkpoint.project_path != run.project_path)
+				continue;
+			session_id = checkpoint.session_id;
+		}
+		if (session_id.empty()) continue;
+		auto &active = active_runs[session_id];
+		if (active.id.empty() || run.started_at > active.started_at)
+			active = {run.id, prompt, run.started_at};
+	}
 	acl::json json;
 	acl::json_node &root = json.create_node();
 	root.add_bool("ok", true);
@@ -177,6 +213,9 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 		item.add_text("agent_id", sessions[i].agent_id.c_str());
 		item.add_text("provider_id", sessions[i].provider_id.c_str());
 		item.add_text("path", sessions[i].project_path.c_str());
+		const auto active = active_runs.find(sessions[i].id);
+		if (active != active_runs.end())
+			item.add_text("active_run_id", active->second.id.c_str());
 		if (!sessions[i].last_run_id.empty()) {
 			item.add_text(
 			    "last_run_id", sessions[i].last_run_id.c_str());
@@ -213,6 +252,23 @@ bool AiAgentSessionListAction::run(request_t &req, response_t &res)
 			if (!append_session_message(sessions[i], j, json,
 			        messages, user_root, runs))
 				break;
+		}
+		if (include_session_detail && active != active_runs.end() &&
+		    !active->second.prompt.empty() &&
+		    std::none_of(sessions[i].messages.begin(), sessions[i].messages.end(),
+		        [&active](const libai::cpp::coding::agent_session_message_t &m) {
+			        return m.run_id == active->second.id && m.role == "user";
+		        })) {
+			// The original user submission belongs in visible history even while
+			// the model reply is still pending. Never expose the model context.
+			auto &message = messages.add_child(false, true);
+			message.add_text("message_id", (active->second.id + ":user").c_str());
+			message.add_text("run_id", active->second.id.c_str());
+			message.add_text("role", "user");
+			message.add_text("text", active->second.prompt.c_str());
+			message.add_text("state", "sent");
+			message.add_number("sent_at", active->second.started_at);
+			message.add_number("created_at", active->second.started_at);
 		}
 	}
 	return sendJson(res, 200, root, req.isKeepAlive());

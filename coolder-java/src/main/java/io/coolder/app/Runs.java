@@ -352,6 +352,10 @@ final class Runs {
       Map<String, Object> session =
           projects.get(projects.records("sessions", a), Json.text(args, "session_id"));
       session.put("last_run_id", id);
+      // Persist the visible submission before the asynchronous model request.
+      Json.list(session.get("messages")).add(Json.obj(
+          "role", "user", "text", Json.text(args, "prompt"), "run_id", id,
+          "sent_at", r.get("started_at"), "state", "sent"));
       r.put("session_id", session.get("id"));
     }
     Job j = new Job(r, new LinkedHashMap<>(a));
@@ -638,16 +642,13 @@ final class Runs {
             s.put("last_run_id", r.get("run_id"));
             s.put("transcript", r.getOrDefault("transcript", new ArrayList<>()));
             List<Object> messages = Json.list(s.get("messages"));
-            messages.add(
-                Json.obj(
-                    "role",
-                    "user",
-                    "text",
-                    r.get("prompt"),
-                    "sent_at",
-                    began / 1000L,
-                    "run_id",
-                    r.get("run_id")));
+            // Retain start-time submission and support older unfinished sessions.
+            boolean submitted = messages.stream().anyMatch(m ->
+                "user".equals(Json.text(Json.map(m), "role"))
+                    && Json.text(r, "run_id").equals(Json.text(Json.map(m), "run_id")));
+            if (!submitted) messages.add(Json.obj(
+                "role", "user", "text", r.get("prompt"),
+                "sent_at", began / 1000L, "run_id", r.get("run_id")));
             Map<String, Object> reply =
                 Json.obj(
                     "role",

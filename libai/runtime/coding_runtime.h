@@ -750,7 +750,10 @@ std::string validate_staged_draft(const std::string &user_root,
     const std::vector<agent_change_proposal_t> &changes,
     const libai::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
     std::string *source_fingerprint = NULL, bool build_only = false,
-    const std::string &tool_execution_key = "");
+    const std::string &tool_execution_key = "",
+    const std::string &test_failure_report = "");
+// Only paths from trusted Go test diagnostics become fixed package arguments.
+std::vector<std::string> focused_go_test_packages(const std::string &report);
 
 // Compute a stable identity for the current ordered change proposals.
 std::string staged_change_fingerprint(

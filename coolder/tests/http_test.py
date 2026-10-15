@@ -717,6 +717,19 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
             },
             status=202,
         )
+        # Refresh before the first reply: the empty durable session must still
+        # expose its exact active run and the user's original submission.
+        reopened, _ = call('/api/v1/ai/sessions?project_id=' + project['project_id']
+            + '&session_id=' + started['session_id'])
+        current = next(s for s in reopened['sessions'] if s['session_id'] == started['session_id'])
+        assert current['active_run_id'] == started['run_id'], current
+        assert current.get('last_run_id', '') == '', current
+        assert len(current['messages']) == 1, current
+        assert current['messages'][0]['text'] == 'Read README.md', current
+        assert current['messages'][0]['run_id'] == started['run_id'], current
+        assert current['messages'][0]['sent_at'] > 0, current
+        assert all(s.get('active_run_id') != started['run_id'] for s in reopened['sessions']
+            if s['session_id'] != started['session_id']), reopened
         call(
             '/api/v1/ai/runs/pause',
             {'run_id': started['run_id'], 'paused': True},

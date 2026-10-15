@@ -68,6 +68,44 @@ std::string preserve_cancelled_coding_progress(
 	return "Task cancelled; private checkpoint, tool receipts and drafts were retained.";
 }
 
+static void persist_terminal_coding_result(
+    const std::shared_ptr<agent_runtime_task_t> &task, const std::string &project_path,
+    const std::string &status, const std::string &error)
+{
+	if (task->text_preview) return;
+	libai::ai::agent_result_store_t store(task->user_root, project_path);
+	libai::ai::agent_result_t result;
+	bool found = false;
+	std::string err;
+	if (!store.load(task->id, result, found, err) || !found) {
+		if (!err.empty()) libai::ai::ai_log_error("agent.runtime", "load-terminal-result", err);
+		return;
+	}
+	{
+		std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);
+		result.task_contract_json = task->task_contract_json;
+		result.task_acceptance_json = task->task_acceptance_json;
+		result.task_acceptance_status = task->task_acceptance_status;
+	}
+	result.text = task->ui_language == "en" ?
+	    (status == "cancelled" ? "Task cancelled. Saved proposals remain available; task completion is not verified." :
+	        "Task failed. Saved proposals remain available; task completion is not verified.") :
+	    (status == "cancelled" ? "任务已取消。已保存的文件提案仍保留，未确认任务完成。" :
+	        "任务运行失败。已保存的文件提案仍保留，未确认任务完成。");
+	if (!error.empty()) result.text += "\n" + error;
+	result.completion_summary = result.text;
+	result.saved_at = static_cast<long long>(time(NULL));
+	refresh_result_task_contract(task->user_root, status, result);
+	// The store merges concurrent review decisions; never reset an accepted
+	// generation or apply/remove files when recording a terminal outcome.
+	if (!store.save(result, err)) {
+		libai::ai::ai_log_error("agent.runtime", "persist-terminal-result", err);
+		return;
+	}
+	set_runtime_completion_summary(task, result.completion_summary);
+	set_runtime_result_artifact(task, store.relative_path(task->id), result.decision);
+}
+
 static void finish_failed_coding_task(
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
     const std::string &project_path, libai::ai::agent_run_store_t &run_store,
@@ -77,6 +115,7 @@ static void finish_failed_coding_task(
 	    err == "agent run cancelled";
 	std::string audit_err;
 	if (cancelled) {
+		persist_terminal_coding_result(runtime_task, project_path, "cancelled", err);
 		if (!run_store.cancel(runtime_task->id, audit_err)) {
 			libai::ai::ai_log_error(
 			    "agent.runtime", "audit-cancel", audit_err);
@@ -93,6 +132,7 @@ static void finish_failed_coding_task(
 			    "remove-cancelled-worktree", draft_err);
 		}
 	} else {
+		persist_terminal_coding_result(runtime_task, project_path, "failed", err);
 		// Provider/workspace layers already log their failure location. This
 		// entry connects that failure to background-task finalization without
 		// recording the prompt, reply or tool transcript.
@@ -195,6 +235,7 @@ static void finish_late_cancelled_task(
     const std::shared_ptr<agent_runtime_task_t> &runtime_task,
     const std::string &project_path, libai::ai::agent_run_store_t &run_store)
 {
+	persist_terminal_coding_result(runtime_task, project_path, "cancelled", "");
 	std::string audit_err;
 	if (!run_store.cancel(runtime_task->id, audit_err)) {
 		libai::ai::ai_log_error(

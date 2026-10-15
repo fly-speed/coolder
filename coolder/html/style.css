@@ -1868,6 +1868,21 @@ html[data-ui-theme='ocean'] {
   background: var(--button);
   font-size: 0.85rem;
 }
+#conversation-panel .thinking-option {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#conversation-panel .thinking-option input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
 #conversation-panel .compose-options #send {
   margin-left: auto;
   padding: 8px 15px;

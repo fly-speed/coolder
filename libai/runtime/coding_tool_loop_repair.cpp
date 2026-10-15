@@ -1,6 +1,7 @@
 #include "stdafx.h"
 // Repair convergence, durable proposals and validated completion.
 #include "coding_tool_loop_internal.h"
+#include "../context/coding_test_changes.h"
 
 namespace action
 {
@@ -55,7 +56,7 @@ void coding_tool_loop_t::build_repair_focus(coding_turn_t &turn)
 {
 	acl::json focus_json;
 	acl::json_node &focus = focus_json.create_node();
-	acl::json failure_report(turn.tool_result.c_str());
+	acl::json failure_report((turn.repair_report.empty() ? turn.tool_result : turn.repair_report).c_str());
 	if (failure_report.finish()) {
 		const std::string failed =
 		    json_text(failure_report["failed_command_id"]);
@@ -152,7 +153,7 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 			continue;
 		tests.insert(change.path);
 	}
-	acl::json report(turn.tool_result.c_str());
+	acl::json report((turn.repair_report.empty() ? turn.tool_result : turn.repair_report).c_str());
 	std::string diagnostic;
 	std::set<std::string> related_files;
 	bool related_complete = false;
@@ -168,6 +169,15 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 			            json_text(report["failed_command_id"])))
 				continue;
 			diagnostic += json_text((*command)["diagnostic"]);
+			auto *diagnostics = json_array_node((*command)["diagnostics"]);
+			for (auto *entry = diagnostics ? diagnostics->first_child() : NULL;
+			     entry; entry = diagnostics->next_child()) {
+				auto *object = entry->is_object() ? entry : entry->get_obj();
+				const auto path = object ? json_text((*object)["path"]) : "";
+				if (!path.empty() && path[0] != '/' && path.find("..") == std::string::npos &&
+				    path.find('\\') == std::string::npos)
+					related_files.insert(project_path + "/" + path);
+			}
 			related_complete = json_bool(
 			    (*command)["failed_test_files_complete"], false);
 			acl::json_node *related =
@@ -197,9 +207,12 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 		repair_required_reads[file] =
 		    libai::ai::agent_workspace_t::content_sha256(content);
 	}
+	std::set<std::string> failure_directories;
+	for (const auto &file : selected) failure_directories.insert(file.substr(0, file.find_last_of('/')));
+	for (const auto &file : related_files) failure_directories.insert(file.substr(0, file.find_last_of('/')));
 	for (const auto &change : changes) {
 		if (!(change.operation == "write" &&
-		        (repair_changed_paths.count(change.path) ||
+		        (failure_directories.count(change.path.substr(0, change.path.find_last_of('/'))) ||
 		            selected.count(change.path) ||
 		            ((repair_failures.alternating() ||
 		                 repair_failures.stalled_tests() ||
@@ -217,19 +230,31 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 	}
 }
 
+void coding_tool_loop_t::review_validation_failure(coding_turn_t &turn, const std::string &report)
+{
+	acl::json json(report.c_str());
+	if (!json.finish() || json_bool(json["validation_passed"], true) ||
+	    json_number(json["commands_executed"], 0) == 0) return;
+	turn.repair_report = report;
+	turn.validation_failed = true;
+	const bool repeated = repeated_repair_failure(report, turn.staged_fingerprint_after, repair_failures);
+	turn.reconsider_repair = true;
+	build_repair_focus(turn);
+	select_repair_sources(turn);
+	if (repeated)
+		turn.repair_focus += "\n<repair_reassessment>The same failure survived a changed revision. "
+		    "Before another patch, reproduce the failing case and compare actual/expected state, return values and side effects. "
+		    "Use a different evidenced fix, not another speculative rewrite. A false return can be the expected terminal "
+		    "result; assert the resulting state separately and check the API contract before changing tests. A timeout names unfinished work, "
+		    "not a package that already printed ok. Keep any test correction justified by the requested behavior.</repair_reassessment>\n";
+}
+
 void coding_tool_loop_t::track_repair_failures(coding_turn_t &turn)
 {
 	track_repair_edits(turn);
-	turn.reconsider_repair = !turn.repair_blocked &&
-	    turn.message.tool.name == "workspace.validate" &&
-	    repeated_repair_failure(turn.tool_result,
-	        turn.staged_fingerprint_after, repair_failures);
 	if (turn.message.tool.name == "workspace.validate" &&
 	    !turn.repair_blocked) {
-		if (turn.reconsider_repair) {
-			build_repair_focus(turn);
-			select_repair_sources(turn);
-		}
+		review_validation_failure(turn, turn.tool_result);
 		repair_changed_paths.clear();
 		pending_repair_edits.clear();
 		last_validation_report = turn.tool_result;
@@ -342,6 +367,65 @@ void coding_tool_loop_t::persist_staged_result(coding_turn_t &turn)
 coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
     coding_turn_t &turn)
 {
+	acl::json tool_result(turn.tool_result.c_str());
+	if (turn.output.response_status == "completed" &&
+	    turn.output.native_tool_call && turn.output.tool_calls.size() == 1 &&
+	    turn.message.tool.name == "workspace.propose_batch" &&
+	    !turn.trace.ok && !turn.repair_blocked &&
+	    tool_result.finish() &&
+	    json_text(tool_result["code"]) == "proposal_batch_unparsed") {
+		// Completion belongs to this model round, not to source generation or
+		// business acceptance. Retain the exact payload instead of regenerating
+		// a large source batch merely because its nested content is not JSON.
+		acl::json archived;
+		auto &record = archived.create_node();
+		record.add_number("version", 1);
+		record.add_text("kind", "unparsed_completed_proposal_batch");
+		record.add_text("run_id", runtime_task->id.c_str());
+		record.add_text("response_status", "completed");
+		record.add_text("tool", turn.message.tool.name.c_str());
+		record.add_text("raw_arguments_json", turn.output.tool_calls[0].arguments_json.c_str());
+		record.add_text("content", turn.message.tool.content.c_str());
+		record.add_text("content_sha256",
+		    libai::ai::agent_workspace_t::content_sha256(turn.message.tool.content).c_str());
+		record.add_text("parse_error", json_text(tool_result["error"]).c_str());
+		record.add_bool("executed", false);
+		record.add_number("existing_staged_changes", changes.size());
+		libai::ai::agent_request_store_t store(runtime_task->user_root, project_path, runtime_task->id);
+		std::string relative_path;
+		if (!store.append_response(serialize_json(record), relative_path, err))
+			return step_t::failed;
+		acl::json event_json;
+		auto &event = event_json.create_node();
+		event.add_text("event", "completed_batch_content_recorded");
+		event.add_text("tool", turn.message.tool.name.c_str());
+		event.add_text("response_archive", relative_path.c_str());
+		event.add_text("parse_status", "unparsed");
+		event.add_bool("round_completed", true);
+		event.add_bool("executed", false);
+		event.add_bool("source_changed", false);
+		event.add_number("content_bytes", turn.message.tool.content.size());
+		event.add_number("existing_staged_changes", changes.size());
+		append_runtime_operation_event(runtime_task, event);
+		final_output = turn.output;
+		final_output.text = chinese ?
+		    "本轮模型响应已结束。批次 content 未能解析为文件清单，原始内容已保留记录；本轮未据此暂存或写入文件，也未确认项目实现完成。" :
+		    "This model round has ended. Batch content could not be parsed as a file list and was recorded exactly; it staged or wrote no files and does not establish project completion.";
+		final_output.text += "\n" + relative_path;
+		if (!changes.empty()) final_output.text += chinese ?
+		    "\n此前已暂存的修改仍保留，验证和审查状态以现有记录为准。" :
+		    "\nEarlier staged changes remain available with their existing validation and review state.";
+		final_output.reasoning = accumulated_reasoning;
+		final_output.input_tokens = total_input_tokens;
+		final_output.cached_input_tokens = total_cached_input_tokens;
+		final_output.output_tokens = total_output_tokens;
+		final_output.reasoning_tokens = total_reasoning_tokens;
+		final_output.latency_ms = total_latency_ms;
+		completion_summary = "- " + final_output.text;
+		memory_summary = deterministic_delivery_summary(original_prompt, changes, final_output.text);
+		rejected_changes = validate_change_proposals(workspace, project_path, changes);
+		return step_t::completed;
+	}
 	const bool verified_batch = turn.trace.ok &&
 	    !turn.batch_validation.report.empty() &&
 	    turn.batch_validation.draft == staged_cycle_fingerprint(changes) &&
@@ -367,7 +451,26 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	std::string completion_validation =
 	    verified_batch ? turn.batch_validation.report : turn.tool_result;
 	bool automatic_compile_check = false;
-	if (!verified_batch && turn.trace.ok && turn.staged_progress &&
+	const bool repair_probe = !libai::ai::focused_compile_repair(original_prompt) &&
+	    !focused_go_test_packages(pending_test_failure_report).empty();
+	const bool test_only = !repair_probe && !verified_batch && turn.trace.ok && turn.staged_progress &&
+	    !libai::ai::focused_compile_repair(original_prompt) &&
+	    libai::ai::coding_only_test_changes(turn.changes_before_tool, changes);
+	if (test_only) {
+		acl::json deferred;
+		auto &event = deferred.create_node();
+		event.add_text("event", "automatic_build_deferred");
+		event.add_text("reason", "test_source_only");
+		event.add_bool("final_validation_required", true);
+		event.add_number("commands_executed", 0);
+		append_runtime_operation_event(runtime_task, event);
+		turn.automatic_build_feedback =
+		    "\n<test_validation_pending>Only test source changed. The intermediate automatic build was deferred. "
+		    "Run workspace.validate once to compile and execute the fixed tests for this revision. Do not reread retained "
+		    "source to confirm it was saved or add tests to build scripts to obtain evidence.</test_validation_pending>\n";
+		next_tool_guidance += turn.automatic_build_feedback;
+	}
+	if (!test_only && !verified_batch && turn.trace.ok && turn.staged_progress &&
 	    !changes.empty()) {
 		const bool focused =
 		    libai::ai::focused_compile_repair(original_prompt);
@@ -379,12 +482,13 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		completion_validation = validate_staged_draft(
 		    runtime_task->user_root, project_path, runtime_task->id,
 		    changes, sandbox_limits, validation_trace, NULL, !focused,
-		    turn.effect_key);
+		    turn.effect_key, repair_probe ? pending_test_failure_report : "");
 		traces.push_back(validation_trace);
 		complete_runtime_tool(
 		    runtime_task, validation_trace, executed_tool_calls);
 		automatic_compile_check = validation_trace.ok;
 		record_acceptance_evidence(completion_validation);
+		review_validation_failure(turn, completion_validation);
 		// Build-only success cannot stand in for the task's final validation.
 		if (focused) {
 			last_validation_report = completion_validation;
@@ -400,11 +504,15 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		auto &node = event.create_node();
 		node.add_text("event", "validation_completed");
 		node.add_text("origin",
-		    focused ? "focused_compile_repair" : "automatic_build");
+		    repair_probe ? "automatic_repair_test" : focused ? "focused_compile_repair" : "automatic_build");
 		node.add_text("report", completion_validation.c_str());
 		append_runtime_operation_event(runtime_task, node);
 		const std::string build_feedback = "\n<automatic_build>" +
 		    completion_validation +
+		    (repair_probe ? "\nThis is a focused repair test, not full validation. If it passes, finish with one full workspace.validate. " :
+		    "\nThis is an intermediate build-only gate. test_status=not-run is expected here. ") +
+		    "workspace.validate independently runs configured tests (including go.test); do not add test invocations "
+		    "to build scripts merely to change this status. "
 		    "\nIf compilation failed, repair the reported compiler diagnostics before continuing. "
 		    "Do not remove the build script, suppress its error status, or expand scope to unrelated issues. "
 		    "A successful build does not authorize unrelated work.</automatic_build>\n";
@@ -436,8 +544,11 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		acceptance_review_requested = true;
 		next_tool_guidance +=
 		    "\n<acceptance_review>Configured checks passed for this revision. Before ending, map each user request "
-		    "ID to observable evidence, distinguishing tested behavior from inferred behavior. Inspect uncovered "
-		    "input/state/output paths or add a targeted behavioral regression test when feasible. "
+		    "ID to observable evidence, distinguishing tested behavior from inferred behavior. Default to returning final JSON "
+		    "now using retained source and validator evidence. Missing a separate direct test is not by itself evidence of a "
+		    "missing implementation: report uncovered behavior as unverified instead of starting another coverage-expansion cycle. "
+		    "Additional tools or edits are warranted only for a concrete implementation defect or an already identified unmet "
+		    "requested behavior. Do not add routine duplicate coverage or reread generated files to confirm they were saved. "
 		    "Do not repeat an unchanged passing build. If required runtime/browser checks are unavailable, "
 		    "finish with the exact unverified requirements and next verification step. Do not claim full task "
 		    "completion merely from these checks. Return final JSON with requirement_progress covering each requested behavior, "

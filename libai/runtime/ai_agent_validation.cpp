@@ -1,5 +1,6 @@
 #include "../common/legacy_branding.h"
 #include "stdafx.h"
+#include "../common/file_ops.h"
 #include "coding_runtime.h"
 #include "../coding/coding_service.h"
 #include "../coding/coding_internal.h"
@@ -534,10 +535,34 @@ static bool prepare_validation_environment(const std::string &user_root,
 	return false;
 }
 
+std::vector<std::string> focused_go_test_packages(const std::string &report)
+{
+	acl::json json(report.c_str());
+	if (!json.finish() || json_text(json["failed_command_id"]) != "go.test") return {};
+	std::vector<std::string> paths;
+	auto *commands = json_array_node(json["commands"]);
+	for (auto *item = commands ? commands->first_child() : NULL; item; item = commands->next_child()) {
+		auto *command = item->is_object() ? item : item->get_obj();
+		if (!command || json_text((*command)["command_id"]) != "go.test") continue;
+		auto *diagnostics = json_array_node((*command)["diagnostics"]);
+		for (auto *diagnostic = diagnostics ? diagnostics->first_child() : NULL;
+		     diagnostic; diagnostic = diagnostics->next_child()) {
+			auto *object = diagnostic->is_object() ? diagnostic : diagnostic->get_obj();
+			const auto path = object ? json_text((*object)["path"]) : "";
+			// A bare filename may be ambiguous: retain full validation in that case.
+			if (path.find('/') == std::string::npos || path.find("..") != std::string::npos ||
+			    path.empty() || path[0] == '/' || path.find('\\') != std::string::npos) return {};
+			paths.push_back(path);
+		}
+	}
+	const auto packages = libai::ai::changed_go_packages("", paths);
+	return packages.size() <= 8 ? packages : std::vector<std::string>();
+}
+
 static acl::json_node &initialize_validation_report(acl::json &json,
     acl::json_node &root, const std::string *source_fingerprint,
     const std::vector<agent_change_proposal_t> &changes, bool build_only,
-    bool focused, bool draft_reused, size_t skipped_files)
+    bool focused, bool draft_reused, size_t skipped_files, bool targeted_tests)
 {
 	root.add_text("source_baseline_sha256", source_fingerprint->c_str());
 	root.add_text("proposal_sha256",
@@ -548,7 +573,7 @@ static acl::json_node &initialize_validation_report(acl::json &json,
 	root.add_bool("build_network_enabled",
 	    libai::ai::ai_runtime_policy_get().allow_build_network);
 	root.add_text("validation_scope",
-	    build_only  ? "build-only" :
+	    targeted_tests ? "targeted-tests" : build_only  ? "build-only" :
 	        focused ? "compile-repair" :
 	                  "project");
 	acl::json_node &skipped = json.create_array();
@@ -566,7 +591,7 @@ std::string validate_staged_draft(const std::string &user_root,
     const std::vector<agent_change_proposal_t> &changes,
     const libai::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
     std::string *source_fingerprint, bool build_only,
-    const std::string &tool_execution_key)
+    const std::string &tool_execution_key, const std::string &test_failure_report)
 {
 	trace.ok=false;
 	if (!libai::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
@@ -601,6 +626,8 @@ std::string validate_staged_draft(const std::string &user_root,
 	const bool focused =
 	    task && libai::ai::focused_compile_repair(task->original_prompt);
 	const auto packages = validation_go_packages(project_path, changes);
+	const auto test_packages = focused_go_test_packages(test_failure_report);
+	const bool targeted_tests = !test_packages.empty();
 	// Finish every build before running any advisory tests in mixed-language projects.
 	if (focused || build_only)
 		std::stable_partition(toolchain.commands.begin(),
@@ -608,13 +635,46 @@ std::string validate_staged_draft(const std::string &user_root,
 		    [](const libai::ai::sandbox_command_t &command) {
 			return !libai::ai::is_test_command(command.id);
 		});
+	if (build_only && !targeted_tests) {
+		// With -o <directory>, Go can skip non-main packages in a multi-package
+		// selection. Compile each staged package separately to a bounded private
+		// file, so detached libraries cannot hide behind a passing entry script.
+		std::vector<std::string> changed_paths;
+		for (const auto &change : changes)
+			if (change.operation == "write" && change.review_status != "rejected")
+				changed_paths.push_back(change.path);
+		const auto staged_packages = libai::ai::changed_go_packages(project_path, changed_paths);
+		std::vector<libai::ai::sandbox_command_t> checks;
+		for (const auto &command : toolchain.commands) {
+			if (command.id != "go.build") continue;
+			const std::string directory = draft_root + "/.libai-build/go-packages";
+			if (!libai::ai::file_ops::make_private_directory(draft_root + "/.libai-build") ||
+			    !libai::ai::file_ops::make_private_directory(directory))
+				return tool_error_json("cannot prepare Go package build output");
+			for (const auto &package : staged_packages) {
+				auto check = command;
+				const auto hash = libai::ai::agent_workspace_t::content_sha256(package);
+				check.id = "go.packages." + hash.substr(0, 16) + ".build";
+				check.fixed_arguments = {"build", "-o", ".libai-build/go-packages/" + hash + ".artifact", package};
+				checks.push_back(check);
+			}
+			break;
+		}
+		toolchain.commands.insert(toolchain.commands.end(), checks.begin(), checks.end());
+	}
 	bool build_executed = false, build_passed = true;
 	acl::json json;
 	acl::json_node &root = json.create_node();
 	root.add_text("tool_execution_key", tool_execution_key.c_str());
 	acl::json_node &skipped =
 	    initialize_validation_report(json, root, source_fingerprint,
-	        changes, build_only, focused, draft_reused, skipped_files);
+	        changes, build_only, focused, draft_reused, skipped_files, targeted_tests);
+	if (targeted_tests) {
+		auto &selected = json.create_array();
+		root.add_child("targeted_packages", selected);
+		for (const auto &package : test_packages) selected.add_array_text(package.c_str());
+		root.add_bool("final_validation_required", true);
+	}
     const auto revision_wire = libai::ai::coding_service_call(draft_root, "tasks.revision", "{}");
     acl::json revision(revision_wire.c_str());
     if (revision.finish() && json_bool(revision["ok"], false))
@@ -644,11 +704,16 @@ std::string validate_staged_draft(const std::string &user_root,
 			return tool_error_json(err);
 		if (command.id.compare(0, 4, "git.") == 0)
 			continue;
-		if (build_only && !toolchain.commands.empty() &&
+		if (targeted_tests) {
+			if (command.id != "go.test") continue;
+			command.fixed_arguments = {"test", "-count=1", "-timeout=15s"};
+			command.fixed_arguments.insert(command.fixed_arguments.end(), test_packages.begin(), test_packages.end());
+		}
+		if (!targeted_tests && build_only && !toolchain.commands.empty() &&
 		    toolchain.commands.front().id == "project.script-build" &&
-		    command.id != "project.script-build")
+		    command.id != "project.script-build" && command.id.compare(0, 12, "go.packages.") != 0)
 			continue;
-		if ((focused || build_only) &&
+		if (!targeted_tests && (focused || build_only) &&
 		    (!select_compile_repair_command(command,
 		        build_only ? std::vector<std::string>() : packages))) {
 			skipped.add_array_text(command.id.c_str());

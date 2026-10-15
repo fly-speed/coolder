@@ -64,10 +64,11 @@ bool resolve_project(const std::string &user_root,
 }
 
 bool prepare_directory(
-    const std::string &project, std::string &directory, std::string &err)
+    const std::string &project, const std::string &kind,
+    std::string &directory, std::string &err)
 {
 	const std::string agent = join_path(project, ".libai_agent");
-	directory = join_path(agent, "requests");
+	directory = join_path(agent, kind + "s");
 	if (!make_directory(agent) || !make_directory(directory)) {
 		err = "cannot create AI request archive directory";
 		return false;
@@ -82,10 +83,11 @@ bool prepare_directory(
 	return true;
 }
 
-std::string request_name(const std::string &run_id, unsigned long sequence)
+std::string request_name(const std::string &run_id, unsigned long sequence,
+    const std::string &kind)
 {
 	std::ostringstream out;
-	out << "request-" << run_id << "-" << std::setw(6) << std::setfill('0')
+	out << kind << "-" << run_id << "-" << std::setw(6) << std::setfill('0')
 	    << sequence << ".json";
 	return out.str();
 }
@@ -147,6 +149,18 @@ agent_request_store_t::agent_request_store_t(const std::string &user_root,
 bool agent_request_store_t::append(const std::string &payload,
     std::string &relative_path, std::string &err) const
 {
+	return append_archive(payload, "request", relative_path, err);
+}
+
+bool agent_request_store_t::append_response(const std::string &payload,
+    std::string &relative_path, std::string &err) const
+{
+	return append_archive(payload, "response", relative_path, err);
+}
+
+bool agent_request_store_t::append_archive(const std::string &payload,
+    const std::string &kind, std::string &relative_path, std::string &err) const
+{
 	relative_path.clear();
 	if (!valid_run_id(run_id_) || !valid_json_payload(payload)) {
 		err = "invalid AI provider JSON request archive";
@@ -158,12 +172,12 @@ bool agent_request_store_t::append(const std::string &payload,
 	}
 	std::lock_guard<libai::mutex> guard(g_request_store_mutex);
 	std::string directory;
-	if (!prepare_directory(project, directory, err)) {
+	if (!prepare_directory(project, kind, directory, err)) {
 		return ai_error("agent.request", "prepare-directory", err);
 	}
 	for (unsigned long sequence = 1; sequence <= kMaxRequestsPerRun;
 	     ++sequence) {
-		const std::string name = request_name(run_id_, sequence);
+		const std::string name = request_name(run_id_, sequence, kind);
 		const std::string target = join_path(directory, name);
 		if (path_exists(target))
 			continue;
@@ -172,7 +186,7 @@ bool agent_request_store_t::append(const std::string &payload,
 		}
 		relative_path = join_path(
 		    join_path(
-		        join_path(project_path_, ".libai_agent"), "requests"),
+		        join_path(project_path_, ".libai_agent"), kind + "s"),
 		    name);
 		return true;
 	}

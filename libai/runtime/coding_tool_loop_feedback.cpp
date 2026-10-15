@@ -159,6 +159,22 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 	}
 	next_tool_guidance +=
 	    batch_read_continuation(turn.message.tool.name, turn.tool_result);
+	if (!turn.trace.ok && repair_review_read_only(turn.message.tool) &&
+	    turn.tool_result.find("workspace path does not exist") != std::string::npos) {
+		acl::json paths_json;
+		auto &paths = paths_json.create_array();
+		size_t count = 0;
+		for (const auto &change : changes) {
+			if (change.review_status == "rejected" || change.operation == "delete") continue;
+			if (++count > 64) break;
+			paths.add_array_text(change.path.c_str());
+		}
+		const std::string correction = "\n<available_draft_paths>" + serialize_json(paths) +
+		    "</available_draft_paths>\nThe requested path is absent. These exact staged paths exist; "
+		    "reuse their retained source or read a needed existing path. Do not guess alternate filenames.\n";
+		next_tool_guidance += correction;
+		turn.addition += correction;
+	}
 	if (turn.validation_failed) {
 		if (turn.reconsider_repair) {
 			supply_repair_review_sources(turn);
@@ -180,7 +196,8 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 		        prompt_id::validation_repair_guard, chinese)) +
 		    validation_repair_context(runtime_task->user_root,
 		        project_path, runtime_task->id, repair_changes,
-		        turn.tool_result, 48 * 1024, &repair_evidence);
+		        turn.repair_report.empty() ? turn.tool_result : turn.repair_report,
+		        48 * 1024, &repair_evidence);
 		turn.addition += repair_context;
 		// Native replay bypasses the textual transcript. Carry the repair
 		// evidence at the next turn's tail rather than silently losing it.
@@ -310,7 +327,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 		                    prompt_text(
 		                        prompt_id::repeated_reads, chinese) :
 		                    ""),
-		        chinese);
+		        chinese, &read_context);
 		compacted_request_bytes = compacted.size();
 		if (measure_native) {
 			pending_request.tool_history.clear();

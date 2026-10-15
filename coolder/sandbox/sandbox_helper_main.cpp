@@ -592,11 +592,17 @@ static int run_macos_sandbox(options_t &options, int argc, char **argv,
 
 	// Explicit project contract: the service reads LIBAI_HTTP_PORT.
 	// Preserve compatibility with legacy fixed-port projects.
-	const bool dynamic_browser_port = !options.browser_node.empty() &&
+	const bool dynamic_http_port = options.probe_port != 0 &&
 	    access((project_root + "/.libai-http-port-env").c_str(), F_OK) ==
 	        0;
-	if (dynamic_browser_port) {
-		if (!allocate_probe_port(options.probe_port))
+	if (dynamic_http_port) {
+		// The released ephemeral port can race with another listener. Retry
+		// selection before constructing the service argv, without touching it.
+		bool available = false;
+		for (int attempt = 0; attempt < 3 && !available; ++attempt)
+			available = allocate_probe_port(options.probe_port) &&
+			    probe_port_available(options.probe_port);
+		if (!available)
 			return 73;
 		const std::string port = std::to_string(options.probe_port);
 		if ((setenv("LIBAI_HTTP_PORT", port.c_str(), 1) != 0 || setenv("WEBCOOL_HTTP_PORT", port.c_str(), 1) != 0))
@@ -612,7 +618,7 @@ static int run_macos_sandbox(options_t &options, int argc, char **argv,
 		// Built-in launchers such as php -S carry the listen address in argv.
 		const std::string argument = argv[i];
 		values.push_back(
-		    dynamic_browser_port && argument == "127.0.0.1:18080" ?
+		    dynamic_http_port && argument == "127.0.0.1:18080" ?
 		        "127.0.0.1:" + std::to_string(options.probe_port) :
 		        argument);
 	}

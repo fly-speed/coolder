@@ -45,6 +45,7 @@ struct run_start_state_t {
 	bool remember_session{};
 	bool resume_after_restart{};
 	bool thinking_enabled{};
+	bool thinking_adaptive{};
 	bool resume_from_progress{};
 	bool assistant_chat{};
 	bool text_preview{};
@@ -128,6 +129,8 @@ bool parse_start_request(
 	    json_bool((*state.body)["resume_after_restart"], false);
 	state.thinking_enabled =
 	    json_bool((*state.body)["thinking_enabled"], true);
+	state.thinking_adaptive =
+	    json_bool((*state.body)["thinking_adaptive"], false);
 	state.requested_effort = json_text((*state.body)["reasoning_effort"]);
 	if (!state.requested_effort.empty() &&
 	    state.requested_effort != "low" &&
@@ -427,12 +430,13 @@ bool preflight_start_provider(
 	// to enabled, while making an unchecked option an explicit disable request.
 	state.thinking_mode =
 	    provider_supports_thinking_disable(*state.provider) ?
-	    (state.thinking_enabled ? "enabled" : "disabled") :
+	    (state.thinking_adaptive && !state.text_preview && !state.assistant_chat ?
+	        "adaptive" : (state.thinking_adaptive || state.thinking_enabled ? "enabled" : "disabled")) :
 	    "";
 	state.reasoning_effort =
 	    libai::cpp::coding::provider_client_t::supports_reasoning_effort(
 	        *state.provider) &&
-	        state.thinking_mode != "disabled" ?
+	        !state.thinking_adaptive && state.thinking_mode != "disabled" ?
 	    state.requested_effort :
 	    "";
 

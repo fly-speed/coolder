@@ -125,6 +125,9 @@ private:
 	    acceptance_baseline;
 	// Whether the model has been asked to review acceptance evidence.
 	bool acceptance_review_requested = false;
+	// Survives intermediate builds; cleared only by a full passing test report.
+	std::string pending_test_failure_report;
+	void review_validation_failure(coding_turn_t &turn, const std::string &report);
 	// Serialized progress evidence for the task requirements.
 	std::string requirement_progress_json;
 

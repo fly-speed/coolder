@@ -63,6 +63,7 @@ bool safe_checkpoint(const agent_checkpoint_t &checkpoint)
 	    checkpoint.max_output_tokens <= 1000000 &&
 	    (checkpoint.thinking_mode.empty() ||
 	        checkpoint.thinking_mode == "enabled" ||
+	        checkpoint.thinking_mode == "adaptive" ||
 	        checkpoint.thinking_mode == "disabled") &&
 	    (checkpoint.reasoning_effort.empty() ||
 	        checkpoint.reasoning_effort == "low" ||

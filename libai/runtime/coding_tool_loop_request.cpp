@@ -4,6 +4,7 @@
 #include "../sdk/model_profile.h"
 #include "browser_debug.h"
 #include "ai_agent_tools_internal.h"
+#include "../context/coding_turn_budget.h"
 
 namespace action
 {
@@ -42,12 +43,45 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 	turn.input.system_prompt +=
 	    prompt_text(prompt_id::interface_language, chinese);
 	std::string runtime_guidance;
+	if (!pending_test_failure_report.empty()) {
+		acl::json report(pending_test_failure_report.c_str());
+		acl::json session_json;
+		auto &session = session_json.create_node();
+		session.add_bool("resolved", false);
+		session.add_text("failed_command", report.finish() ? json_text(report["failed_command_id"]).c_str() : "");
+		session.add_text("failure_report", libai::ai::utf8_prefix(pending_test_failure_report, 8192).c_str());
+		runtime_guidance += "\n<repair_session>" + serialize_json(session) +
+		    "</repair_session>\nA passing intermediate build does not resolve these test failures. "
+		    "Use the exact current supplied implementation and failing tests. Correct the root cause with a small related patch; "
+		    "the runtime automatically retests known failing Go packages after an edit. A focused pass still requires one full validation. "
+		    "Keep the user's thinking choice unchanged. Before changing a test, check its input, expected state and API return contract; "
+		    "never weaken a requirement to obtain a pass. State only a concise evidence-based repair decision, not speculative rewrites.\n";
+	}
 	if (!runtime_task->text_preview)
 		runtime_guidance +=
 		    "\n<read_efficiency>Read known files together. workspace.read_batch accepts paths or {path, query} objects. "
 		    "Use returned next_content unchanged to continue all remaining pages and omitted files in one call. "
 		    "Reuse source pages still present in read_working_set or tool history; do not restart a truncated batch. "
 		    "Reserve at least half the run for implementation and verification.</read_efficiency>\n"
+		    "<read_before_design>First check bootstrap_source and bootstrap_directories for the existing baseline. "
+		    "If required source or directory entries are missing, call the necessary read/list tools immediately, grouped where possible, "
+		    "before detailed implementation or test design. Do not draft a whole implementation in reasoning and then end the turn "
+		    "with a tiny baseline read. Reuse complete supplied listings and .gitignore content. Once necessary reads are complete, "
+		    "choose a concise design and submit related implementation and tests together; do not repeatedly reconsider settled "
+		    "architecture or tool batching. If a later discovery requires another read, keep a short decision summary in the "
+		    "visible tool-call preamble so it survives context compaction; never put source code in that summary.</read_before_design>\n"
+		    "<implementation_checkpoint>Before generating code, inspect existing entry points and their tests alongside build scripts. "
+		    "Submit mutually dependent definitions, callers, tests and embedded assets in one coherent batch. "
+		    "Do not submit placeholder methods, nonexistent imports or partial HTML as a complete implementation. "
+		    "Check callers of scaffold functions before replacing an entry point. Plan observable tests for each core requested behavior "
+		    "and include them with the first complete implementation batch, rather than adding routine coverage after a green final validation. "
+		    "Reuse exact current source supplied in bootstrap_source, staged_working_set and read_working_set; read only missing bytes "
+		    "or changed versions, not files again just to confirm the tool saved them. Never remove unrelated tests or weaken assertions.</implementation_checkpoint>\n"
+		    "<test_environment>Read command_network in validation capabilities before choosing test fixtures. "
+		    "When the test command forbids loopback, use in-process HTTP handlers and deterministic stream writers "
+		    "rather than opening listening sockets (Go: httptest.NewRecorder with ServeHTTP, not httptest.NewServer). "
+		    "Keep real service readiness and browser checks in their separately authorized validators; never treat "
+		    "in-process tests as proof of browser behavior.</test_environment>\n"
 		    "<failure_scope>A failing test alone does not establish a regression caused by this task. "
 		    "Relate failures to the user request and changed behavior before editing more files. Do not rewrite assertions "
 		    "or change unrelated behavior merely to obtain a green suite. If a failure is unrelated or its intended contract "
@@ -57,7 +91,11 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 		    "\nAfter each saved batch of code changes, LibAI automatically runs the project build script "
 		    "(or the fixed toolchain build when no script is present) in the draft sandbox. "
 		    "Submit mutually dependent edits together. Read the automatic build report and repair compiler errors "
-		    "before moving on; do not ask the user to compile manually.\n";
+		    "before moving on; do not ask the user to compile manually. Test-only source edits defer this intermediate gate "
+		    "to the next full validation. workspace.validate compiles and runs fixed tests independently of the build script "
+		    "(Go: go.test runs go test -count=1 ./...). Automatic build test_status=not-run is expected, not a missing "
+		    "test capability. Keep newly generated build scripts focused on building; never insert duplicate test commands "
+		    "merely to obtain test evidence, and preserve existing user-required script behavior.\n";
 	if (!runtime_task->text_preview &&
 	    libai::ai::focused_compile_repair(original_prompt)) {
 		runtime_guidance +=
@@ -246,6 +284,18 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 	turn.input.max_output_tokens = max_output_tokens;
 	turn.input.thinking_mode = thinking_mode;
 	turn.input.reasoning_effort = reasoning_effort;
+	const auto budget = libai::ai::coding_turn_budget(reasoning_effort,
+	    thinking_mode, max_output_tokens,
+	    libai::ai::provider_client_t::supports_reasoning_effort(provider),
+	    !runtime_task->text_preview && !runtime_task->assistant_chat,
+	    initial_prompt.find("<execution_mode>large:") != std::string::npos ||
+	        !repair_required_reads.empty() ||
+	        (acceptance_report.empty() ? last_validation_report : acceptance_report)
+	            .find("\"validation_passed\":false") != std::string::npos);
+	turn.input.reasoning_effort = budget.effort;
+	turn.input.thinking_mode = budget.thinking;
+	turn.input.max_output_tokens = budget.output_tokens;
+	turn.reasoning_policy = budget.policy;
 	// Kimi Code Plan uses this stable value to associate repeated prefixes
 	// with one coding session. DeepSeek performs prefix caching automatically
 	// and deliberately receives no undocumented cache parameter.
@@ -279,6 +329,7 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 		// existed. Keep the rest of this stateless tool chain in the same mode;
 		// a later fresh chain may use the user's configured thinking mode again.
 		turn.input.reasoning_effort = "none";
+		turn.reasoning_policy = "recovery_without_reasoning";
 		if (!turn.input.thinking_mode.empty())
 			turn.input.thinking_mode = "disabled";
 	}
@@ -524,6 +575,7 @@ void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
 	    turn.input.reasoning_effort.empty() ?
 	        "provider_default" :
 	        turn.input.reasoning_effort.c_str());
+	request_event.add_text("reasoning_policy", turn.reasoning_policy.c_str());
 	request_event.add_bool(
 	    "require_tool_call", turn.input.require_tool_call);
 	request_event.add_bool("proposal_only_turn", proposal_only_turn);

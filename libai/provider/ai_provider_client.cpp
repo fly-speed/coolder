@@ -256,25 +256,38 @@ bool completion_call_t::request_with_retries()
 	// Retry-After value. Retry it inside the same model turn so the durable agent
 	// checkpoint does not fail merely because the next token-bucket slot is one
 	// second away. Quota/billing 429s remain terminal via classify_error().
+	// An explicit HTTP 503 is also a temporary rejection. Only replay it before
+	// any model content or executable tool call has been received. Share the
+	// three-retry budget with rate limits, so alternating 429/503 cannot extend it.
+	auto unavailable_before_output = [&]() {
+		return status == 503 && result.error_category == provider_error_unavailable &&
+		    result.retryable_error && result.text.empty() && result.reasoning.empty() &&
+		    result.tool_calls.empty() && !result.native_tool_call;
+	};
 	for (unsigned int retry = 0; !requested &&
-	     result.error_category == provider_error_rate_limit && retry < 3;
+	     (result.error_category == provider_error_rate_limit || unavailable_before_output()) && retry < 3;
 	     ++retry) {
 		classify_error(status, err, result);
 		if (!result.retryable_error)
 			break;
+		const bool unavailable = unavailable_before_output();
 		const unsigned long delay_seconds =
 		    rate_limit_retry_delay_seconds(err, retry);
-		ai_log_error("provider.client", "rate-limit-retry",
-		    "temporary provider rate limit/overload; retrying after " +
+		ai_log_error("provider.client", unavailable ? "service-unavailable-retry" : "rate-limit-retry",
+		    std::string(unavailable ? "temporary provider HTTP 503" : "temporary provider rate limit/overload") +
+		        "; retry " + std::to_string(retry + 1) + "/3 after " +
 		        std::to_string(delay_seconds) + " seconds");
 		if (!wait_for_rate_limit_retry(delay_seconds, observer)) {
-			err = "AI provider rate-limit retry cancelled";
+			err = unavailable ? "AI provider service-unavailable retry cancelled" :
+			    "AI provider rate-limit retry cancelled";
 			result.error_category = provider_error_cancelled;
+			result.retryable_error = false;
 			return false;
 		}
 		result = completion_result_t();
 		result.effective_max_output_tokens =
 		    effective_max_output_tokens;
+		if (unavailable) transport_retried = true;
 		requested = submit_request();
 	}
 	// Some compatible Responses gateways sporadically terminate an HTTP-200 SSE

@@ -54,11 +54,28 @@ bool may_retry_coding_tool_after_review(const agent_tool_request_t &request)
 
 bool coding_tool_requires_confirmation(const agent_tool_request_t &request)
 {
-	// Batches may have started validation commands before a later failure.
-	// rolled_back only describes the candidate draft, never external effects.
+	if (request.name == "workspace.execute_batch") {
+		// Inspect the actual child tools, never a model-supplied rollback flag.
+		// Reads and private proposals cannot launch external commands. A failed
+		// returned batch of only those tools can be settled and repaired normally.
+		acl::json json(request.content.c_str());
+		auto *items = json.finish() ? json_array_node(&json.get_root()) : NULL;
+		if (!items || !items->first_child()) return true;
+		size_t count = 0;
+		for (auto *item = items->first_child(); item; item = items->next_child()) {
+			auto *object = item->is_object() ? item : item->get_obj();
+			if (!object || ++count > 16) return true;
+			agent_tool_request_t child;
+			child.name = json_text((*object)["name"]);
+			if (!is_parallel_read_tool(child.name) && !may_retry_coding_tool_after_review(child))
+				return true;
+		}
+		return false;
+	}
+	// Validation/browser commands may have external effects even when a later
+	// proposal rolls back. They still require receipt reconciliation on failure.
 	return request.name.compare(0, 8, "browser.") == 0 ||
-	    request.name == "workspace.validate" ||
-	    request.name == "workspace.execute_batch";
+	    request.name == "workspace.validate";
 }
 
 std::string execute_workspace_tool(libai::ai::agent_workspace_t &workspace,

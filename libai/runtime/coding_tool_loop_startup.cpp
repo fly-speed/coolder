@@ -475,6 +475,8 @@ void coding_tool_loop_t::discover_validation_capabilities()
 		capability.add_bool("discovery_ok", discovered);
 		capability.add_bool("build_network_enabled",
 		    libai::ai::ai_runtime_policy_get().allow_build_network);
+		capability.add_text("automatic_build_scope", "build-only; test-only source edits defer to full validation");
+		capability.add_text("test_evidence_source", "workspace.validate fixed test commands; independent of build scripts");
 		if (discovered) {
 			capability.add_bool("node_acceptance_policy_enabled",
 			    available.functional_acceptance_enabled);
@@ -482,6 +484,15 @@ void coding_tool_loop_t::discover_validation_capabilities()
 			    capability_json.create_array();
 			capability.add_child("commands", commands);
 			append_validation_commands(commands, available);
+			auto &network = capability_json.create_array();
+			capability.add_child("command_network", network);
+			for (const auto &command : available.commands) {
+				auto &entry = network.add_child(false, true);
+				entry.add_text("command_id", command.id.c_str());
+				entry.add_bool("loopback_allowed",
+				    command.allow_loopback_network || command.allow_outbound_network);
+				entry.add_bool("outbound_allowed", command.allow_outbound_network);
+			}
 			acl::json_node &unavailable =
 			    capability_json.create_array();
 			capability.add_child("unavailable_tools", unavailable);

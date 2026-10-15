@@ -60,6 +60,11 @@ install(DIRECTORY html/ DESTINATION share/coolder/html)
 enable_testing()
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+ if(APPLE)
+  add_test(NAME coolder_dynamic_http_port
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/dynamic_http_port_test.py"
+      "$<TARGET_FILE:libai-sandbox-helper>")
+ endif()
  add_test(NAME coolder_facade_boundary COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/facade_dependency_test.py")
 	add_test(NAME coolder_logging
 		COMMAND "${Python3_EXECUTABLE}"
