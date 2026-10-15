@@ -447,9 +447,15 @@ static long long append_validation_command(acl::json &json,
     item.add_bool("cancelled", result.cancelled);
 	item.add_text("command_id", command.id.c_str());
 	item.add_text("executable", command.executable.c_str());
+	item.add_text("working_directory", ".");
+	auto &fixed_arguments = json.create_array();
+	item.add_child("arguments", fixed_arguments);
+	for (const auto &argument : command.fixed_arguments) fixed_arguments.add_array_text(argument.c_str());
+	item.add_number("elapsed_ms", static_cast<long long>(result.elapsed_ms));
 	item.add_text("scope",
 	    !command.browser_probe_node.empty() ?
 	        "cross-browser-configured-assertions" :
+	        command.id == "go.syntax.build" ? "syntax-only" :
 	        command.id == "functional.acceptance" ? "functional" :
 	        command.http_probe_port != 0          ? "http-readiness" :
 	                                                "build-or-test");
@@ -662,6 +668,34 @@ std::string validate_staged_draft(const std::string &user_root,
 		}
 		toolchain.commands.insert(toolchain.commands.end(), checks.begin(), checks.end());
 	}
+	// After a Go compiler/script failure, gather other syntax errors without
+	// running more build scripts, tests, services or network requests. gofmt -l
+	// parses without rewriting files; use only the configured Go installation.
+	if (!targeted_tests) {
+		for (const auto &go_command : toolchain.commands) {
+			if (go_command.id != "go.build") continue;
+			const auto slash = go_command.executable.find_last_of("/\\");
+			if (slash == std::string::npos) break;
+			const auto formatter = go_command.executable.substr(0, slash + 1) +
+			    (go_command.executable.size() >= 4 && go_command.executable.substr(go_command.executable.size()-4) == ".exe" ? "gofmt.exe" : "gofmt");
+			std::ifstream available(formatter.c_str(), std::ios::binary);
+			if (!available.good()) break;
+			libai::ai::sandbox_command_t syntax;
+			syntax.id = "go.syntax.build"; syntax.executable = formatter;
+			syntax.fixed_arguments = {"-e", "-l"};
+			std::set<std::string> paths;
+			for (const auto &change : changes) {
+				std::string relative;
+				if (change.operation != "write" || change.review_status == "rejected" ||
+				    change.path.size() < 3 || change.path.substr(change.path.size()-3) != ".go" ||
+				    !project_path_to_draft_path(project_path, change.path, relative)) continue;
+				if (paths.size() < 64) paths.insert("./" + relative);
+			}
+			for (const auto &path : paths) syntax.fixed_arguments.push_back(path);
+			if (!paths.empty()) toolchain.commands.push_back(syntax);
+			break;
+		}
+	}
 	bool build_executed = false, build_passed = true;
 	acl::json json;
 	acl::json_node &root = json.create_node();
@@ -697,6 +731,9 @@ std::string validate_staged_draft(const std::string &user_root,
 		if (should_cancel())
 			return tool_error_json("agent run cancelled");
 		libai::ai::sandbox_command_t command = toolchain.commands[i];
+		const bool syntax_probe = command.id == "go.syntax.build";
+		if (syntax_probe && (passed || !libai::ai::compile_command(failed_command_id))) continue;
+		if (!passed && !syntax_probe) continue;
 		if (!command.browser_probe_node.empty() &&
 		    !libai::ai::agent_workspace_t::resolve_project_root(
 		        user_root, project_path, command.browser_evidence_root,
@@ -711,7 +748,7 @@ std::string validate_staged_draft(const std::string &user_root,
 		}
 		if (!targeted_tests && build_only && !toolchain.commands.empty() &&
 		    toolchain.commands.front().id == "project.script-build" &&
-		    command.id != "project.script-build" && command.id.compare(0, 12, "go.packages.") != 0)
+		    command.id != "project.script-build" && !syntax_probe && command.id.compare(0, 12, "go.packages.") != 0)
 			continue;
 		if (!targeted_tests && (focused || build_only) &&
 		    (!select_compile_repair_command(command,
@@ -787,10 +824,12 @@ std::string validate_staged_draft(const std::string &user_root,
 		        result.timed_out || !result.error.empty()))
 			continue;
 		passed = false;
-		failed_command_id = command.id;
-		failed_command_reason = result.error + "\n" +
-		    result.standard_error + "\n" + result.standard_output;
-		break;
+		if (failed_command_id.empty()) {
+			failed_command_id = command.id;
+			failed_command_reason = result.error + "\n" +
+			    result.standard_error + "\n" + result.standard_output;
+		}
+		// Continue only to the fixed, bounded syntax probe, never later tests.
 	}
 	// A focused task may finish with test warnings; never label failing tests as passed.
 	const bool compile_repair_completed = focused && build_executed &&
@@ -817,6 +856,8 @@ std::string validate_staged_draft(const std::string &user_root,
 	    "business functionality. Functional evidence covers only the assertions "
 	    "in the configured acceptance test; missing or skipped tests are not verified.");
 	root.add_number("commands_executed", static_cast<long long>(executed));
+	root.add_number("commands_executed_this_call", static_cast<long long>(executed));
+	root.add_bool("executed_this_call", executed > 0);
 	root.add_number("diagnostic_count", diagnostic_count);
 	acl::json_node &unavailable = json.create_array();
 	root.add_child("unavailable_tools", unavailable);

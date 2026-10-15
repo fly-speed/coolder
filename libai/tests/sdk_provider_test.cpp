@@ -37,6 +37,30 @@ int main()
 		assert(provider_detail::responses_compact_url(provider) == prefix + "/responses/compact");
 	}
 
+	// GLM adaptive off/recovery must be serialized as a valid light reasoning
+	// request; manually enabled mode may retain the provider default effort.
+	for (const std::string model : {"glm-5.3-flash", "ZHIPU/GLM-5.3", "glm-5.2", "glm-4.7"}) {
+		provider_config_t provider; provider.model=model;
+		provider.protocol="openai_compatible"; provider.base_url="https://example.invalid";
+		const bool effort = model != "glm-4.7";
+		assert(provider_client_t::supports_reasoning_effort(provider)==effort);
+		for (const std::string requested : {"none", "low", "high", "max", ""}) {
+			completion_request_t input; input.user_prompt="fixture";
+			input.thinking_mode=requested=="none"?"disabled":"enabled";
+			input.reasoning_effort=requested;
+			std::string payload;
+			assert(provider_client_t::serialize_completion_request(provider,input,true,payload));
+			acl::json body(payload.c_str()); assert(body.finish());
+			const auto actual_thinking=nullable_text(object_child(body["thinking"],"type"));
+			if(actual_thinking!="enabled")std::cerr << "GLM payload: " << payload << "\n";
+			assert(actual_thinking=="enabled");
+			std::string expected=requested=="none"?"low":requested;
+			if(model=="glm-5.2" && expected=="low")expected="high";
+			if(!effort)expected.clear();
+			assert(nullable_text(body["reasoning_effort"])==expected);
+		}
+	}
+
 	// Protocol completion must not depend on HTTP EOF or gateway keep-alive.
 	for (const std::string protocol : { "openai_chat", "openai_responses",
 	         "anthropic_messages", "ollama" }) {

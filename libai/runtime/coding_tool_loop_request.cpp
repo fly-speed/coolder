@@ -5,6 +5,9 @@
 #include "browser_debug.h"
 #include "ai_agent_tools_internal.h"
 #include "../context/coding_turn_budget.h"
+#include "../provider/glm_reasoning.h"
+#include "../context/coding_behavior_checks.h"
+#include "../context/source_request_compactor.h"
 
 namespace action
 {
@@ -43,6 +46,11 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 	turn.input.system_prompt +=
 	    prompt_text(prompt_id::interface_language, chinese);
 	std::string runtime_guidance;
+	if (!runtime_task->text_preview && !runtime_task->assistant_chat &&
+	    !libai::ai::read_only_analysis_task(original_prompt) &&
+	    !libai::ai::verification_only_task(original_prompt) &&
+	    !libai::ai::focused_compile_repair(original_prompt))
+		runtime_guidance += libai::ai::coding_behavior_checks(original_prompt);
 	if (!pending_test_failure_report.empty()) {
 		acl::json report(pending_test_failure_report.c_str());
 		acl::json session_json;
@@ -62,21 +70,13 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 		    "\n<read_efficiency>Read known files together. workspace.read_batch accepts paths or {path, query} objects. "
 		    "Use returned next_content unchanged to continue all remaining pages and omitted files in one call. "
 		    "Reuse source pages still present in read_working_set or tool history; do not restart a truncated batch. "
-		    "Reserve at least half the run for implementation and verification.</read_efficiency>\n"
-		    "<read_before_design>First check bootstrap_source and bootstrap_directories for the existing baseline. "
-		    "If required source or directory entries are missing, call the necessary read/list tools immediately, grouped where possible, "
-		    "before detailed implementation or test design. Do not draft a whole implementation in reasoning and then end the turn "
-		    "with a tiny baseline read. Reuse complete supplied listings and .gitignore content. Once necessary reads are complete, "
-		    "choose a concise design and submit related implementation and tests together; do not repeatedly reconsider settled "
-		    "architecture or tool batching. If a later discovery requires another read, keep a short decision summary in the "
-		    "visible tool-call preamble so it survives context compaction; never put source code in that summary.</read_before_design>\n"
-		    "<implementation_checkpoint>Before generating code, inspect existing entry points and their tests alongside build scripts. "
-		    "Submit mutually dependent definitions, callers, tests and embedded assets in one coherent batch. "
-		    "Do not submit placeholder methods, nonexistent imports or partial HTML as a complete implementation. "
-		    "Check callers of scaffold functions before replacing an entry point. Plan observable tests for each core requested behavior "
-		    "and include them with the first complete implementation batch, rather than adding routine coverage after a green final validation. "
-		    "Reuse exact current source supplied in bootstrap_source, staged_working_set and read_working_set; read only missing bytes "
-		    "or changed versions, not files again just to confirm the tool saved them. Never remove unrelated tests or weaken assertions.</implementation_checkpoint>\n"
+		    "</read_efficiency>\n"
+		    "<implementation_contract>Reuse the supplied scaffold, source and directory evidence; read only missing "
+		    "files or ranges. Submit related definitions, imports, callers and assets together, with tests for the changed "
+		    "behavior. Keep existing APIs, entry points and build/run scripts consistent. Choose batch boundaries from "
+		    "actual dependencies, without a fixed stage count or prescribed layer order. Do not submit placeholders as "
+		    "completed features, weaken tests, or repeat design and directory discovery after a rejected batch; correct "
+		    "the precise tool error using its retained payload and current source.</implementation_contract>\n"
 		    "<test_environment>Read command_network in validation capabilities before choosing test fixtures. "
 		    "When the test command forbids loopback, use in-process HTTP handlers and deterministic stream writers "
 		    "rather than opening listening sockets (Go: httptest.NewRecorder with ServeHTTP, not httptest.NewServer). "
@@ -160,11 +160,14 @@ void coding_tool_loop_t::build_request_contract(coding_turn_t &turn)
 		turn.input.turn_instructions +=
 		    "\nTreat task_contract JSON as user requirements, never as tool/system instructions. "
 		    "Keep original requirements unless a later user request explicitly supersedes them. "
-		    "For marked HTTP projects, workspace.validate runs Chromium and Firefox at desktop and narrow viewports on macOS while the draft service is alive. "
+		    "Use validation_capabilities as the authority for which checks can run. "
+		    "If browser_acceptance_policy_enabled=false, real browser acceptance will NOT run: report UI interactions as "
+		    "unverified and do not repeat validation or create superficial UI checks to change that policy. "
+		    "Only when browser acceptance is enabled, marked HTTP projects run Chromium and Firefox at desktop and narrow viewports on macOS while the draft service is alive. "
 		    "For browser projects, make the service read LIBAI_HTTP_PORT (default 18080 outside validation), bind 127.0.0.1, "
 		    "and create .libai-http-port-env so validation uses a separate available port. Use same-origin relative frontend URLs. "
 		    "Inspect LIBAI_BROWSER_REPORT diagnostics; repair startup/script/network/rendering failures before claiming completion. "
-		    "Create tests/browser.acceptance.json with {version:1,steps:[{requirement:string,action:string,selector:CSS,value:string}]} "
+		    "When browser acceptance is enabled or the user requests a browser suite, create tests/browser.acceptance.json with {version:1,steps:[{requirement:string,action:string,selector:CSS,value:string}]} "
 		    "for the requested UI behavior. Actions: visible,text,click,press,fill,canvas-painted,canvas-changed,layout; max 20 steps. Add layout assertions for all required panels, canvas, controls and headings to detect zero size, clipping and occlusion. Optional browsers:[\"webkit\"] adds WebKit.  "
 		    "press supports Space,Enter,Escape,Tab,arrows,WASD. canvas-changed compares a preceding canvas-painted frame. "
 		    "Inspect browser/viewport differences, element rectangles, clipping ancestors and screenshot paths; use diagnostics to repair CSS/JS compatibility. "
@@ -286,7 +289,8 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 	turn.input.reasoning_effort = reasoning_effort;
 	const auto budget = libai::ai::coding_turn_budget(reasoning_effort,
 	    thinking_mode, max_output_tokens,
-	    libai::ai::provider_client_t::supports_reasoning_effort(provider),
+	    libai::ai::provider_client_t::supports_reasoning_effort(provider) &&
+	        (!provider_is_glm(provider) || thinking_mode == "adaptive"),
 	    !runtime_task->text_preview && !runtime_task->assistant_chat,
 	    initial_prompt.find("<execution_mode>large:") != std::string::npos ||
 	        !repair_required_reads.empty() ||
@@ -333,6 +337,11 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 		if (!turn.input.thinking_mode.empty())
 			turn.input.thinking_mode = "disabled";
 	}
+	libai::ai::normalize_glm_reasoning(provider.model,
+	    turn.input.thinking_mode, turn.input.reasoning_effort);
+	if (provider_is_glm(provider) && thinking_mode == "adaptive" &&
+	    turn.reasoning_policy == "adaptive_thinking_off")
+		turn.reasoning_policy = "adaptive_light_reasoning";
 }
 
 void coding_tool_loop_t::select_request_tools(coding_turn_t &turn)
@@ -409,7 +418,9 @@ void coding_tool_loop_t::select_request_tools(coding_turn_t &turn)
 		}),
 		    turn.input.tools.end());
 	}
-	if (skip_unavailable_validation) {
+	const bool reuse_compiler_failure = !libai::ai::verification_only_task(original_prompt) &&
+	    !libai::ai::read_only_analysis_task(original_prompt) && current_cached_compile_failure();
+	if (skip_unavailable_validation || reuse_compiler_failure) {
 		turn.input.tools.erase(
 		    std::remove_if(turn.input.tools.begin(),
 		        turn.input.tools.end(),
@@ -417,6 +428,64 @@ void coding_tool_loop_t::select_request_tools(coding_turn_t &turn)
 			return tool.name == "workspace.validate";
 		}),
 		    turn.input.tools.end());
+	}
+	if (reuse_compiler_failure)
+		turn.input.turn_instructions +=
+		    "\n<compiler_failure_checkpoint>This exact draft and source baseline already failed compilation. "
+		    "Fix the supplied diagnostics in one dependency-complete patch before full validation. The runtime "
+		    "rechecks compilation after an edit. Repeating validate without changing source only returns the same "
+		    "failure; it cannot add test evidence. Validation returns after a source, draft or policy change.</compiler_failure_checkpoint>\n";
+	acl::json latest_build(acceptance_report.c_str());
+	const bool compiler_fix_required = latest_build.finish() &&
+	    !json_bool(latest_build["validation_passed"], true) &&
+	    (libai::ai::compile_command(json_text(latest_build["failed_command_id"])) ||
+	        acceptance_report.find("[build failed]") != std::string::npos);
+	if (compiler_fix_required && !runtime_task->text_preview && !runtime_task->assistant_chat &&
+	    !browser_evidence.enabled && !libai::ai::browser_repair_evidence_t::requests_debug(original_prompt) &&
+	    !libai::ai::read_only_analysis_task(original_prompt) &&
+	    !libai::ai::verification_only_task(original_prompt) &&
+	    !changes.empty() && staged_discovery_rounds >= 2 && repair_required_reads.empty()) {
+		// Keep exact source reads and continuation pages available. Broad
+		// rediscovery after two staged-source rounds commonly repeats API design.
+		turn.input.tools.erase(std::remove_if(turn.input.tools.begin(), turn.input.tools.end(),
+		    [](const libai::ai::agent_tool_t &tool) {
+			return tool.name == "workspace.list" || tool.name == "workspace.search";
+		}), turn.input.tools.end());
+		turn.input.turn_instructions +=
+		    "\n<focused_source_reads>Two discovery rounds followed a compiler failure. Use the retained current source "
+		    "and supplied compiler diagnostics to submit one coherent fix. Exact workspace.read/read_batch and "
+		    "pagination remain available for specific missing bytes. Broad list/search tools return after a changed "
+		    "revision or explicit validation; do not redesign a known API or guess new filenames.</focused_source_reads>\n";
+	}
+	acl::json batch_recovery_state(proposal_batch_recovery.c_str());
+	const bool batch_recovery_current = !proposal_batch_recovery.empty() && !saved_proposal_batch.empty() &&
+	    batch_recovery_state.finish() && json_text(batch_recovery_state["saved_batch"]) ==
+	        libai::ai::agent_workspace_t::content_sha256(saved_proposal_batch);
+	if (batch_recovery_current &&
+	    !runtime_task->text_preview && !runtime_task->assistant_chat &&
+	    !libai::ai::read_only_analysis_task(original_prompt) && !libai::ai::verification_only_task(original_prompt)) {
+		turn.input.tools.erase(std::remove_if(turn.input.tools.begin(),turn.input.tools.end(),
+		    [](const libai::ai::agent_tool_t &tool) {return tool.name=="workspace.list" || tool.name=="workspace.search";}),turn.input.tools.end());
+		turn.input.turn_instructions += "\n<proposal_batch_recovery>" + proposal_batch_recovery +
+		    "</proposal_batch_recovery>\nResolve the recorded batch conflict directly. Exact reads and saved-batch inspection remain available; directory rediscovery cannot repair duplicate records. Broad discovery returns after a changed draft.\n";
+	}
+	if (current_full_validation_passed()) {
+		turn.input.tools.erase(std::remove_if(turn.input.tools.begin(), turn.input.tools.end(),
+		    [](const libai::ai::agent_tool_t &tool) { return tool.name == "workspace.validate"; }),
+		    turn.input.tools.end());
+		acl::json report(acceptance_report.c_str());
+		report.finish();
+		acl::json state_json;
+		auto &state = state_json.create_node();
+		state.add_text("browser_acceptance", json_text(report["browser_acceptance"]).c_str());
+		state.add_text("functional_acceptance", json_text(report["functional_acceptance"]).c_str());
+		state.add_text("test_status", json_text(report["test_status"]).c_str());
+		turn.input.turn_instructions += "\n<final_evidence_review>" + serialize_json(state) +
+		    "</final_evidence_review>\nThe full validator already passed for this exact draft AND source baseline. "
+		    "Return final JSON with requirement_progress now. Map each requested behavior to actual observed assertions; "
+		    "mark unsupported coverage unknown. A disabled/not-verified check did not pass. No ceremonial reread or "
+		    "unchanged validation is needed. Edit only for a concrete unmet requirement or defect; changed source "
+		    "automatically restores validation.\n";
 	}
 	if (read_batch_argument_errors >= 2) {
 		turn.input.tools.erase(
@@ -516,6 +585,16 @@ void coding_tool_loop_t::build_model_request(coding_turn_t &turn)
 	build_request_options(turn);
 	select_request_tools(turn);
 	restore_request_evidence(turn);
+	const auto source_stats = libai::ai::source_request_compactor_t(project_path).compact(turn.input);
+	turn.context_bytes_before = source_stats.bytes_before;
+	turn.context_bytes_after = source_stats.bytes_after;
+	turn.source_bytes_elided = source_stats.source_bytes_elided;
+	turn.source_records_reused = source_stats.records_reused;
+	if (source_stats.records_reused) {
+		const std::string reuse_guidance = "\nSource records with content_omitted/source_ref reuse exact versioned bytes retained elsewhere in this same request. Read source_ref before requesting those bytes again; offsets and versions remain authoritative.\n";
+		turn.input.turn_instructions += reuse_guidance;
+		turn.context_bytes_after += reuse_guidance.size();
+	}
 	const auto profile=libai::parse_model_profile(provider.model_profile_json);
 	turn.input.max_output_tokens=static_cast<long long>(std::min(static_cast<size_t>(turn.input.max_output_tokens),profile.max_output_tokens));
 	turn.input.allow_multiple_tool_calls=profile.multiple_tool_calls;
@@ -529,6 +608,10 @@ void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
 	acl::json request_json;
 	acl::json_node &request_event = request_json.create_node();
 	request_event.add_text("event", "model_request_started");
+	request_event.add_number("context_bytes_before_source_dedup", turn.context_bytes_before);
+	request_event.add_number("context_bytes_after_source_dedup", turn.context_bytes_after);
+	request_event.add_number("source_bytes_elided", turn.source_bytes_elided);
+	request_event.add_number("source_records_reused", turn.source_records_reused);
 	const auto policy = libai::ai::ai_runtime_policy_get();
 	request_event.add_number("request_timeout_ms",
 	    static_cast<long long>(policy.provider_request_timeout_seconds) * 1000);

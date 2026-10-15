@@ -17,138 +17,87 @@ std::string validation_repair_context(const std::string &user_root,
     const std::string &validation_result, size_t maximum_bytes,
     const libai::ai::completion_request_t *evidence)
 {
-	// A compiler diagnostic often points at an unchanged dependent file rather
-	// than the files already present in `changes`. The old repair guard forbade a
-	// read while attaching only staged files, leaving the model without the exact
-	// source it was required to repair. Read diagnostic paths from the private
-	// draft (never the formal tree) and carry those bytes into the repair turn.
-	std::vector<std::string> diagnostic_paths;
-	acl::json parsed(validation_result.c_str());
-	acl::json_node *commands =
-	    parsed.finish() ? json_array_node(parsed["commands"]) : NULL;
-	for (acl::json_node *command = commands ? commands->first_child() :
-	                                          NULL;
-	     command != NULL; command = commands->next_child()) {
-		acl::json_node *command_object =
-		    command->is_object() ? command : command->get_obj();
-		acl::json_node *diagnostics = command_object == NULL ?
-		    NULL :
-		    json_array_node((*command_object)["diagnostics"]);
-		for (acl::json_node *diagnostic =
-		         diagnostics ? diagnostics->first_child() : NULL;
-		     diagnostic != NULL;
-		     diagnostic = diagnostics->next_child()) {
-			acl::json_node *object = diagnostic->is_object() ?
-			    diagnostic :
-			    diagnostic->get_obj();
-			std::string path =
-			    object == NULL ? "" : json_text((*object)["path"]);
-			std::string normalized;
-			std::string normalize_err;
-			if (path.empty() ||
-			    !libai::ai::agent_workspace_t::normalize_path(
-			        path, normalized, false, normalize_err))
-				continue;
-			if (!(std::find(diagnostic_paths.begin(),
-			          diagnostic_paths.end(),
-			          normalized) == diagnostic_paths.end()))
-				continue;
-			diagnostic_paths.push_back(normalized);
-		}
-	}
-
-	std::ostringstream out;
-	out << "\n<repair_source_context>\n";
-	size_t used = 0;
-	std::set<std::string> included;
-	libai::ai::agent_workspace_t draft_workspace(
-	    persistent_draft_root(user_root, project_path, run_id));
-	std::vector<std::string> source_files;
-	if (std::any_of(diagnostic_paths.begin(), diagnostic_paths.end(),
-	        [](const std::string &path) {
-		return path.find('/') == std::string::npos;
-	}))
-		source_files =
-		    libai::ai::diagnostic_source_files(draft_workspace);
-	for (auto &path : diagnostic_paths) {
-		if (!(path.find('/') == std::string::npos))
-			continue;
-
-		const auto resolved =
-		    libai::ai::unique_diagnostic_source(path, source_files);
-		if (resolved.empty())
-			continue;
-		path = resolved;
-	}
-	for (size_t i = 0; i < diagnostic_paths.size(); ++i) {
-		std::string content;
-		bool truncated = false;
-		std::string read_err;
-		if (!draft_workspace.read(
-		        diagnostic_paths[i], content, truncated, read_err) ||
-		    truncated) {
-			out << "[Missing or truncated diagnostic source: "
-			    << diagnostic_paths[i]
-			    << "; use bounded workspace reads before editing.]\n";
-			continue;
-		}
-		const std::string display_path = project_path.empty() ?
-		    diagnostic_paths[i] :
-		    project_path + "/" + diagnostic_paths[i];
-		if (evidence &&
-		    (libai::ai::request_has_source(
-		         *evidence, display_path, content) ||
-		        libai::ai::request_has_source(
-		            *evidence, diagnostic_paths[i], content))) {
-			included.insert(display_path);
-			continue;
-		}
-		const std::string header = "--- " + display_path +
-		    " (compiler diagnostic source) ---\n";
-		if (used + header.size() + content.size() + 1 > maximum_bytes)
-			break;
-		out << header << content << "\n";
-		used += header.size() + content.size() + 1;
-		included.insert(display_path);
-	}
-	// Prioritize declarations, then callers. A large implementation must not
-	// prevent smaller dependent files later in the snapshot from being included.
-	bool omitted = false;
-	for (int priority = 0; priority < 2; ++priority) {
-		for (size_t i = 0; i < changes.size(); ++i) {
-			if (changes[i].operation != "write" ||
-			    changes[i].content.empty() ||
-			    changes[i].review_status == "rejected" ||
-			    included.find(changes[i].path) != included.end() ||
-			    libai::ai::staged_interface_path(
-			        changes[i].path) != (priority == 0))
-				continue;
-			if (evidence &&
-			    (libai::ai::request_has_source(*evidence,
-			         changes[i].path, changes[i].content) ||
-			        (workspace_path_is_below(
-			             changes[i].path, project_path) &&
-			            libai::ai::request_has_source(*evidence,
-			                changes[i].path.substr(
-			                    project_path.size() + 1),
-			                changes[i].content))))
-				continue;
-			const std::string header = "--- " + changes[i].path +
-			    " (current staged source) ---\n";
-			if (used + header.size() + changes[i].content.size() +
-			        1 >
-			    maximum_bytes) {
-				omitted = true;
-				continue;
-			}
-			out << header << changes[i].content << "\n";
-			used += header.size() + changes[i].content.size() + 1;
-		}
-	}
-	if (omitted)
-		out << "[remaining repair source omitted by context bound]\n";
-	out << "</repair_source_context>\n";
-	return out.str();
+    std::map<std::string,size_t> diagnostic_lines;
+    bool script_failure = false;
+    acl::json report(validation_result.c_str());
+    auto *commands = report.finish() ? json_array_node(report["commands"]) : NULL;
+    for (auto *entry=commands?commands->first_child():NULL;entry;entry=commands->next_child()) {
+        auto *command=entry->is_object()?entry:entry->get_obj();
+        if (!command || json_bool((*command)["passed"],true)) continue;
+        script_failure = script_failure || json_text((*command)["command_id"])=="project.script-build";
+        auto *diagnostics=json_array_node((*command)["diagnostics"]);
+        for(auto *d=diagnostics?diagnostics->first_child():NULL;d;d=diagnostics->next_child()) {
+            auto *o=d->is_object()?d:d->get_obj(); if(!o)continue;
+            std::string path,err;
+            if(libai::ai::agent_workspace_t::normalize_path(json_text((*o)["path"]),path,false,err))
+                diagnostic_lines.emplace(path,static_cast<size_t>(std::max(1LL,json_number((*o)["line"],1))));
+        }
+    }
+    libai::ai::agent_workspace_t draft(persistent_draft_root(user_root,project_path,run_id));
+    std::vector<std::string> inventory;
+    std::map<std::string,size_t> selected;
+    for(const auto &d:diagnostic_lines) {
+        auto path=d.first;
+        if(path.find('/')==std::string::npos) {
+            if(inventory.empty())inventory=libai::ai::diagnostic_source_files(draft);
+            const auto resolved=libai::ai::unique_diagnostic_source(path,inventory);
+            if(!resolved.empty())path=resolved;
+        }
+        selected.emplace(path,d.second);
+    }
+    // Include the actual script and entry configuration for target/cwd failures,
+    // rather than attaching every generated file when no source path was printed.
+    if(script_failure)for(const char *path:{"build.sh","build.bat","go.mod","src/main.go"})selected.emplace(path,1);
+    const auto directory=[](const std::string &path) {
+        const auto slash=path.find_last_of('/');
+        return slash==std::string::npos?std::string():path.substr(0,slash);
+    };
+    std::set<std::string> directories;
+    for(const auto &d:selected)directories.insert(directory(d.first));
+    size_t related=0;
+    for(const auto &change:changes) {
+        std::string relative;
+        if(change.operation!="write" || change.review_status=="rejected" ||
+            !project_path_to_draft_path(project_path,change.path,relative))continue;
+        if(related<4 && (libai::ai::staged_interface_path(relative) ||
+            directories.count(directory(relative)))) {
+            if(selected.emplace(relative,1).second)++related;
+        }
+    }
+    std::string records="[";size_t used=2;
+    for(const auto &entry:selected) {
+        std::string content,err;bool truncated=false;
+        const auto display=project_path.empty()?entry.first:project_path+"/"+entry.first;
+        if(!draft.read(entry.first,content,truncated,err) || truncated)continue;
+        if(evidence && (libai::ai::request_has_source(*evidence,display,content) ||
+            libai::ai::request_has_source(*evidence,entry.first,content)))continue;
+        size_t offset=0;
+        if(content.size()>6144 && entry.second>12) {
+            size_t line=1;
+            while(offset<content.size() && line<entry.second-12)if(content[offset++]=='\n')++line;
+        }
+        libai::ai::text_read_page_t page;
+        if(!libai::ai::read_text_page(content,std::to_string(offset),page,err,6144,1024*1024))continue;
+        acl::json one;auto &record=one.create_node();
+        record.add_text("path",display.c_str()).add_text("file_sha256",libai::ai::agent_workspace_t::content_sha256(content).c_str())
+            .add_text("source_role",diagnostic_lines.empty()?"build checkpoint source":"diagnostic/package source")
+            .add_number("offset",page.offset).add_number("next_offset",page.next_offset)
+            .add_number("total_bytes",page.total_bytes).add_bool("eof",page.eof);
+        if(!page.eof || page.offset>0)record.add_text("read_hint","This is a source window, not the complete file. Read only missing ranges using workspace.read and byte offsets.");
+        if(!page.eof)record.add_text("next_query",std::to_string(page.next_offset).c_str());
+        record.add_text("content",page.content.c_str());
+        const auto encoded=serialize_json(record);
+        if(used+encoded.size()+1>maximum_bytes) {
+            record.free_child(record["content"]);record.add_bool("content_omitted",true)
+                .add_text("read_hint","Source omitted by repair-context budget; use workspace.read for this exact path/range.");
+        }
+        const auto bounded=serialize_json(record);if(used+bounded.size()+1>maximum_bytes)break;
+        used+=bounded.size()+1;
+        if(records.size()>1)records+=",";
+        records+=bounded;
+    }
+    return "\n<repair_source_context>\n"+records+"]"+
+        "\n</repair_source_context>\nSource windows include version and offsets; use exact missing ranges. Diagnostic packages/interfaces are included, not every caller in the repository; use targeted code.references when a caller is still missing.\n";
 }
 
 static void merge_reviewed_progress(libai::ai::agent_progress_t &progress,

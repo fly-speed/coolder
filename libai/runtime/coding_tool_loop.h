@@ -110,6 +110,8 @@ private:
 	// Associate validation evidence with its exact source and draft
 	// revisions.
 	void record_acceptance_evidence(const std::string &report);
+	bool current_full_validation_passed();
+	bool current_cached_compile_failure();
 	// Persist the final task-acceptance outcome for the completed
 	// invocation.
 	bool finish_task_acceptance(bool completed);
@@ -329,6 +331,8 @@ private:
 	// Bounded proposal payload retained for follow-up batch operations.
 	std::string
 	    saved_proposal_batch; // One bounded payload, scoped to this running task.
+	// Exact structural rejection retained until the draft changes.
+	std::string proposal_batch_recovery;
 	// Once a model has exhausted an entire output budget on reasoning, keep the
 	// remainder of this run in direct protocol mode. A single successful recovery
 	// must not be followed immediately by another high-effort reasoning loop.
@@ -395,6 +399,8 @@ private:
 	size_t non_tool_turns = 0;
 	// Additional source reads used to supply missing repair evidence.
 	size_t supplementary_read_calls = 0;
+	// Discovery after a staged edit should converge on exact missing bytes.
+	size_t staged_discovery_rounds = 0;
 	// Whether this run has produced a staged revision for the task.
 	bool has_task_revision = false;
 	// Resolved tool-call ceiling after applying run policy.

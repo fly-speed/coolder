@@ -196,6 +196,11 @@ bool repeated_repair_failure(const std::string &report,
 // bypass the review boundary or partially modify the draft.
 bool repair_review_read_only(const agent_tool_request_t &request)
 {
+	if (request.name=="workspace.propose_batch") {
+		acl::json ref(request.content.c_str());
+		return ref.finish() && ref.get_root().is_object() && !json_text(ref["saved_batch"]).empty() && ref["inspect_index"] != NULL &&
+		    !ref["offset"] && !ref["limit"] && !ref["exclude_indices"];
+	}
 	if (is_parallel_read_tool(request.name) ||
 	    request.name == "browser.status" ||
 	    request.name == "browser.snapshot" ||
@@ -328,6 +333,18 @@ bool remember_read_page(
 	return false;
 }
 
+// Source records alone cannot reconstruct errors or paths omitted by the
+// batch budget. Preserve the bounded envelope until the model receives it.
+static bool read_feedback_needs_exchange(acl::json &parsed)
+{
+    auto *errors = json_array_node(parsed["errors"]);
+    auto *omitted = json_array_node(parsed["omitted_paths"]);
+    const auto next = json_text(parsed["next_content"]);
+    return json_number(parsed["failed_files"], 0) != 0 ||
+        (errors && errors->first_child()) || (omitted && omitted->first_child()) ||
+        (!next.empty() && next != "[]");
+}
+
 bool remember_read_result(const std::string &name, const std::string &result,
     libai::ai::agent_read_context_t &context)
 {
@@ -360,7 +377,9 @@ bool remember_read_result(const std::string &name, const std::string &result,
 	acl::json_node *files = json_array_node(parsed["files"]);
 	if (files == NULL)
 		return remember_read_page(parsed.get_root(), context);
-	bool retained = true;
+	// Cached pages do not retain batch errors. Keep the exchange so the next
+	// model request receives failures as well as successful source pages.
+	bool retained = !read_feedback_needs_exchange(parsed);
 	for (acl::json_node *item = files->first_child(); item != NULL;
 	     item = files->next_child()) {
 		acl::json_node *object =
@@ -398,6 +417,8 @@ bool read_result_is_retained(const std::string &name, const std::string &result,
 		return true;
 	}
 	if (name != "workspace.read" && name != "workspace.read_batch")
+		return false;
+	if (read_feedback_needs_exchange(parsed))
 		return false;
 	const auto retained = [&context](acl::json_node &page) {
 		return page["content"] != NULL &&

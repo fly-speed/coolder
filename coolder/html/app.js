@@ -507,6 +507,31 @@ function resetRun() {
   $('tools').replaceChildren();
 }
 
+let thinkingProviderKey = '';
+let thinkingProviderWasGLM = false;
+let nonGLMThinkingChoice = null;
+function syncThinkingControls() {
+  const provider = state.providers.find(p => p.id === $('provider').value);
+  const key = provider ? provider.id + ':' + provider.model : '';
+  const glm = /^(?:.*\/)?glm-/i.test(provider?.model || '');
+  const enabled = $('thinking-enabled');
+  const adaptive = $('thinking-adaptive');
+  if (key !== thinkingProviderKey) {
+    if (glm) {
+      if (!thinkingProviderWasGLM) nonGLMThinkingChoice = { enabled: enabled.checked, adaptive: adaptive.checked };
+      enabled.checked = true;
+      adaptive.checked = true;
+    } else if (thinkingProviderWasGLM && nonGLMThinkingChoice) {
+      enabled.checked = nonGLMThinkingChoice.enabled;
+      adaptive.checked = nonGLMThinkingChoice.adaptive;
+    }
+    thinkingProviderKey = key;
+    thinkingProviderWasGLM = glm;
+  }
+  if (glm) enabled.checked = true;
+  enabled.disabled = glm || adaptive.checked;
+}
+
 async function providers() {
   const data = await api('/providers');
   state.providers = data.providers || [];
@@ -529,6 +554,7 @@ async function providers() {
     o.value = '';
     $('provider').append(o);
   }
+  syncThinkingControls();
   renderProviderList();
 }
 
@@ -1324,9 +1350,8 @@ $('prompt').onkeydown = e => {
 document.addEventListener('pointerdown', e => {
   if (!$('send-options').contains(e.target)) $('send-options').open = false;
 });
-$('thinking-adaptive').addEventListener('change', () => {
-  $('thinking-enabled').disabled = $('thinking-adaptive').checked;
-});
+$('provider').addEventListener('change', syncThinkingControls);
+$('thinking-adaptive').addEventListener('change', syncThinkingControls);
 $('send-options').addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     e.preventDefault();

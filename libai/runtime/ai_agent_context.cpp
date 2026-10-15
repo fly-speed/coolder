@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../provider/glm_reasoning.h"
 #include "../common/identifiers.h"
 // Attachments, provider selection, initial context and completion summaries.
 #include "coding_runtime.h"
@@ -265,6 +266,11 @@ bool provider_identity_contains(
 		    std::tolower(static_cast<unsigned char>(ch)));
 	});
 	return identity.find(needle) != std::string::npos;
+}
+
+bool provider_is_glm(const libai::ai::provider_config_t &provider)
+{
+    return libai::ai::glm_model(provider.model);
 }
 
 bool provider_is_deepseek(const libai::ai::provider_config_t &provider)

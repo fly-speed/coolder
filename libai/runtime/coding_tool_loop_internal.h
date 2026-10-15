@@ -20,6 +20,8 @@ struct coding_turn_t {
 	// Provider-neutral request prepared for the current model turn.
 	libai::ai::completion_request_t input{};
 	std::string reasoning_policy;
+	size_t context_bytes_before = 0, context_bytes_after = 0;
+	size_t source_bytes_elided = 0, source_records_reused = 0;
 	// Normalized provider completion for the current model turn.
 	libai::ai::completion_result_t output{};
 	// Per-attempt telemetry before retry usage is merged into billable totals.

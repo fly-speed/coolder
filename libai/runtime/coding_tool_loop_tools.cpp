@@ -12,6 +12,26 @@ using coding_loop_detail::save_coding_progress;
 
 namespace
 {
+std::string duplicate_batch_recovery(const std::string &wire, unsigned depth=0)
+{
+    if (depth>4) return "";
+    acl::json json(wire.c_str()); if (!json.finish()) return "";
+    if (json_text(json["error_code"])=="proposal_batch_duplicate_paths" &&
+        !json_text(json["saved_batch"]).empty()) return wire;
+    auto cause=json_text(json["cause"]);
+    if (cause.empty()) {
+        const auto error=json_text(json["error"]); const auto begin=error.find('{');
+        if (begin!=std::string::npos) cause=error.substr(begin);
+    }
+    if (!cause.empty()) { const auto found=duplicate_batch_recovery(cause,depth+1); if (!found.empty())return found; }
+    auto *items=json_array_node(json["results"]);
+    for(auto *item=items?items->first_child():NULL;item;item=items->next_child()) {
+        auto *object=item->is_object()?item:item->get_obj(); if(!object)continue;
+        const auto found=duplicate_batch_recovery(json_text((*object)["result"]),depth+1);
+        if (!found.empty())return found;
+    }
+    return "";
+}
 acl::json_node *browser_object(acl::json_node *n)
 {
 	return n && n->is_object() ? n : (n ? n->get_obj() : NULL);
@@ -845,6 +865,18 @@ void coding_tool_loop_t::materialize_tool_changes(coding_turn_t &turn)
 
 void coding_tool_loop_t::observe_tool_progress(coding_turn_t &turn)
 {
+	if (turn.staged_progress) proposal_batch_recovery.clear();
+	const auto recovery=duplicate_batch_recovery(turn.tool_result);
+	if (!recovery.empty()) {
+		acl::json report(recovery.c_str());report.finish();
+		if (json_text(report["saved_batch"])==libai::ai::agent_workspace_t::content_sha256(saved_proposal_batch))
+			proposal_batch_recovery=recovery;
+	}
+
+	if (turn.staged_progress || turn.message.tool.name == "workspace.validate")
+		staged_discovery_rounds = 0;
+	else if (turn.trace.ok && !changes.empty() && repair_review_read_only(turn.message.tool))
+		++staged_discovery_rounds;
 	std::vector<std::string> priority_paths;
 	for (const auto &change : changes)
 		priority_paths.push_back(change.path);

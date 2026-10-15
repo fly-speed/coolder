@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "../sdk/model_profile.h"
 #include "ai_provider_client_internal.h"
+#include "glm_reasoning.h"
 #include "../common/utf8_text.h"
 #include "../prompt/prompt_language.h"
 
@@ -811,6 +812,10 @@ static void normalize_completion_reasoning(const provider_config_t &provider,
 	// keeps recovery deterministic when a model exhausted its reasoning budget.
 	effective_thinking = input.thinking_mode;
 	effective_effort = input.reasoning_effort;
+	if (glm_model(provider.model)) {
+		normalize_glm_reasoning(provider.model, effective_thinking, effective_effort);
+		return;
+	}
 	if (input.reasoning_effort == "none") {
 		if (kimi_model_is(provider, "kimi-k2.7-code")) {
 			// K2.7 Code always thinks. Kimi rejects type=disabled and does not
@@ -955,7 +960,7 @@ bool provider_client_t::supports_reasoning_effort(
 	return (provider.protocol == "openai_responses" ||
 	           provider.protocol == "openai_chat" ||
 	           provider.protocol == "openai_compatible") &&
-	    (kimi_model_is(provider, "kimi-k3") ||
+	    (glm_effort_model(provider.model) || kimi_model_is(provider, "kimi-k3") ||
 	        kimi_model_is(provider, "deepseek-v4") ||
 	        qwen_responses_endpoint(provider));
 }

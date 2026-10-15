@@ -428,7 +428,13 @@ bool preflight_start_provider(
 	// DeepSeek V4 defaults to high-effort thinking when the request omits its
 	// vendor toggle. Preserve existing behavior by defaulting the browser option
 	// to enabled, while making an unchecked option an explicit disable request.
-	state.thinking_mode =
+	const bool glm = provider_is_glm(*state.provider);
+	if (glm) {
+		state.thinking_enabled = true;
+		state.thinking_adaptive = json_bool((*state.body)["thinking_adaptive"], true);
+	}
+	state.thinking_mode = glm ?
+	    (state.thinking_adaptive && !state.text_preview && !state.assistant_chat ? "adaptive" : "enabled") :
 	    provider_supports_thinking_disable(*state.provider) ?
 	    (state.thinking_adaptive && !state.text_preview && !state.assistant_chat ?
 	        "adaptive" : (state.thinking_adaptive || state.thinking_enabled ? "enabled" : "disabled")) :

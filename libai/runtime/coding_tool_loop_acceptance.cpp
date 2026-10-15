@@ -56,6 +56,18 @@ bool coding_tool_loop_t::prepare_task_contract()
 	runtime_task->task_acceptance_status = "pending_verification";
 	return true;
 }
+bool coding_tool_loop_t::current_full_validation_passed()
+{
+	if (!acceptance_review_requested || !last_validation_passed || acceptance_report.empty() ||
+	    acceptance_draft.empty() || acceptance_baseline.empty()) return false;
+	acl::json report(acceptance_report.c_str());
+	if (!report.finish() || !json_bool(report["validation_passed"], false) ||
+	    json_text(report["validation_scope"]) != "project") return false;
+	return acceptance_draft == libai::ai::agent_workspace_t::content_sha256(
+	        staged_change_fingerprint(changes)) &&
+	    acceptance_baseline == validation_baseline_fingerprint(workspace, project_path);
+}
+
 void coding_tool_loop_t::record_acceptance_evidence(const std::string &report)
 {
 	// Capture each trusted validator result, including auto-build, final and
@@ -72,6 +84,12 @@ void coding_tool_loop_t::record_acceptance_evidence(const std::string &report)
 		if (passed && scope != "build-only" && json_text(evidence["test_status"]) == "passed") {
 			pending_test_failure_report.clear();
 			repair_failures.clear();
+			unresolved_repair_contract.clear();
+			repair_contract_findings.clear();
+			repair_required_reads.clear();
+			repair_supplied_versions.clear();
+			pending_repair_edits.clear();
+			repair_changed_paths.clear();
 		}
 	}
 	acceptance_report = report;

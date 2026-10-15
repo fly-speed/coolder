@@ -9,6 +9,34 @@ namespace agent_detail
 namespace workspace_tool_detail
 {
 
+static std::string read_inspection_error(workspace_tool_context_t &context,
+    const std::string &error, const std::string &path, const std::string &relative)
+{
+	if (error != "workspace path is not a regular file")
+		return workspace_inspection_error(error, path, context.chinese);
+	std::vector<libai::ai::workspace_entry_t> entries;
+	std::string list_error;
+	if (!context.read_workspace.list(relative, entries, list_error))
+		return workspace_inspection_error(error, path, context.chinese);
+	acl::json json;
+	auto &root = json.create_node();
+	root.add_bool("ok", false).add_text("error", "requested path is a directory, not a file")
+	    .add_text("path", path.c_str()).add_text("path_state", "directory")
+	    .add_text("suggested_tool", "workspace.list")
+	    .add_text("next_action", "Reuse these directory entries; use workspace.list for the remaining listing. Read only regular file paths.");
+	auto &items = json.create_array(); root.add_child("entries", items);
+	size_t bytes = 0, count = 0;
+	for (const auto &entry : entries) {
+		const auto display = workspace_read_path_to_project(context.project_path, context.live_source_view, entry.path);
+		if (count >= 8 || bytes + display.size() + 64 > 1024) break;
+		auto &item = items.add_child(false, true);
+		item.add_text("path", display.c_str()).add_bool("directory", entry.directory);
+		bytes += display.size() + 64; ++count;
+	}
+	root.add_bool("entries_complete", count == entries.size());
+	return serialize_json(root);
+}
+
 static void overlay_workspace_entries(workspace_tool_context_t &context,
     size_t i, const std::string &prefix,
     std::vector<libai::ai::workspace_entry_t> &entries)
@@ -152,12 +180,29 @@ std::string execute_workspace_read_batch(workspace_tool_context_t &context)
 		return tool_error_json("read_batch requires at least one path");
 	auto &files = context.json.create_array();
 	context.root.add_child("files", files);
+	auto &errors = context.json.create_array();
+	context.root.add_child("errors", errors);
 	acl::json continuation_json;
 	auto &continuation = continuation_json.create_array();
 	auto &omitted = context.json.create_array();
 	context.root.add_child("omitted_paths", omitted);
-	size_t total = 0, returned = 0;
+	size_t total = 0, returned = 0, failed = 0;
 	for (const auto &request : requests) {
+		const auto record_error = [&](const std::string &wire) {
+			acl::json parsed(wire.c_str()); parsed.finish();
+			auto &item = errors.add_child(false, true);
+			item.add_text("path", request.first.c_str());
+			item.add_text("error", libai::ai::utf8_prefix(json_text(parsed["error"]), 512).c_str());
+			item.add_text("path_state", json_text(parsed["path_state"]).c_str());
+			if (parsed["suggested_tool"]) item.add_text("suggested_tool", json_text(parsed["suggested_tool"]).c_str());
+			// Directory hints are bounded independently; successful pages survive.
+			if (parsed["entries"] && failed == 0) {
+				item.add_text("directory_entries_json", serialize_json(*parsed["entries"]).c_str());
+				item.add_bool("directory_entries_complete", json_bool(parsed["entries_complete"], false));
+				item.add_text("next_action", json_text(parsed["next_action"]).c_str());
+			}
+			++failed; context.err.clear();
+		};
 		const auto queue = [&](const std::string &query) {
 			auto &next = continuation.add_child(false, true);
 			next.add_text("path", request.first.c_str());
@@ -180,20 +225,17 @@ std::string execute_workspace_read_batch(workspace_tool_context_t &context)
 			relative = request.first;
 		if (!context.read_workspace.read(
 		        relative, content, truncated, context.err))
-			return workspace_inspection_error(
-			    context.err, request.first, context.chinese);
-		if (truncated)
-			return tool_error_json(
-			    "text file exceeds configured read file limit: " +
-			    request.first);
+		{ record_error(read_inspection_error(context, context.err, request.first, relative)); continue; }
+		if (truncated) {
+			record_error(tool_error_json("text file exceeds configured read file limit: " + request.first)); continue;
+		}
 		libai::ai::text_read_page_t page;
 		if (!libai::ai::read_text_page(content, request.second, page,
 		        context.err,
 		        std::min(context.read_chunk_bytes,
 		            context.read_batch_bytes - total),
 		        context.read_file_limit_bytes))
-			return workspace_inspection_error(
-			    context.err, request.first, context.chinese);
+		{ record_error(workspace_inspection_error(context.err, request.first, context.chinese)); continue; }
 		auto &file = files.add_child(false, true);
 		file.add_text("path", request.first.c_str());
 		file.add_text("file_sha256",
@@ -225,10 +267,20 @@ std::string execute_workspace_read_batch(workspace_tool_context_t &context)
 	}
 	context.root.add_number("requested_files", requests.size());
 	context.root.add_number("returned_files", returned);
+	context.root.add_number("failed_files", failed);
+	context.root.add_bool("partial", failed > 0 && returned > 0);
 	context.root.add_text(
 	    "next_content", serialize_json(continuation).c_str());
 	context.root.add_text("read_hint",
 	    "If next_content is not [], pass it unchanged as workspace.read_batch content to read remaining pages and omitted files together.");
+	if (failed && !returned) {
+		context.root.free_child(context.root["ok"]);
+		context.root.add_bool("ok", false).add_bool("truncated", context.trace.truncated);
+		context.root.add_text("error", "No requested files could be read; inspect the per-path errors.");
+		const auto result = finish_workspace_tool_result(context);
+		context.trace.ok = false;
+		return result;
+	}
 	return finish_workspace_tool_result(context);
 }
 
@@ -238,8 +290,7 @@ std::string execute_workspace_read(workspace_tool_context_t &context)
 	bool truncated = false;
 	if (!context.read_workspace.read(
 	        context.draft_path, content, truncated, context.err)) {
-		return workspace_inspection_error(
-		    context.err, context.path, context.chinese);
+		return read_inspection_error(context, context.err, context.path, context.draft_path);
 	}
 	if (truncated)
 		return tool_error_json(

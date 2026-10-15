@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ai_agent_tools_internal.h"
+#include "../context/compile_failure_cache.h"
 
 namespace action
 {
@@ -28,6 +29,7 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 		}
 		cached.get_root().add_bool("validation_reused", true)
 		    .add_bool("executed_this_call", false)
+		    .add_number("commands_executed_this_call", 0)
 		    .add_text("reused_for_tool_execution_key", context.tool_execution_key.c_str());
 		return serialize_json(cached.get_root());
 	}
@@ -40,7 +42,10 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 	    "";
 	const std::string fingerprint =
 	    baseline + "\n" + staged_change_fingerprint(validation_changes);
+	const auto task = find_runtime_task(context.user_root, context.run_id);
+	const std::string execution_revision = task ? task->coding_execution_revision : "";
 	if (context.validation_cache && !baseline.empty() &&
+	    context.validation_cache->execution_revision == execution_revision &&
 	    !context.validation_cache->report.empty() &&
 	    context.validation_cache->fingerprint == fingerprint &&
 	    !context.validation_cache->draft_fingerprint.empty() &&
@@ -55,8 +60,11 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 		acl::json cached(context.validation_cache->report.c_str());
 		cached.get_root().add_bool("validation_reused", true);
 		cached.get_root().add_bool("executed_this_call", false);
+		cached.get_root().add_number("commands_executed_this_call", 0);
 		cached.get_root().add_text("reused_for_tool_execution_key", context.tool_execution_key.c_str());
 		cached.get_root().add_text("reuse_note",
+		    libai::ai::deterministic_compile_failure(context.validation_cache->report) ?
+		        "This exact revision already failed compilation. No commands ran in this call; fix the cached diagnostics before full validation. This is not full-project test evidence." :
 		    prompt_text(json_bool(cached["validation_passed"], false) ?
 		            prompt_id::validation_success_reused :
 		            prompt_id::validation_next_step,
@@ -81,6 +89,7 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 	context.validation_cache->draft_fingerprint =
 	    validation_baseline_fingerprint(context.draft_workspace, "");
 	context.validation_cache->report = report;
+	context.validation_cache->execution_revision = execution_revision;
 
 	return report;
 }

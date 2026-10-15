@@ -360,12 +360,15 @@ with tempfile.TemporaryDirectory(prefix='coolder-test-') as temp:
         )
 
         def wait_run(run_id):
-            for _ in range(160):
+            # Real host runs include sandboxed builds and tests. Keep a bounded
+            # observation window without assuming they finish within 16 seconds.
+            deadline = time.monotonic() + 90
+            while time.monotonic() < deadline:
                 result, _ = call('/api/v1/ai/runs/status?id=' + run_id)
                 if result['status'] != 'running':
                     return result
                 time.sleep(0.1)
-            raise AssertionError('run timed out')
+            raise AssertionError(f'run {run_id} timed out after 90 seconds; last status: {result}')
 
         result = wait_run(started['run_id'])
         assert result['status'] == 'completed', result

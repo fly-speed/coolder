@@ -18,7 +18,7 @@ bool coding_tool_loop_t::prepare_execution_revision()
     acl::json context,input,policy;auto &root=context.create_node();
     auto &arguments=input.create_node();auto &settings=policy.create_node();
     if(!libai::ai::coding_detail::runtime("runtime.policy.get",arguments,settings,err))return false;
-    root.add_text("implementation","libai-coding-execution-v13-library-branding")
+    root.add_text("implementation","libai-coding-execution-v16-batch-recovery")
         .add_text("policy_json",serialize_json(settings).c_str())
         .add_text("provider_protocol",provider.protocol.c_str()).add_text("provider_url",provider.base_url.c_str())
         .add_text("provider_model",provider.model.c_str()).add_bool("allow_file_content",provider.allow_file_content)
@@ -480,6 +480,8 @@ void coding_tool_loop_t::discover_validation_capabilities()
 		if (discovered) {
 			capability.add_bool("node_acceptance_policy_enabled",
 			    available.functional_acceptance_enabled);
+			capability.add_bool("browser_acceptance_policy_enabled",
+			    available.browser_acceptance_enabled);
 			acl::json_node &commands =
 			    capability_json.create_array();
 			capability.add_child("commands", commands);

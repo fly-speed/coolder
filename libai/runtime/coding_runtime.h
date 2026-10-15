@@ -319,6 +319,8 @@ struct unavailable_validation_t {
 };
 // Cached validation report bound to its staged content fingerprint.
 struct validation_cache_t {
+	// Runtime policy/tool/limit identity; an environment change invalidates reuse.
+	std::string execution_revision;
 	// Fingerprint identifying the current staged source tree.
 	std::string draft_fingerprint;
 	// Fingerprint used to identify a particular content version.
@@ -557,6 +559,8 @@ const libai::ai::provider_config_t *select_provider(
     const std::string &requested);
 
 // Recognize the DeepSeek provider configuration.
+bool provider_is_glm(const libai::ai::provider_config_t &provider);
+
 bool provider_is_deepseek(const libai::ai::provider_config_t &provider);
 
 // Check whether the model permits disabling its thinking mode.

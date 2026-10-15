@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ai_agent_tools_internal.h"
+#include "../storage/agent_request_store.h"
 
 namespace action
 {
@@ -61,6 +62,61 @@ static bool withdraw_created_proposal(
 	return withdraw;
 }
 
+// A rejection must identify the actual conflicting records. Retain the exact
+// payload; the model chooses which record to keep, never an implicit last-wins.
+static std::string duplicate_proposal_batch(workspace_tool_context_t &context,
+    const std::string &payload,
+    const std::map<std::string, std::vector<size_t>> &occurrences,
+    const std::vector<acl::json_node *> &records)
+{
+    acl::json json; auto &root = json.create_node();
+    root.add_bool("ok", false).add_text("error_code", "proposal_batch_duplicate_paths")
+        .add_text("error", "propose_batch contains duplicate paths; no changes staged")
+        .add_bool("formal_source_changed", false).add_number("staged_files", 0)
+        .add_number("index_base", 0).add_number("total_items", records.size());
+    auto &conflicts = json.create_array(); root.add_child("duplicate_paths", conflicts);
+    size_t total = 0, emitted = 0, bytes = 0;
+    for (const auto &entry : occurrences) {
+        if (entry.second.size() < 2) continue;
+        ++total;
+        acl::json one; auto &group = one.create_node();
+        group.add_text("path", entry.first.c_str());
+        auto &items = one.create_array(); group.add_child("items", items);
+        for (size_t index : entry.second) {
+            auto *record = records[index];
+            const auto content = json_text((*record)["content"]);
+            auto &item = items.add_child(false, true);
+            item.add_number("index", index)
+                .add_text("operation", json_text((*record)["operation"]).empty() ? "write" : json_text((*record)["operation"]).c_str())
+                .add_number("content_bytes", content.size())
+                .add_text("content_sha256", libai::ai::agent_workspace_t::content_sha256(content).c_str());
+        }
+        const auto wire = serialize_json(group);
+        if (bytes + wire.size() > 8 * 1024) continue;
+        conflicts.add_child(json.duplicate_node(group)); bytes += wire.size(); ++emitted;
+    }
+    root.add_number("duplicate_path_count", total)
+        .add_bool("duplicate_paths_complete", emitted == total);
+    if (context.saved_proposal_batch && payload.size() <= libai::ai::kMaxSavedProposalBytes) {
+        *context.saved_proposal_batch = payload;
+        root.add_text("saved_batch", libai::ai::agent_workspace_t::content_sha256(payload).c_str());
+        // Audit survives transcript compaction; replay remains scoped to this
+        // running task, matching the existing capacity-recovery reference.
+        acl::json archive; auto &record = archive.create_node();
+        record.add_text("kind", "rejected_duplicate_proposal_batch")
+            .add_text("run_id", context.run_id.c_str()).add_text("content", payload.c_str())
+            .add_text("content_sha256", libai::ai::agent_workspace_t::content_sha256(payload).c_str())
+            .add_bool("executed", false);
+        libai::ai::agent_request_store_t store(context.user_root, context.project_path, context.run_id);
+        std::string path, error;
+        if (store.append_response(serialize_json(record), path, error)) root.add_text("response_archive", path.c_str());
+        else root.add_text("archive_error", error.c_str());
+        root.add_text("next_action", "The batch was rejected atomically; its files/directories were not created. Do not list missing directories or regenerate the whole batch. Choose the intended record for each duplicate. Inspect exact saved content with {saved_batch,inspect_index,query:\"0\"}; inspect_index is zero-based and query is a byte offset. Replay with {saved_batch,offset:0,limit:TOTAL,exclude_indices:[indices to discard]}. Keep one intended record per path; never discard conflicting content arbitrarily. TOTAL must respect max_items; use offset/limit slices for larger payloads. References last only for this running task.");
+        root.add_number("max_items", libai::ai::kMaxProposalBatchItems);
+    } else root.add_text("next_action", "No changes staged. Correct the reported duplicate paths and resubmit; do not rediscover directories or assume rejected files exist.");
+    return serialize_json(root);
+}
+
 std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 {
 	if (context.staged_changes == NULL) {
@@ -68,9 +124,11 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 		    "incremental review storage is unavailable");
 	}
 	std::string payload = context.request.content;
-	long long offset = 0, limit = -1;
+	long long offset = 0, limit = -1, inspect_index = -1;
+	std::set<size_t> excluded;
+	bool inspect = false;
 	acl::json reference(payload.c_str());
-	if (reference.finish() &&
+	if (reference.finish() && reference.get_root().is_object() &&
 	    !json_text(reference["saved_batch"]).empty()) {
 		if (!context.saved_proposal_batch ||
 		    context.saved_proposal_batch->empty() ||
@@ -79,15 +137,28 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 		            *context.saved_proposal_batch))
 			return tool_error_json(
 			    "saved_batch is unavailable in this running task");
-		offset = json_number(reference["offset"], -1);
-		limit = json_number(reference["limit"], -1);
-		if (offset < 0 || limit < 1 ||
-		    static_cast<size_t>(limit) >
-		        libai::ai::kMaxProposalBatchItems)
-			return tool_error_json(
-			    "saved_batch requires offset >= 0 and limit in 1-" +
-			    std::to_string(
-			        libai::ai::kMaxProposalBatchItems));
+		inspect = reference["inspect_index"] != NULL;
+		if (inspect) {
+			inspect_index = json_number(reference["inspect_index"], -1);
+			if (inspect_index < 0 || reference["exclude_indices"] || reference["offset"] || reference["limit"])
+				return tool_error_json("saved_batch inspection requires one nonnegative inspect_index and optional query only");
+			if (reference["query"] && !reference["query"]->is_string())
+				return tool_error_json("saved_batch inspection query must be a decimal byte-offset string");
+		} else {
+			offset = json_number(reference["offset"], -1);
+			limit = json_number(reference["limit"], -1);
+			if (offset < 0 || limit < 1 || static_cast<size_t>(limit) > libai::ai::kMaxProposalBatchItems)
+				return tool_error_json("saved_batch requires offset >= 0 and limit in 1-" + std::to_string(libai::ai::kMaxProposalBatchItems));
+			if (reference["exclude_indices"]) {
+				auto *array = json_array_node(reference["exclude_indices"]);
+				if (!array) return tool_error_json("exclude_indices must be an array of unique zero-based indices");
+				for (auto *item=array->first_child();item;item=array->next_child()) {
+					const auto index=json_number(item,-1);
+					if (index<0 || !excluded.insert(static_cast<size_t>(index)).second || excluded.size()>libai::ai::kMaxProposalBatchItems)
+						return tool_error_json("exclude_indices must contain unique nonnegative integer indices within batch capacity");
+				}
+			}
+		}
 		payload = *context.saved_proposal_batch;
 	}
 	acl::json batch_json(payload.c_str());
@@ -97,11 +168,39 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 	if (items == NULL)
 		return tool_error_json(
 		    "propose_batch content must be a JSON array or saved_batch reference");
+	std::vector<acl::json_node *> records;
+	for (auto *item=items->first_child();item;item=items->next_child())
+		records.push_back(item->is_object()?item:item->get_obj());
+	if (!excluded.empty() && *excluded.rbegin() >= records.size())
+		return tool_error_json("exclude_indices index is outside the saved batch");
+	if (inspect) {
+		if (static_cast<size_t>(inspect_index)>=records.size() || !records[inspect_index])
+			return tool_error_json("inspect_index is outside the saved batch or not a file object");
+		auto &item=*records[inspect_index]; std::string path;
+		if (!resolve_project_tool_path(json_text(item["path"]), context.project_path, false, path, context.err))
+			return tool_error_json(context.err);
+		const auto content=json_text(item["content"]);
+		libai::ai::text_read_page_t page;
+		if (!libai::ai::read_text_page(content,json_text(reference["query"]),page,context.err,
+		        std::min<size_t>(context.read_chunk_bytes,4096),libai::ai::kMaxProposalFileBytes))
+			return tool_error_json(context.err);
+		context.root.add_bool("inspection_only",true).add_text("source_view","rejected_proposal_record").add_bool("formal_source_changed",false)
+		    .add_bool("staged",false).add_number("inspect_index",inspect_index)
+		    .add_text("saved_batch",json_text(reference["saved_batch"]).c_str())
+		    .add_text("path",path.c_str()).add_text("file_sha256",libai::ai::agent_workspace_t::content_sha256(content).c_str())
+		    .add_text("content",page.content.c_str()).add_number("offset",page.offset)
+		    .add_number("next_offset",page.next_offset).add_number("total_bytes",page.total_bytes).add_bool("eof",page.eof);
+		if (!page.eof) context.root.add_text("next_query",std::to_string(page.next_offset).c_str());
+		return finish_workspace_tool_result(context);
+	}
+	const auto selected_index = [&](size_t index) {
+		return index>=static_cast<size_t>(offset) &&
+		    (limit<0 || index-static_cast<size_t>(offset)<static_cast<size_t>(limit)) && !excluded.count(index);
+	};
 	size_t total = 0, selected = 0, selected_bytes = 0;
 	for (acl::json_node *item = items->first_child(); item;
 	     item = items->next_child(), ++total) {
-		if (total < static_cast<size_t>(offset) ||
-		    (limit >= 0 && selected >= static_cast<size_t>(limit)))
+		if (!selected_index(total))
 			continue;
 		++selected;
 		acl::json_node *object =
@@ -140,6 +239,16 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 
 		return serialize_json(out);
 	}
+	std::map<std::string,std::vector<size_t>> occurrences;
+	for (size_t i=0;i<records.size();++i) {
+		if (!selected_index(i)) continue;
+		std::string path;
+		if (!records[i] || !resolve_project_tool_path(json_text((*records[i])["path"]),
+		        context.project_path,false,path,context.err)) return tool_error_json(context.err.empty()?"propose_batch item must be an object":context.err);
+		occurrences[path].push_back(i);
+	}
+	for (const auto &entry:occurrences)
+		if (entry.second.size()>1) return duplicate_proposal_batch(context,payload,occurrences,records);
 	std::vector<agent_change_proposal_t> candidate =
 	    *context.staged_changes;
 	std::vector<std::string> unchanged_paths;
@@ -151,10 +260,7 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 	size_t index = 0;
 	for (acl::json_node *item = items->first_child(); item != NULL;
 	     item = items->next_child(), ++index) {
-		if (index < static_cast<size_t>(offset))
-			continue;
-		if (limit >= 0 && count >= static_cast<size_t>(limit))
-			break;
+		if (!selected_index(index)) continue;
 		++count;
 		acl::json_node *object =
 		    item->is_object() ? item : item->get_obj();

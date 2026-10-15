@@ -1,6 +1,7 @@
 #include "stdafx.h"
 // Next-turn feedback, progress limits, compaction and budget completion.
 #include "coding_tool_loop_internal.h"
+#include "../context/source_request_compactor.h"
 
 namespace action
 {
@@ -302,6 +303,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 	pending_request.user_prompt =
 	    validation_capabilities + provider_history_base;
 	pending_request.tool_history = provider_tool_history;
+	libai::ai::source_request_compactor_t(project_path).compact(pending_request);
 	std::string pending_payload;
 	const bool measure_native = stateless_responses &&
 	    !provider_tool_history.empty() &&
@@ -333,6 +335,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 			pending_request.tool_history.clear();
 			pending_request.user_prompt =
 			    validation_capabilities + compacted;
+			libai::ai::source_request_compactor_t(project_path).compact(pending_request);
 			std::string compacted_payload;
 			if (libai::ai::provider_client_t::
 			        serialize_completion_request(provider,

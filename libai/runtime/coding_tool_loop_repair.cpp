@@ -2,11 +2,26 @@
 // Repair convergence, durable proposals and validated completion.
 #include "coding_tool_loop_internal.h"
 #include "../context/coding_test_changes.h"
+#include "../context/compile_failure_cache.h"
 
 namespace action
 {
 namespace agent_detail
 {
+
+bool coding_tool_loop_t::current_cached_compile_failure()
+{
+	if (!libai::ai::deterministic_compile_failure(validation_cache.report) ||
+	    validation_cache.execution_revision != runtime_task->coding_execution_revision ||
+	    validation_cache.fingerprint != validation_baseline_fingerprint(workspace, project_path) +
+	        "\n" + staged_change_fingerprint(changes)) return false;
+	libai::ai::agent_workspace_t draft(persistent_draft_root(runtime_task->user_root, project_path, runtime_task->id));
+	if (validation_cache.draft_fingerprint.empty() ||
+	    validation_cache.draft_fingerprint != validation_baseline_fingerprint(draft, "")) return false;
+	std::string receipt_error;
+	return validate_cached_command_receipts(runtime_task->user_root, project_path,
+	    validation_cache.report, receipt_error);
+}
 
 void coding_tool_loop_t::track_repair_edits(coding_turn_t &turn)
 {
@@ -63,19 +78,26 @@ void coding_tool_loop_t::build_repair_focus(coding_turn_t &turn)
 		focus.add_text("failed_command", failed.c_str());
 		acl::json_node *cmds =
 		    json_array_node(failure_report["commands"]);
+		auto &reported = focus_json.create_array();
+		focus.add_child("failed_commands", reported);
 		for (acl::json_node *item = cmds ? cmds->first_child() : NULL;
 		     item; item = cmds->next_child()) {
 			acl::json_node *command =
 			    item->is_object() ? item : item->get_obj();
-			if (!(command &&
-			        json_text((*command)["command_id"]) == failed))
+			if (!(command && (json_text((*command)["command_id"]) == failed ||
+			        (!json_bool((*command)["passed"], true) &&
+			            libai::ai::compile_command(json_text((*command)["command_id"]))))))
 				continue;
-			focus.add_text("observed_failure_excerpt",
-			    libai::ai::failure_examples(
-			        json_text((*command)["diagnostic"]))
-			        .c_str());
+			auto &record = reported.add_child(false, true);
+			record.add_text("command_id", json_text((*command)["command_id"]).c_str());
+			record.add_text("working_directory", json_text((*command)["working_directory"]).c_str());
+			if ((*command)["arguments"]) record.add_text("arguments_json", serialize_json(*(*command)["arguments"]).c_str());
+			record.add_text("observed_failure_excerpt", libai::ai::failure_examples(json_text((*command)["diagnostic"])).c_str());
+			if (auto *diagnostics=json_array_node((*command)["diagnostics"]))
+				record.add_child("diagnostics",focus_json.duplicate_node(*diagnostics));
 		}
 	}
+	focus.add_text("repair_scope","Repair the reported errors together with their required imports, definitions and callers in one related edit. These are observed diagnostics, not proof that later compilation has no additional errors.");
 	acl::json_node &edits = focus_json.create_array();
 	focus.add_child("last_edits", edits);
 	auto add_failures = [&](const char *name,
@@ -164,9 +186,9 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 		     item; item = commands->next_child()) {
 			acl::json_node *command =
 			    item->is_object() ? item : item->get_obj();
-			if (!(command &&
-			        json_text((*command)["command_id"]) ==
-			            json_text(report["failed_command_id"])))
+			if (!(command && (json_text((*command)["command_id"]) == json_text(report["failed_command_id"]) ||
+			        (!json_bool((*command)["passed"], true) &&
+			            libai::ai::compile_command(json_text((*command)["command_id"]))))))
 				continue;
 			diagnostic += json_text((*command)["diagnostic"]);
 			auto *diagnostics = json_array_node((*command)["diagnostics"]);
@@ -456,6 +478,48 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	const bool test_only = !repair_probe && !verified_batch && turn.trace.ok && turn.staged_progress &&
 	    !libai::ai::focused_compile_repair(original_prompt) &&
 	    libai::ai::coding_only_test_changes(turn.changes_before_tool, changes);
+	std::string implementation_feedback;
+	if (turn.trace.ok && turn.staged_progress && !changes.empty()) {
+		acl::json checkpoint_json; auto &checkpoint = checkpoint_json.create_node();
+		checkpoint.add_text("event", "implementation_checkpoint_submitted");
+		auto &paths = checkpoint_json.create_array(); checkpoint.add_child("changed_paths", paths);
+		size_t bytes = 0, files = 0, tests = 0;
+		for (const auto &change : changes) {
+			if (change.review_status == "rejected") continue;
+			const auto before = std::find_if(turn.changes_before_tool.begin(), turn.changes_before_tool.end(),
+			    [&](const agent_change_proposal_t &old) { return old.path == change.path && old.operation == change.operation && old.content == change.content && old.target_path == change.target_path; });
+			if (before != turn.changes_before_tool.end()) continue;
+			if (change.operation == "write") bytes += change.content.size();
+			++files;
+			if (libai::ai::coding_test_source(change.path)) ++tests;
+			if (files <= 64) paths.add_array_text(change.path.c_str());
+		}
+		checkpoint.add_number("changed_files", files).add_number("changed_source_bytes", bytes)
+		    .add_number("changed_test_files", tests).add_bool("path_list_complete", files <= 64);
+		append_runtime_operation_event(runtime_task, checkpoint);
+		size_t staged_tests=0, changed_sources=0;
+		for (const auto &change:changes) {
+			if (change.review_status=="rejected" || change.operation!="write")continue;
+			if (libai::ai::coding_test_source(change.path)) {++staged_tests;continue;}
+			const auto dot=change.path.find_last_of('.');
+			const auto extension=dot==std::string::npos?"":change.path.substr(dot);
+			const std::set<std::string> source_extensions={".go",".cpp",".cc",".c",".h",".hpp",".rs",".java",".py",".js",".ts",".html",".css",".cjs",".mjs"};
+			if (!source_extensions.count(extension))continue;
+			const auto old=std::find_if(turn.changes_before_tool.begin(),turn.changes_before_tool.end(),[&](const agent_change_proposal_t &before) {
+				return before.path==change.path && before.operation==change.operation && before.content==change.content;
+			});
+			if (old==turn.changes_before_tool.end())++changed_sources;
+		}
+		if (changed_sources && !verified_batch && !libai::ai::focused_compile_repair(original_prompt) &&
+		    !libai::ai::read_only_analysis_task(original_prompt) && !libai::ai::verification_only_task(original_prompt)) {
+			acl::json evidence;auto &record=evidence.create_node();
+			record.add_number("changed_source_files",changed_sources).add_number("changed_test_files",tests)
+			    .add_number("staged_test_files",staged_tests);
+			implementation_feedback="\n<implementation_evidence>"+serialize_json(record)+"</implementation_evidence>\n";
+			if (!staged_tests)implementation_feedback+="No separate test files changed. Build-only is not test evidence. Use relevant existing or inline tests, or include required behavior tests with related implementation before final validation.\n";
+		}
+
+	}
 	if (test_only) {
 		acl::json deferred;
 		auto &event = deferred.create_node();
@@ -483,6 +547,16 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		    runtime_task->user_root, project_path, runtime_task->id,
 		    changes, sandbox_limits, validation_trace, NULL, !focused,
 		    turn.effect_key, repair_probe ? pending_test_failure_report : "");
+		if (validation_trace.ok && libai::ai::deterministic_compile_failure(completion_validation)) {
+			acl::json failure(completion_validation.c_str());
+			failure.finish();
+			validation_cache.fingerprint = json_text(failure["source_baseline_sha256"]) + "\n" +
+			    staged_change_fingerprint(changes);
+			libai::ai::agent_workspace_t draft(persistent_draft_root(runtime_task->user_root, project_path, runtime_task->id));
+			validation_cache.draft_fingerprint = validation_baseline_fingerprint(draft, "");
+			validation_cache.execution_revision = runtime_task->coding_execution_revision;
+			validation_cache.report = completion_validation;
+		}
 		traces.push_back(validation_trace);
 		complete_runtime_tool(
 		    runtime_task, validation_trace, executed_tool_calls);
@@ -519,6 +593,10 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		next_tool_guidance += build_feedback;
 		// Keep evidence in the durable tool transcript as well as the next request.
 		turn.automatic_build_feedback = build_feedback;
+	}
+	if (!implementation_feedback.empty()) {
+		next_tool_guidance+=implementation_feedback;
+		turn.automatic_build_feedback+=implementation_feedback;
 	}
 	const bool compile_completed =
 	    libai::ai::focused_compile_repair(original_prompt) &&
