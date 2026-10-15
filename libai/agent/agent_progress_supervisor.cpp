@@ -127,10 +127,10 @@ void agent_progress_supervisor_t::observe_investigation(
 }
 
 bool agent_progress_supervisor_t::investigation_checkpoint_due(
-    size_t run_budget) const
+    size_t run_budget, bool repairing) const
 {
 	return investigation_calls_ >=
-	    std::max<size_t>(1, std::min<size_t>(24, run_budget / 2));
+	    std::max<size_t>(1, std::min<size_t>(repairing ? 6 : 12, run_budget / 2));
 }
 
 size_t agent_progress_supervisor_t::investigation_calls() const

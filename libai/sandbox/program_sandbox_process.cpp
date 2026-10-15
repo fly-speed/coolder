@@ -231,6 +231,10 @@ static std::vector<std::string> posix_helper_arguments(
 	        (command->allow_loopback_network ? "loopback" : "none"));
 	values.push_back("--probe-port");
 	values.push_back(std::to_string(command->http_probe_port));
+    if (!command->acceptance_probe_node.empty()) {
+        values.push_back("--acceptance-node");
+        values.push_back(command->acceptance_probe_node);
+    }
 	values.push_back("--probe-path");
 	values.push_back(command->http_probe_path);
 #if defined(__APPLE__) || defined(__linux__)
@@ -320,8 +324,11 @@ bool execute_posix_sandbox(const sandbox_request_t &request,
 		    "prepare-temporary-directory", result.error);
 	}
 	environment_values.push_back("PATH=/usr/bin:/bin:/usr/sbin:/sbin");
-	environment_values.push_back("HOME=" + workdir);
+	environment_values.push_back("HOME=" + workdir + "/.libai-build/home");
 	environment_values.push_back("TMPDIR=" + temp_directory);
+    // Keep compiler cache metadata out of the source fingerprint. On macOS
+    // Go otherwise creates HOME/Library/Caches inside the draft source tree.
+    environment_values.push_back("GOCACHE=" + workdir + "/.libai-build/go-cache");
 	environment_values.push_back("LANG=C");
 	environment_values.push_back("GIT_TERMINAL_PROMPT=0");
 	environment_values.push_back("GIT_CONFIG_NOSYSTEM=1");

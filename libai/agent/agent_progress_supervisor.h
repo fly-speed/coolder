@@ -50,7 +50,7 @@ public:
 	void observe_investigation(size_t tool_calls, bool draft_changed);
 	// Report whether read-only investigation has reached its checkpoint
 	// budget.
-	bool investigation_checkpoint_due(size_t run_budget = 48) const;
+	bool investigation_checkpoint_due(size_t run_budget = 48, bool repairing = false) const;
 	// Return the number of investigation calls since the last checkpoint.
 	size_t investigation_calls() const;
 

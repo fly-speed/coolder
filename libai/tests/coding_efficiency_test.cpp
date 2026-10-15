@@ -81,6 +81,69 @@ struct coding_loop_test_access_t {
         assert(!deterministic_compile_failure(R"({"validation_passed":false,"commands":[{"command_id":"go.build","passed":false,"started":true,"timed_out":true,"diagnostics":[{"path":"x.go","line":2}]}]})"));
         assert(!deterministic_compile_failure(R"({"validation_passed":false,"commands":[{"command_id":"go.test","passed":false,"started":true,"diagnostics":[{"path":"x_test.go","line":2}]}]})"));
     }
+    static void repair_evidence_scope(const coding_loop_arguments_t &args) {
+        assert(args.changes.empty());
+        coding_tool_loop_t loop(args);
+        const auto draft=persistent_draft_root(args.runtime_task->user_root,args.project_path,args.runtime_task->id);
+        assert(file_ops::make_private_directory(draft+"/src"));
+        assert(file_ops::make_private_directory(draft+"/src/gate"));
+        for(const char *name:{"value.go","value_test.go","unrelated.go","other_test.go"}) {
+            const std::string path="src/gate/"+std::string(name),content="package gate\n// "+std::string(name)+"\n";
+            std::ofstream(draft+"/"+path)<<content;
+            agent_change_proposal_t c;c.path="fixture/"+path;c.operation="write";c.content=content;
+            args.changes.push_back(c);
+        }
+        coding_turn_t turn;
+        turn.tool_result=R"json({"failed_command_id":"go.test","commands":[{"command_id":"go.test","diagnostic":"--- FAIL: TestValue (0.00s)","diagnostics":[{"path":"src/gate/value_test.go","line":3}]}]})json";
+        loop.select_repair_sources(turn);
+        assert(loop.repair_required_reads.size()==2);
+        assert(loop.repair_required_reads.count("fixture/src/gate/value_test.go"));
+        assert(loop.repair_required_reads.count("fixture/src/gate/value.go"));
+        assert(!loop.repair_required_reads.count("fixture/src/gate/unrelated.go"));
+        loop.repair_required_reads.clear();
+        // Existing evidence larger than the supply budget must still count as
+        // reviewed, leaving the whole additional budget for missing sources.
+        acl::json records;auto &list=records.create_array();
+        for(const char *name:{"a.go","b.go","z.go"}) {
+            const std::string file="fixture/src/gate/"+std::string(name);
+            const std::string body="package gate\n// "+std::string(name==std::string("z.go")?32:20000,'x')+"\n";
+            std::ofstream(draft+"/src/gate/"+name)<<body;
+            const auto hash=agent_workspace_t::content_sha256(body);
+            loop.repair_required_reads[file]=hash;
+            if(name==std::string("z.go"))continue;
+            auto &r=list.add_child(false,true);r.add_text("path",file.c_str())
+                .add_text("file_sha256",hash.c_str()).add_number("offset",0).add_text("content",body.c_str());
+        }
+        turn.input.user_prompt="<read_working_set>"+std::string(list.to_string().c_str())+"</read_working_set>";
+        loop.supply_repair_review_sources(turn);
+        assert(loop.repair_required_reads.empty() && loop.repair_supplied_versions.size()==3);
+        assert(turn.addition.find("fixture/src/gate/z.go")!=std::string::npos);
+        assert(turn.addition.find("fixture/src/gate/a.go")==std::string::npos);
+        args.changes.clear();
+    }
+    static void no_mutation_claim(const coding_loop_arguments_t &args) {
+        assert(args.changes.empty());
+        agent_change_proposal_t retained;retained.path="fixture/src/retained.go";
+        retained.operation="write";retained.content="package main\n";
+        args.changes.push_back(retained); // Prior work must not count as this invocation's repair.
+        coding_tool_loop_t loop(args);
+        loop.task_contract=R"({"requests":[]})";
+        loop.acceptance_report=R"({"source_contract_review":{"status":"review_only","findings":[]}})";
+        loop.initial_proposal_identity=agent_workspace_t::content_sha256(staged_cycle_fingerprint(args.changes));
+        const auto old_text=args.final_output.text;
+        args.final_output.text="All requested changes were fixed.";
+        assert(loop.finish_task_acceptance(true));
+        assert(args.final_output.text.find("created or changed no file proposals")!=std::string::npos ||
+            args.final_output.text.find("本次执行未新增或修改文件提案")!=std::string::npos);
+        acl::json evidence(args.runtime_task->task_acceptance_json.c_str());assert(evidence.finish());
+        assert(args.runtime_task->task_acceptance_json.find("\"source_contract_review\":{")!=std::string::npos);
+        assert(args.runtime_task->task_acceptance_json.find("\"source_contract_review\":\"source_contract_review\"")==std::string::npos);
+        assert(json_number(evidence["mutation_batches_this_invocation"],-1)==0);
+        assert(json_number(evidence["retained_proposal_count"],-1)==1);
+        assert(!json_bool(evidence["proposals_changed_since_invocation_start"],true));
+        args.final_output.text=old_text;
+        args.changes.clear();
+    }
     static void proposal_recovery(const coding_loop_arguments_t &args) {
         assert(args.changes.empty());
         std::string saved;
@@ -93,6 +156,18 @@ struct coding_loop_test_access_t {
                 true,request,trace,&args.changes,args.runtime_task->id,args.sandbox_limits,false,
                 nullptr,nullptr,&saved,nullptr,"recovery.fixture."+std::to_string(++sequence));
         };
+        for (const char *content : {"round complete", "{\"summary\":\"done\"}"}) {
+            const auto raw=invoke(content);
+            acl::json parsed(raw.c_str());assert(parsed.finish());
+            assert(!trace.ok && args.changes.empty());
+            assert(json_text(parsed["code"])=="proposal_batch_unparsed");
+        }
+        for (const char *content : {"{\"saved_batch\":\"missing\",\"offset\":0,\"limit\":1}",
+                "{\"saved_batch\":\"\"}", "{\"saved_batch\":7}"}) {
+            const auto missing=invoke(content);
+            acl::json missing_json(missing.c_str());assert(missing_json.finish());
+            assert(!trace.ok && json_text(missing_json["code"])!="proposal_batch_unparsed");
+        }
         const std::string payload=R"([{"path":"src/recovery.go","content":"package main\nvar Recovery = 6\n"},{"path":"src/helper.go","content":"package main\nvar Helper = 2\n"},{"path":"fixture/src/recovery.go","content":"package main\nvar Recovery = 7\n"}])";
         const auto rejected=invoke(payload);
         acl::json failure(rejected.c_str());assert(failure.finish());
@@ -183,7 +258,7 @@ struct coding_loop_test_access_t {
         loop.staged_discovery_rounds = 0;
         loop.acceptance_review_requested = true;
         loop.last_validation_passed = true;
-        loop.acceptance_report = R"({"validation_passed":true,"validation_scope":"project","test_status":"passed","browser_acceptance":"disabled","functional_acceptance":"not-verified"})";
+        loop.acceptance_report = R"({"validation_passed":true,"validation_scope":"project","test_status":"passed","browser_acceptance":"disabled","functional_acceptance":"not-verified","source_contract_review":{"status":"review_only","findings":[]}})";
         loop.acceptance_draft = agent_workspace_t::content_sha256(staged_change_fingerprint(args.changes));
         loop.acceptance_baseline = validation_baseline_fingerprint(args.workspace,args.project_path);
         coding_turn_t final;
@@ -191,6 +266,8 @@ struct coding_loop_test_access_t {
         assert(!has(final,"workspace.validate") && has(final,"workspace.patch_set"));
         assert(final.input.turn_instructions.find("final_evidence_review") != std::string::npos);
         assert(final.input.turn_instructions.find("disabled") != std::string::npos);
+        assert(final.input.turn_instructions.find("\"source_contract_review\":{")!=std::string::npos);
+        assert(final.input.turn_instructions.find("\"source_contract_review\":\"source_contract_review\"")==std::string::npos);
         args.changes.back().content += "// changed\n";
         coding_turn_t edited;
         loop.select_request_tools(edited);
@@ -218,6 +295,39 @@ struct coding_loop_test_access_t {
         assert(loop.pending_test_failure_report == failed && loop.acceptance_report == failed);
         loop.record_acceptance_evidence(R"({"validation_scope":"targeted-tests","validation_passed":true,"test_status":"passed"})");
         assert(loop.pending_test_failure_report == failed && loop.acceptance_report == failed);
+        const std::string two_packages = R"({"validation_scope":"project","validation_passed":false,"failed_command_id":"go.test","test_status":"failed","commands":[{"command_id":"go.test","diagnostics":[{"path":"src/core/value_test.go"},{"path":"src/adapters/server_test.go"}]}]})";
+        const std::string partial = R"({"validation_scope":"targeted-tests","validation_passed":false,"failed_command_id":"go.test","test_status":"failed","commands":[{"command_id":"go.test","diagnostics":[{"path":"src/core/value_test.go"}]}]})";
+        loop.record_acceptance_evidence(failed);
+        loop.unresolved_repair_contract="stale failure";
+        loop.record_acceptance_evidence(R"({"validation_scope":"targeted-tests","validation_passed":true,"test_status":"passed","targeted_packages":["./src/core"]})");
+        assert(loop.pending_test_failure_report.empty() && loop.unresolved_repair_contract.empty());
+        assert(loop.repair_full_validation_pending);
+        coding_turn_t ready;loop.build_request_instructions(ready);
+        assert((ready.input.system_prompt+ready.input.turn_instructions).find("focused_tests_passed")!=std::string::npos);
+        assert((ready.input.system_prompt+ready.input.turn_instructions).find("\"resolved\":false")==std::string::npos);
+        loop.record_acceptance_evidence(two_packages);
+        loop.record_acceptance_evidence(R"({"validation_scope":"targeted-tests","validation_passed":true,"test_status":"passed","targeted_packages":["./src/core"]})");
+        assert(loop.pending_test_failure_report==two_packages); // Adapters still unresolved.
+        loop.record_acceptance_evidence(partial);
+        assert(loop.pending_test_failure_report == two_packages);
+        assert(focused_go_test_packages(loop.pending_test_failure_report).size() == 2);
+        loop.record_acceptance_evidence(R"({"validation_scope":"targeted-tests","validation_passed":true,"test_status":"passed"})");
+        assert(loop.pending_test_failure_report == two_packages);
+        for (const auto &extra : {std::string(",\"diagnostic\":\"panic: test timed out after 15s\""),
+                 std::string(",\"diagnostic_truncated\":true"), std::string(",\"timed_out\":true"),
+                 std::string(",\"diagnostic\":\"FAIL\\texample.com/app/src/unmapped\\n\""),
+                 std::string(",\"diagnostic\":\"fatal error: concurrent map writes\"")}) {
+            const auto mixed = std::string(R"({"failed_command_id":"go.test","commands":[{"command_id":"go.test","diagnostics":[{"path":"src/core/value_test.go"}])") + extra + "}]}";
+            assert(focused_go_test_packages(mixed).empty());
+            acl::json targeted(mixed.c_str()); assert(targeted.finish());
+            targeted.get_root().add_text("validation_scope", "targeted-tests");
+            targeted.get_root().add_text("test_status", "failed");
+            targeted.get_root().add_bool("validation_passed", false);
+            loop.record_acceptance_evidence(serialize_json(targeted.get_root()));
+            assert(focused_go_test_packages(loop.pending_test_failure_report).empty());
+            loop.record_acceptance_evidence(two_packages);
+        }
+        loop.record_acceptance_evidence(failed);
         assert(loop.last_validated_fingerprint.empty());
         coding_turn_t request;
         loop.build_request_options(request);
@@ -232,6 +342,10 @@ struct coding_loop_test_access_t {
         coding_turn_t second; second.staged_fingerprint_after = "second";
         loop.review_validation_failure(second, failed);
         assert(second.repair_focus.find("repair_reassessment") != std::string::npos);
+        coding_turn_t third; third.staged_fingerprint_after = "third";
+        loop.review_validation_failure(third, failed);
+        assert(loop.repair_failures.stalled_tests());
+        assert(third.repair_focus.find("go-test:TestValue")!=std::string::npos);
         loop.record_acceptance_evidence(R"({"validation_scope":"project","validation_passed":true,"test_status":"passed"})");
         assert(loop.pending_test_failure_report.empty());
         assert(loop.unresolved_repair_contract.empty() && loop.repair_supplied_versions.empty());
@@ -240,28 +354,53 @@ struct coding_loop_test_access_t {
     }
     static void adaptive(const coding_loop_arguments_t &args) {
         coding_tool_loop_t loop(args);
-        auto check = [&](bool enabled) {
-            coding_turn_t turn;
-            loop.build_request_options(turn);
-            assert(turn.input.thinking_mode == (enabled ? "enabled" : "disabled"));
-            assert(turn.input.reasoning_effort == (enabled ? "high" : "none"));
-            assert(turn.reasoning_policy == (enabled ? "adaptive_thinking_on" : "adaptive_thinking_off"));
-            std::string wire;
-            assert(provider_client_t::serialize_completion_request(args.provider, turn.input, true, wire));
-            assert(wire.find("adaptive") == std::string::npos);
-            assert(wire.find(enabled ? "\"effort\":\"high\"" : "\"effort\":\"none\"") != std::string::npos);
+        auto check = [&](const char *effort) {
+            coding_turn_t turn;loop.build_request_options(turn);
+            if(turn.input.reasoning_effort!=effort)std::cerr<<"expected "<<effort<<" got "<<turn.input.reasoning_effort<<" trigger "<<turn.reasoning_trigger<<"\n";
+            assert(turn.input.reasoning_effort==effort);
+            assert(turn.input.thinking_mode==(std::string(effort)=="none"?"disabled":"enabled"));
+            std::string wire;assert(provider_client_t::serialize_completion_request(args.provider,turn.input,true,wire));
+            assert(wire.find("adaptive")==std::string::npos);
         };
-        check(false);
-        loop.acceptance_report = "{\"validation_passed\":false}";
-        check(true);
-        loop.acceptance_report = "{\"validation_passed\":true}";
-        check(false);
-        loop.acceptance_report = "{\"validation_passed\":false}";
-        loop.output_budget_recovery_mode = true;
-        coding_turn_t recovery;
-        loop.build_request_options(recovery);
-        assert(recovery.input.thinking_mode == "disabled");
-        assert(recovery.input.reasoning_effort == "none");
+        check("low"); // Initial implementation, rather than blind high effort.
+        loop.acceptance_report=R"({"validation_passed":false})";
+        check("none"); // An unclassified/environment failure is not a design problem.
+        loop.acceptance_report=R"({"validation_passed":false,"test_status":"failed"})";
+        check("low");
+        const auto ids=repair_failure_signatures("--- FAIL: TestValue (0.01s)\n");
+        loop.repair_failures.observe("go.test","one",ids,false);
+        loop.repair_failures.observe("go.test","two",ids,false);
+        check("high");check("low"); // One escalation for the same failed revision.
+        agent_tool_trace_t read;read.name="workspace.read";args.traces.push_back(read);
+        check("none");args.traces.clear();
+        loop.reasoning_validation_report=R"({"validation_passed":true,"test_status":"passed"})";
+        check("low"); // Empty unit-test draft still represents initial implementation.
+        loop.output_budget_recovery_mode=true;check("none");
+    }
+    static void oversized_checkpoint(const coding_loop_arguments_t &args) {
+        auto task=args.runtime_task;const auto session=task->session_id;
+        task->session_id=std::string(32,'c');
+        agent_progress_store_t store(task->user_root,args.project_path,task->session_id);
+        const auto old_changes=task->changes;const auto old_outputs=task->provider_tool_outputs;
+        const auto old_response=task->provider_response_id;
+        agent_change_proposal_t kept;kept.operation="write";kept.path="fixture/src/checkpoint.go";
+        kept.content="package main\n// EXACT_PROPOSAL\n";kept.review_status="pending";
+        task->changes={kept};task->provider_response_id="provider-checkpoint";
+        task->provider_tool_outputs={{"call-checkpoint","{\"ok\":true}"}};
+        const std::string tail="<assistant_tool_call>{\"name\":\"workspace.validate\"}</assistant_tool_call>\n<tool_result>{\"validation_passed\":false,\"diagnostic\":\"LATEST_FAILURE\"}</tool_result>";
+        std::string error;
+        assert(coding_loop_detail::save_coding_progress(store,args.provider,task,args.project_path,args.original_prompt,
+            std::string(300*1024,'x')+tail,"","",45,error));
+        agent_progress_t restored;bool found=false;
+        assert(store.load(restored,found,error) && found);
+        assert(restored.transcript.size()<=kMaxToolTranscriptBytes);
+        assert(restored.transcript.find("LATEST_FAILURE")!=std::string::npos);
+        assert(restored.original_prompt==args.original_prompt && restored.completed_tool_calls==45);
+        assert(restored.staged_changes.size()==1 && restored.staged_changes[0].content==kept.content);
+        assert(restored.provider_tool_outputs.size()==1 && restored.provider_tool_outputs[0].output=="{\"ok\":true}");
+        assert(restored.provider_response_id=="provider-checkpoint");
+        assert(store.remove(error));task->session_id=session;task->changes=old_changes;
+        task->provider_tool_outputs=old_outputs;task->provider_response_id=old_response;
     }
     static void test_only_validation(const coding_loop_arguments_t &args) {
         coding_tool_loop_t loop(args);
@@ -283,6 +422,30 @@ struct coding_loop_test_access_t {
         assert(loop.next_tool_guidance.find("test_validation_pending") != std::string::npos);
         args.changes.clear();
     }
+    static void bounded_investigation(const coding_loop_arguments_t &args) {
+        coding_tool_loop_t loop(args);
+        assert(loop.model_tool_call_limit() + 1 == loop.effective_tool_call_limit);
+        for (const char *name : {"workspace.read", "workspace.read_batch", "workspace.patch_set"})
+            loop.model_tools.emplace_back(name, "fixture", false, true, true, "workspace");
+        loop.proposal_tools.push_back(loop.model_tools.back());
+        loop.pending_test_failure_report=R"({"failed_command_id":"go.test"})";
+        loop.progress_supervisor.observe_investigation(6, false);
+        coding_turn_t turn; loop.select_request_tools(turn);
+        assert(turn.investigation_checkpoint);
+        assert(turn.input.tools.size()==3); // Missing source can still be read.
+        loop.supplementary_read_calls=4;
+        coding_turn_t bounded;loop.select_request_tools(bounded);
+        assert(bounded.input.tools.size()==1 && bounded.input.tools[0].name=="workspace.patch_set");
+        loop.repair_required_reads["fixture/missing.go"]="version";
+        coding_turn_t required;loop.select_request_tools(required);
+        assert(required.input.tools.size()==3); // Required evidence overrides the limit.
+        loop.repair_required_reads.clear();
+        loop.progress_supervisor.observe_investigation(1,true);
+        loop.supplementary_read_calls=0;
+        coding_turn_t edited;loop.select_request_tools(edited);
+        assert(!edited.investigation_checkpoint && edited.input.tools.size()==3);
+    }
+
     static void budgets(const coding_loop_arguments_t &args) {
         coding_tool_loop_t loop(args);
         coding_turn_t ordinary;
@@ -296,12 +459,12 @@ struct coding_loop_test_access_t {
         assert(wire.find("\"effort\":\"low\"") != std::string::npos);
         assert(wire.find("implementation_contract") != std::string::npos);
         assert(wire.find("generation_checkpoints") == std::string::npos);
-        // A real validator failure escalates; successful later evidence clears it.
+        // Unclassified failures do not justify high reasoning.
         loop.acceptance_report = "{\"validation_passed\":false}";
         coding_turn_t repair;
         loop.build_request_options(repair);
-        assert(repair.input.reasoning_effort == "high");
-        assert(repair.input.max_output_tokens == 131072);
+        assert(repair.input.reasoning_effort == "low");
+        assert(repair.input.max_output_tokens == 65536);
         loop.acceptance_report = "{\"validation_passed\":true}";
         coding_turn_t passed;
         loop.build_request_options(passed);
@@ -456,6 +619,33 @@ static void request_source_compaction() {
 
 }
 
+static void retained_read_coverage() {
+    agent_read_context_t retained(4096);
+    agent_read_coverage_t coverage;
+    const auto page=[](const char *version, int offset, const char *content) {
+        acl::json j;auto &o=j.create_node();o.add_bool("ok",true).add_text("path","p/clock.go")
+            .add_text("file_sha256",version).add_number("offset",offset).add_text("content",content);
+        return serialize_json(o);
+    };
+    const auto first=annotate_read_coverage("workspace.read",page("v1",0,"0123456789"),coverage,false);
+    assert(remember_read_result("workspace.read",first,retained));
+    auto repeated=annotate_read_coverage("workspace.read",page("v1",0,"0123456789"),coverage,false);
+    assert(remember_read_result("workspace.read",repeated,retained));
+    restore_read_coverage(retained,coverage); // Exact retained bytes survive history compaction.
+    repeated=annotate_read_coverage("workspace.read",page("v1",4,"456789"),coverage,false);
+    acl::json parsed(repeated.c_str());assert(parsed.finish());
+    assert(json_number(parsed["new_read_bytes"],-1)==0 && json_bool(parsed["low_value_read"],false));
+    std::vector<std::string> observations;collect_observation_signatures("workspace.read",repeated,observations);
+    assert(observations.empty()); // Changing an offset cannot reset the guard.
+    auto extended=annotate_read_coverage("workspace.read",page("v1",8,"89abcd"),coverage,false);
+    acl::json extra(extended.c_str());assert(extra.finish() && json_number(extra["new_read_bytes"],-1)==4);
+    auto changed=annotate_read_coverage("workspace.read",page("v2",0,"0123456789"),coverage,false);
+    acl::json fresh(changed.c_str());assert(fresh.finish() && json_number(fresh["new_read_bytes"],-1)==10);
+    retained.clear();restore_read_coverage(retained,coverage);
+    auto evicted=annotate_read_coverage("workspace.read",page("v2",0,"0123456789"),coverage,false);
+    acl::json retry(evicted.c_str());assert(retry.finish() && json_number(retry["new_read_bytes"],-1)==10);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     assert(file_ops::make_private_directory(argv[1]));
@@ -471,12 +661,40 @@ int main(int argc, char **argv) {
     std::ofstream(root + "/fixture/src/main.go") << "package main\n// bootstrap-entry-marker\nfunc greeting() string { return \"hello\" }\nfunc main() {}\n";
     std::ofstream(root + "/fixture/src/main_test.go") << "package main\n// bootstrap-test-marker\nfunc checkGreeting() { _ = greeting() }\n";
     agent_workspace_t workspace(root);
+    {
+        agent_draft_store_t snapshot(root, project, std::string(32, 'c'));
+        size_t skipped = 0; bool reused = false; std::string error, before;
+        assert(snapshot.materialize({}, skipped, error));
+        agent_workspace_t draft(snapshot.root_path());
+        assert(draft.tree_sha256("", before, error, {}, {".libai-go-app"}));
+        std::ofstream(snapshot.root_path()+"/.libai-go-app", std::ios::binary) << "verified artifact";
+        assert(snapshot.record_validation_outputs(before, {".libai-go-app"}, error));
+        assert(snapshot.materialize({}, skipped, error, &reused) && reused);
+        std::ofstream(snapshot.root_path()+"/src/main.go", std::ios::app) << "// test changed source\n";
+        assert(!snapshot.record_validation_outputs(before, {".libai-go-app"}, error));
+        reused = false;
+        assert(snapshot.materialize({}, skipped, error, &reused) && !reused);
+        agent_change_proposal_t directory, script;
+        directory.operation="mkdir";directory.path=project+"/tests";
+        script.operation="write";script.path=project+"/tests/acceptance.test.cjs";script.content="// first\n";
+        std::vector<agent_change_proposal_t> edits{directory,script};
+        assert(snapshot.materialize(edits,skipped,error));
+        assert(draft.tree_sha256("",before,error,{}, {".libai-go-app"}));
+        std::ofstream(snapshot.root_path()+"/.libai-go-app") << "verified artifact";
+        assert(snapshot.record_validation_outputs(before,{".libai-go-app"},error));
+        edits[1].content="// changed assertion\n";
+        assert(snapshot.materialize(edits,skipped,error));
+        std::string artifact;bool truncated=false;
+        assert(draft.read(".libai-go-app",artifact,truncated,error) && artifact=="verified artifact");
+        assert(snapshot.remove(error));
+    }
     provider_config_t provider; provider.id = "fixture"; provider.protocol = "openai_responses";
     provider.model = "deepseek-v4-flash"; provider.allow_file_content = true;
     provider.base_url = "http://127.0.0.1:1/v1";
     std::string initial, error;
     assert(compose_initial_prompt(workspace, provider, root, project, "Implement the project.",
         "", "standard", "", initial, error, false));
+    assert(initial.find("module fixture") != std::string::npos);
     assert(initial.find("bootstrap-entry-marker") != std::string::npos);
     assert(initial.find("bootstrap-test-marker") != std::string::npos);
     assert(initial.find("bootstrap-ignore-marker") != std::string::npos);
@@ -520,6 +738,7 @@ int main(int argc, char **argv) {
     coding_loop_arguments_t args{provider,key,workspace,project,prompt,initial,reasoning,images,
         0,64,131072,6,32768,limits,thinking,effort,output,traces,changes,memory,summary,title,rejected,task,error};
     coding_loop_test_access_t::budgets(args);
+    coding_loop_test_access_t::bounded_investigation(args);
     coding_loop_test_access_t::test_only_validation(args);
     thinking = "adaptive"; effort = "max";
     coding_loop_test_access_t::adaptive(args);
@@ -529,24 +748,30 @@ int main(int argc, char **argv) {
     coding_loop_test_access_t::delivery_tools(args);
     coding_loop_test_access_t::compile_cache(args);
     coding_loop_test_access_t::proposal_recovery(args);
+    coding_loop_test_access_t::repair_evidence_scope(args);
+    coding_loop_test_access_t::no_mutation_claim(args);
+    coding_loop_test_access_t::oversized_checkpoint(args);
     thinking = "enabled";
-    auto large = coding_turn_budget("low", "adaptive", 131072, true, true, true);
+    auto large = coding_turn_budget("low", "adaptive", 131072, true, true, true, true);
     assert(large.thinking == "enabled" && large.effort == "high" && large.output_tokens == 131072);
     auto toggle_only = coding_turn_budget("", "adaptive", 131072, false, true, false);
     assert(toggle_only.thinking == "disabled" && toggle_only.effort.empty());
     assert(coding_turn_budget("high", "enabled", 131072, true, true, false).effort == "high");
     assert(coding_turn_budget("max", "enabled", 131072, true, true, false).output_tokens == 131072);
-    assert(coding_turn_budget("", "disabled", 131072, true, true, false).effort.empty());
+    assert(coding_turn_budget("", "disabled", 131072, true, true, false).effort == "none");
     assert(coding_turn_budget("", "enabled", 4096, true, true, false).output_tokens == 4096);
     assert(coding_turn_budget("", "enabled", 131072, false, true, false).effort.empty());
     source_retention();
+    retained_read_coverage();
     test_change_scope();
     request_source_compaction();
-    const auto behavior = coding_behavior_checks("实现多人多房间贪吃蛇游戏，三档速度，空格暂停再继续");
-    for (const char *scenario : {"shared_lifecycle", "room_isolation", "observable_speed", "toggle_resume"})
-        assert(behavior.find(scenario) != std::string::npos);
-    assert(coding_behavior_checks("Fix a compiler error in a library").empty());
-    assert(coding_behavior_checks("Optimize build speed").empty());
-    assert(coding_behavior_checks("A multiplayer game with speed controls").find("observable_speed") != std::string::npos);
+    const auto behavior = coding_behavior_checks("Implement a shared application");
+    assert(behavior.size() < 1500);
+    assert(behavior.find("behavior_contract") != std::string::npos);
+    assert(behavior.find("first and repeated updates") != std::string::npos);
+    assert(behavior.find("valid state remains valid") != std::string::npos);
+    assert(behavior.find("actual serialization, identity") != std::string::npos);
+    assert(coding_behavior_checks("Implement a game") == behavior);
+    assert(coding_behavior_checks("Implement a compiler library") == behavior);
     std::cout << "PASS: adaptive requests, recovery precedence, bootstrap visibility and bounded versioned source retention\n";
 }

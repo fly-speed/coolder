@@ -318,7 +318,14 @@ struct unavailable_validation_t {
 	}
 };
 // Cached validation report bound to its staged content fingerprint.
+struct validation_build_receipt_t {
+    std::string input_identity, artifact, artifact_sha256, receipt_key, report;
+    libai::ai::sandbox_result_t result;
+};
 struct validation_cache_t {
+    // In-memory, same-run evidence; only plain Go builds can be reused when
+    // the standalone acceptance script changes. Tests always execute.
+    std::map<std::string, validation_build_receipt_t> build_receipts;
 	// Runtime policy/tool/limit identity; an environment change invalidates reuse.
 	std::string execution_revision;
 	// Fingerprint identifying the current staged source tree.
@@ -626,6 +633,10 @@ std::string annotate_read_coverage(const std::string &name,
     const std::string &result, libai::ai::agent_read_coverage_t &coverage,
     bool chinese);
 
+// Rebuild coverage from source pages that remain available to the model.
+void restore_read_coverage(const libai::ai::agent_read_context_t &context,
+    libai::ai::agent_read_coverage_t &coverage);
+
 // Collect stable signatures used to recognize repeated tool observations.
 void collect_observation_signatures(const std::string &name,
     const std::string &result, std::vector<std::string> &signatures);
@@ -755,7 +766,7 @@ std::string validate_staged_draft(const std::string &user_root,
     const libai::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
     std::string *source_fingerprint = NULL, bool build_only = false,
     const std::string &tool_execution_key = "",
-    const std::string &test_failure_report = "");
+    const std::string &test_failure_report = "", validation_cache_t *command_cache = NULL);
 // Only paths from trusted Go test diagnostics become fixed package arguments.
 std::vector<std::string> focused_go_test_packages(const std::string &report);
 

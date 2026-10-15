@@ -6,6 +6,8 @@
 #include "../coding/coding_internal.h"
 #include "../validation/repair_scope.h"
 #include "../validation/diagnostic_source.h"
+#include "../validation/source_contract_review.h"
+#include "../validation/go_build_checkpoint.h"
 namespace action
 {
 namespace agent_detail
@@ -191,6 +193,7 @@ static long long append_validation_diagnostics(acl::json &json,
 		related.add_array_text(path.c_str());
 	item.add_bool("failed_test_files_complete",
 	    all_failed_tests_mapped && !related_paths.empty());
+	item.add_bool("diagnostic_truncated", diagnostic.size() > 4096 || result.output_truncated);
 	if (diagnostic.size() > 4096)
 		diagnostic.resize(4096);
 	if (!diagnostic.empty())
@@ -431,10 +434,12 @@ static long long append_validation_command(acl::json &json,
     const libai::ai::sandbox_result_t &result,
     const ctest_io_contract_t &io_contract, const std::string &draft_root,
     bool test_command, bool no_tests, bool dispatched, bool command_passed,
-    const std::string &execution_key)
+    const std::string &execution_key, bool reused = false)
 {
 	acl::json_node &item = commands.add_child(false, true);
 	item.add_text("idempotency_key", execution_key.c_str());
+    item.add_bool("reused", reused).add_bool("executed_this_call", !reused);
+    if (reused) item.add_text("reuse_reason", "unchanged Go build inputs and verified artifact; only standalone acceptance may differ");
 	if ((command.id == "cpp.ctest" || command.id == "c.ctest") && !execution_key.empty())
 		item.add_text("inventory_idempotency_key", (execution_key + ".inventory").c_str());
 	if (test_command)
@@ -447,14 +452,20 @@ static long long append_validation_command(acl::json &json,
     item.add_bool("cancelled", result.cancelled);
 	item.add_text("command_id", command.id.c_str());
 	item.add_text("executable", command.executable.c_str());
+    if (!command.acceptance_probe_node.empty()) {
+        item.add_bool("service_managed", true);
+        item.add_text("acceptance_node", command.acceptance_probe_node.c_str());
+        item.add_text("acceptance_script", "tests/acceptance.test.cjs");
+    }
 	item.add_text("working_directory", ".");
 	auto &fixed_arguments = json.create_array();
 	item.add_child("arguments", fixed_arguments);
 	for (const auto &argument : command.fixed_arguments) fixed_arguments.add_array_text(argument.c_str());
-	item.add_number("elapsed_ms", static_cast<long long>(result.elapsed_ms));
+	item.add_number("elapsed_ms", reused ? 0 : static_cast<long long>(result.elapsed_ms));
 	item.add_text("scope",
 	    !command.browser_probe_node.empty() ?
 	        "cross-browser-configured-assertions" :
+	        command.id.size()>=14 && command.id.compare(command.id.size()-14,14,".compile-tests")==0 ? "test-compilation-only" :
 	        command.id == "go.syntax.build" ? "syntax-only" :
 	        command.id == "functional.acceptance" ? "functional" :
 	        command.http_probe_port != 0          ? "http-readiness" :
@@ -544,13 +555,24 @@ static bool prepare_validation_environment(const std::string &user_root,
 std::vector<std::string> focused_go_test_packages(const std::string &report)
 {
 	acl::json json(report.c_str());
-	if (!json.finish() || json_text(json["failed_command_id"]) != "go.test") return {};
+	if (!json.finish() || json_text(json["failed_command_id"]) != "go.test" ||
+	    json_bool(json["repair_requires_full_validation"], false)) return {};
 	std::vector<std::string> paths;
 	auto *commands = json_array_node(json["commands"]);
 	for (auto *item = commands ? commands->first_child() : NULL; item; item = commands->next_child()) {
 		auto *command = item->is_object() ? item : item->get_obj();
 		if (!command || json_text((*command)["command_id"]) != "go.test") continue;
+		if (json_bool((*command)["passed"], false)) continue;
+		// Structured file diagnostics do not cover a second package that panicked,
+		// timed out or disappeared from truncated output. Never narrow that report.
+		const auto raw = json_text((*command)["diagnostic"]) + "\n" + json_text((*command)["error"]);
+		if (json_bool((*command)["timed_out"], false) ||
+		    json_bool((*command)["diagnostic_truncated"], false) ||
+		    raw.find("panic:") != std::string::npos || raw.find("fatal error:") != std::string::npos ||
+		    raw.find("signal:") != std::string::npos || raw.find("test timed out") != std::string::npos)
+			return {};
 		auto *diagnostics = json_array_node((*command)["diagnostics"]);
+		if (!diagnostics || !diagnostics->first_child()) return {};
 		for (auto *diagnostic = diagnostics ? diagnostics->first_child() : NULL;
 		     diagnostic; diagnostic = diagnostics->next_child()) {
 			auto *object = diagnostic->is_object() ? diagnostic : diagnostic->get_obj();
@@ -559,6 +581,19 @@ std::vector<std::string> focused_go_test_packages(const std::string &report)
 			if (path.find('/') == std::string::npos || path.find("..") != std::string::npos ||
 			    path.empty() || path[0] == '/' || path.find('\\') != std::string::npos) return {};
 			paths.push_back(path);
+		}
+		// Go also reports failing package identities without source locations.
+		// Every such package must be covered before a focused run is safe.
+		const auto packages = libai::ai::changed_go_packages("", paths);
+		const std::regex failed_package(R"((^|\n)FAIL[\t ]+([^\s]+))");
+		for (auto match = std::sregex_iterator(raw.begin(), raw.end(), failed_package);
+		     match != std::sregex_iterator(); ++match) {
+			const auto failed = (*match)[2].str();
+			if (!std::any_of(packages.begin(), packages.end(), [&](const std::string &package) {
+				const auto suffix = package.substr(1); // ./src/core -> /src/core
+				return failed.size() >= suffix.size() &&
+				    failed.compare(failed.size() - suffix.size(), suffix.size(), suffix) == 0;
+			})) return {};
 		}
 	}
 	const auto packages = libai::ai::changed_go_packages("", paths);
@@ -592,12 +627,79 @@ static acl::json_node &initialize_validation_report(acl::json &json,
 	return skipped;
 }
 
+static void append_source_contract_review(acl::json &json, acl::json_node &root,
+    const std::string &draft_root)
+{
+    libai::ai::agent_workspace_t draft(draft_root);
+    const auto inventory=libai::ai::diagnostic_source_files(draft);
+    std::map<std::string,std::string> sources;
+    size_t bytes=0;
+    bool complete=!inventory.empty();
+    for(const auto &path:inventory) {
+        using libai::ai::source_contract_detail::ends;
+        if(!ends(path,".go") && !ends(path,".js") && !ends(path,".ts") && !ends(path,".html"))continue;
+        if(sources.size()>=128 || bytes>=1024*1024) {complete=false;break;}
+        std::string source,error;bool truncated=false;
+        if(!draft.read(path,source,truncated,error) || truncated || source.size()>256*1024 || bytes+source.size()>1024*1024) {
+            complete=false;continue;
+        }
+        bytes+=source.size();sources.emplace(path,std::move(source));
+    }
+    auto &review=json.create_node();root.add_child("source_contract_review",review);
+    review.add_text("status","review_only").add_bool("scan_complete",complete)
+        .add_number("files_scanned",sources.size())
+        .add_text("scope","bounded Go/JavaScript lexical signals; not type analysis, executed checks or requirement coverage");
+    auto &items=json.create_array();review.add_child("findings",items);
+    for(const auto &finding:libai::ai::source_contract_review(sources)) {
+        auto &item=items.add_child(false,true);
+        item.add_text("kind",finding.kind.c_str()).add_text("path",finding.path.c_str())
+            .add_number("line",finding.line).add_text("detail",finding.detail.c_str());
+        if(!finding.related_path.empty())item.add_text("related_path",finding.related_path.c_str()).add_number("related_line",finding.related_line);
+    }
+}
+
+static bool build_tool_sha256(const std::string &executable, std::string &digest, std::string &error)
+{
+    char resolved[PATH_MAX];
+    if (!realpath(executable.c_str(), resolved)) return false;
+    const std::string path(resolved);
+    const auto slash = path.find_last_of("/\\");
+    if (slash == std::string::npos || slash == 0) return false;
+    libai::ai::agent_workspace_t tool_directory(path.substr(0, slash), false);
+    return tool_directory.file_sha256(path.substr(slash + 1), digest, error);
+}
+
+// Conservative reuse: no embedded assets, cgo or arbitrary build scripts.
+// The actual tree digest (not merely proposals) includes every other source,
+// config, dependency and fixture, and the output artifact is checked separately.
+static bool go_build_cache_safe(libai::ai::agent_workspace_t &draft) {
+    std::vector<std::string> dirs(1, ""); size_t files=0, bytes=0;
+    for (size_t i=0;i<dirs.size();++i) {
+        if(dirs.size()>128) return false;
+        std::vector<libai::ai::workspace_entry_t> entries;std::string error;
+        if(!draft.list(dirs[i],entries,error) || entries.size()>=2000) return false;
+        for(const auto &entry:entries) {
+            if(entry.directory) {
+                // Host-private compiler caches are not Go package inputs.
+                if (entry.path != ".libai-build") dirs.push_back(entry.path);
+                continue;
+            }
+            if(entry.path.size()<3 || entry.path.substr(entry.path.size()-3)!=".go") continue;
+            std::string text;bool truncated=false;
+            if(++files>256 || !draft.read(entry.path,text,truncated,error) || truncated ||
+                (bytes+=text.size())>2*1024*1024 || text.find("//go:embed")!=std::string::npos ||
+                text.find("\"C\"")!=std::string::npos) return false;
+        }
+    }
+    return files>0;
+}
+
 std::string validate_staged_draft(const std::string &user_root,
     const std::string &project_path, const std::string &run_id,
     const std::vector<agent_change_proposal_t> &changes,
     const libai::ai::sandbox_limits_t &limits, agent_tool_trace_t &trace,
     std::string *source_fingerprint, bool build_only,
-    const std::string &tool_execution_key, const std::string &test_failure_report)
+    const std::string &tool_execution_key, const std::string &test_failure_report, validation_cache_t *command_cache)
 {
 	trace.ok=false;
 	if (!libai::ai::program_sandbox_t::valid_idempotency_key(tool_execution_key))
@@ -629,11 +731,70 @@ std::string validate_staged_draft(const std::string &user_root,
 	        draft_root, toolchain, readonly_roots, err))
 		return tool_error_json(err);
 	const auto task = find_runtime_task(user_root, run_id);
+    libai::ai::agent_workspace_t cache_workspace(draft_root);
+    std::string build_inputs, cache_error, validation_inputs;
+    std::vector<std::string> build_outputs, build_exclusions;
+    bool cache_safe = command_cache && task && !tool_execution_key.empty() && go_build_cache_safe(cache_workspace);
+    std::string go_tool_hash;
+    if (cache_safe) {
+        for (const auto &candidate : toolchain.commands) if (candidate.id == "go.build") {
+            if (!build_tool_sha256(candidate.executable, go_tool_hash, cache_error)) cache_safe = false;
+            if (candidate.fixed_arguments.size() == 4) build_outputs.push_back(candidate.fixed_arguments[2]);
+            for (const auto &other : toolchain.commands) if (other.id == "project.script-build") {
+                std::string script; bool truncated = false;
+                if (!cache_workspace.read("build.sh", script, truncated, cache_error) || truncated ||
+                    !libai::ai::plain_go_build_script(script, candidate.fixed_arguments)) cache_safe = false;
+                else {
+                    std::istringstream lines(script); std::string line;
+                    while (std::getline(lines, line)) {
+                        std::istringstream words(line); std::string g, b, o, out;
+                        if (words >> g >> b >> o >> out && g == "go" && b == "build" && o == "-o") {
+                            // Restrict reusable script outputs to the normal artifact directory.
+                            if (out.compare(0, 6, "build/") != 0 || out.find('/', 6) != std::string::npos ||
+                                (out.find('.') != std::string::npos && out.substr(out.size()-4) != ".exe")) cache_safe = false;
+                            else build_outputs.push_back(out);
+                        }
+                    }
+                }
+            }
+        }
+        if (go_tool_hash.empty()) cache_safe = false;
+        if (cache_safe) {
+            for (const auto &output : build_outputs) {
+                const auto slash = output.find_last_of('/');
+                if (slash != std::string::npos &&
+                    !libai::ai::file_ops::safe_directory(draft_root+"/"+output.substr(0, slash)) &&
+                    !cache_workspace.create_directory_if_absent(output.substr(0, slash), cache_error)) cache_safe = false;
+            }
+            build_exclusions = build_outputs;
+            build_exclusions.push_back("tests/acceptance.test.cjs");
+            if (!cache_workspace.tree_sha256("", build_inputs, cache_error, {}, build_exclusions) ||
+                !cache_workspace.tree_sha256("", validation_inputs, cache_error, {}, build_outputs)) cache_safe = false;
+        }
+        build_inputs += "\n" + go_tool_hash;
+        for (const auto &path : readonly_roots) build_inputs += "\n" + path;
+        build_inputs += "\n" + task->coding_execution_revision + "\n" + *source_fingerprint + "\n" +
+            std::to_string(limits.timeout_ms) + ":" + std::to_string(limits.cpu_seconds) + ":" +
+            std::to_string(limits.memory_bytes) + ":" + std::to_string(limits.process_count) + ":" +
+            std::to_string(limits.open_files) + ":" + std::to_string(limits.file_size_bytes) + ":" + std::to_string(limits.output_bytes);
+    }
 	const bool focused =
 	    task && libai::ai::focused_compile_repair(task->original_prompt);
 	const auto packages = validation_go_packages(project_path, changes);
 	const auto test_packages = focused_go_test_packages(test_failure_report);
 	const bool targeted_tests = !test_packages.empty();
+	bool script_deferred=false;
+	if(build_only && !focused && !targeted_tests && !toolchain.commands.empty() &&
+	    toolchain.commands.front().id=="project.script-build") {
+		libai::ai::agent_workspace_t draft(draft_root);
+		std::string script,error;bool truncated=false;
+		if(draft.read("build.sh",script,truncated,error) && !truncated)
+			for(const auto &command:toolchain.commands) {
+				if(command.id!="go.build" || !libai::ai::plain_go_build_script(script,command.fixed_arguments))continue;
+				script_deferred=true;break;
+			}
+		if(script_deferred)toolchain.commands.erase(toolchain.commands.begin());
+	}
 	// Finish every build before running any advisory tests in mixed-language projects.
 	if (focused || build_only)
 		std::stable_partition(toolchain.commands.begin(),
@@ -658,6 +819,7 @@ std::string validate_staged_draft(const std::string &user_root,
 			    !libai::ai::file_ops::make_private_directory(directory))
 				return tool_error_json("cannot prepare Go package build output");
 			for (const auto &package : staged_packages) {
+				if(script_deferred && command.fixed_arguments.size()==4 && command.fixed_arguments[3]==package)continue;
 				auto check = command;
 				const auto hash = libai::ai::agent_workspace_t::content_sha256(package);
 				check.id = "go.packages." + hash.substr(0, 16) + ".build";
@@ -667,6 +829,35 @@ std::string validate_staged_draft(const std::string &user_root,
 			break;
 		}
 		toolchain.commands.insert(toolchain.commands.end(), checks.begin(), checks.end());
+	}
+	// A mixed implementation/test proposal must type-check its changed test
+	// packages too. -c compiles test binaries without running tests or init().
+	// Full/targeted validation still owns actual test execution.
+	std::set<std::string> test_compile_packages;
+	std::vector<std::string> selected_test_compile_packages;
+	if (build_only && !targeted_tests) {
+		for (const auto &change:changes) {
+			if (change.operation!="write" || change.review_status=="rejected" ||
+			    change.path.size()<8 || change.path.substr(change.path.size()-8)!="_test.go")continue;
+			for (const auto &package:libai::ai::changed_go_packages(project_path,{change.path}))test_compile_packages.insert(package);
+		}
+		std::vector<libai::ai::sandbox_command_t> checks;
+		for (const auto &go_command:toolchain.commands) {
+			if (go_command.id!="go.build" || test_compile_packages.empty())continue;
+			if (!libai::ai::file_ops::make_private_directory(draft_root+"/.libai-build") ||
+			    !libai::ai::file_ops::make_private_directory(draft_root+"/.libai-build/go-test-compile"))
+				return tool_error_json("cannot prepare Go test compilation output");
+			for (const auto &package:test_compile_packages) {
+				if (checks.size()>=8)break;
+				auto check=go_command;
+				const auto hash=libai::ai::agent_workspace_t::content_sha256(package);
+				check.id="go.packages."+hash.substr(0,16)+".compile-tests";
+				check.fixed_arguments={"test","-c","-o",".libai-build/go-test-compile/"+hash+".test",package};
+				checks.push_back(check);selected_test_compile_packages.push_back(package);
+			}
+			break;
+		}
+		toolchain.commands.insert(toolchain.commands.end(),checks.begin(),checks.end());
 	}
 	// After a Go compiler/script failure, gather other syntax errors without
 	// running more build scripts, tests, services or network requests. gofmt -l
@@ -703,6 +894,19 @@ std::string validate_staged_draft(const std::string &user_root,
 	acl::json_node &skipped =
 	    initialize_validation_report(json, root, source_fingerprint,
 	        changes, build_only, focused, draft_reused, skipped_files, targeted_tests);
+	if(script_deferred) {
+		skipped.add_array_text("project.script-build");
+		root.add_text("build_script_checkpoint","plain_go_wrapper_deferred_to_full_validation");
+	}
+	// Review the same materialized revision as the commands, including automatic
+	// compilation failures. No extra model call, executable or test pass is implied.
+	if(!focused && !targeted_tests)append_source_contract_review(json,root,draft_root);
+	if (!test_compile_packages.empty()) {
+		auto &selected=json.create_array();root.add_child("test_compile_packages_selected",selected);
+		for (const auto &package:selected_test_compile_packages)selected.add_array_text(package.c_str());
+		root.add_number("test_compile_package_count_total",test_compile_packages.size());
+		root.add_bool("test_compile_plan_complete",selected_test_compile_packages.size()==test_compile_packages.size());
+	}
 	if (targeted_tests) {
 		auto &selected = json.create_array();
 		root.add_child("targeted_packages", selected);
@@ -717,7 +921,7 @@ std::string validate_staged_draft(const std::string &user_root,
 	acl::json_node &commands = json.create_array();
 	root.add_child("commands", commands);
 	bool passed = true;
-	size_t executed = 0;
+	size_t executed = 0, reused_commands = 0;
 	bool http_passed = false;
 	std::string browser_status =
 	    toolchain.browser_acceptance_enabled ? "not-run" : "disabled";
@@ -770,9 +974,61 @@ std::string validate_staged_draft(const std::string &user_root,
 		const std::string execution_key = tool_execution_key.empty() ? "" :
 		    "validation." + libai::ai::agent_workspace_t::content_sha256(serialize_json(input));
 		bool receipt_unconfirmed=false;
-		const bool dispatched =
-		    dispatch_validation_command(command, draft_root, limits,
-		        readonly_roots, should_cancel, result, io_contract, execution_key,user_root,project_path,receipt_unconfirmed,tool_execution_key);
+        std::string artifact, input_identity, evidence_key=execution_key;
+        if (cache_safe) {
+            std::string current_tree;
+            if (!cache_workspace.tree_sha256("", current_tree, cache_error, {}, build_exclusions)) cache_safe = false;
+            else build_inputs.replace(0, 64, current_tree);
+        }
+        if (cache_safe) {
+            if (command.id=="go.build" && command.fixed_arguments.size()==4 && command.fixed_arguments[1]=="-o")
+                artifact=command.fixed_arguments[2];
+            if (command.id=="project.script-build") {
+                std::string script;bool truncated=false;
+                if (cache_workspace.read("build.sh",script,truncated,cache_error) && !truncated)
+                    for (const auto &go_command:toolchain.commands) if(go_command.id=="go.build" && libai::ai::plain_go_build_script(script,go_command.fixed_arguments)) {
+                        std::istringstream lines(script);std::string line;
+                        while(std::getline(lines,line)) {std::istringstream words(line);std::string g,b,o,out;
+                            if(words>>g>>b>>o>>out && g=="go" && b=="build" && o=="-o")artifact=out;}
+                    }
+            }
+            if(!artifact.empty()) {
+                input_identity=build_inputs+"\n"+command.executable+"\n"+std::to_string(command.allow_outbound_network);
+                for(const auto &arg:command.fixed_arguments)input_identity+="\n"+arg;
+                // The executable may be upgraded independently of project files.
+                std::string executable_hash;
+                if(!build_tool_sha256(command.executable,executable_hash,cache_error)) artifact.clear();
+                else input_identity+="\n"+executable_hash;
+            }
+        }
+        bool command_reused=false, dispatched=false;
+        if (!artifact.empty()) {
+            const auto found=command_cache->build_receipts.find(command.id);
+            std::string artifact_hash;
+            if (found != command_cache->build_receipts.end() && found->second.input_identity == input_identity &&
+                cache_workspace.file_sha256(artifact,artifact_hash,cache_error) && artifact_hash == found->second.artifact_sha256 &&
+                validate_cached_command_receipts(user_root,project_path,found->second.report,cache_error)) {
+                result=found->second.result;evidence_key=found->second.receipt_key;
+                dispatched=true;command_reused=true;++reused_commands;
+            }
+
+        }
+        if(!command_reused) dispatched=dispatch_validation_command(command, draft_root, limits,
+            readonly_roots, should_cancel, result, io_contract, execution_key,user_root,project_path,receipt_unconfirmed,tool_execution_key);
+        if (!command_reused && !artifact.empty() && dispatched && result.exit_code==0 && !result.cancelled && !result.timed_out && result.error.empty()) {
+            validation_build_receipt_t cached;cached.input_identity=input_identity;cached.artifact=artifact;
+            std::string post_build_inputs;
+            if(cache_workspace.tree_sha256("",post_build_inputs,cache_error,{},build_exclusions))
+                cached.input_identity.replace(0,64,post_build_inputs);
+            else cached.input_identity.clear();
+            if(cache_workspace.file_sha256(artifact,cached.artifact_sha256,cache_error)) {
+                cached.result=result;cached.receipt_key=execution_key;
+                acl::json receipt;auto &parent=receipt.create_node();auto &list=receipt.create_array();
+                parent.add_text("tool_execution_key",tool_execution_key.c_str()).add_child("commands",list);
+                append_validation_command(receipt,list,command,result,io_contract,draft_root,false,false,true,true,execution_key);
+                cached.report=serialize_json(parent);command_cache->build_receipts[command.id]=cached;
+            }
+        }
 		if(receipt_unconfirmed)
 			return tool_error_json("validation command receipt requires host reconciliation: "+execution_key+" "+result.error);
 
@@ -783,7 +1039,7 @@ std::string validate_staged_draft(const std::string &user_root,
 			build_executed = true;
 			build_passed = build_passed && command_passed;
 		}
-		if (command.http_probe_port != 0)
+		if (command.http_probe_port != 0 && command.id != "functional.acceptance")
 			http_passed = command_passed;
 		if (!command.browser_probe_node.empty())
 			browser_status = command_passed ? "passed" :
@@ -816,8 +1072,8 @@ std::string validate_staged_draft(const std::string &user_root,
 		}
 		diagnostic_count += append_validation_command(json, commands,
 		    command, result, io_contract, draft_root, test_command,
-		    no_tests, dispatched, command_passed, execution_key);
-		++executed;
+		    no_tests, dispatched, command_passed, evidence_key, command_reused);
+		if (!command_reused) ++executed;
 		if (result.cancelled || should_cancel())
 			return tool_error_json("agent run cancelled");
 		if (!(!dispatched || result.exit_code != 0 ||
@@ -836,7 +1092,7 @@ std::string validate_staged_draft(const std::string &user_root,
 	    build_passed &&
 	    (passed || libai::ai::is_test_command(failed_command_id));
 	root.add_bool("compile_repair_completed", compile_repair_completed);
-	root.add_bool("validation_passed", passed && executed > 0);
+	root.add_bool("validation_passed", passed && (executed + reused_commands) > 0);
 	root.add_text("test_status",
 	    tests_executed ? (tests_passed ? "passed" : "failed") : "not-run");
 	root.add_bool("http_readiness_passed", http_passed);
@@ -855,6 +1111,7 @@ std::string validate_staged_draft(const std::string &user_root,
 	    "Build/test and HTTP readiness do not prove "
 	    "business functionality. Functional evidence covers only the assertions "
 	    "in the configured acceptance test; missing or skipped tests are not verified.");
+	root.add_number("commands_reused", static_cast<long long>(reused_commands));
 	root.add_number("commands_executed", static_cast<long long>(executed));
 	root.add_number("commands_executed_this_call", static_cast<long long>(executed));
 	root.add_bool("executed_this_call", executed > 0);
@@ -872,7 +1129,7 @@ std::string validate_staged_draft(const std::string &user_root,
 		        browser_status, failed_command_reason,
 		        failed_command_id));
 	}
-	if (executed == 0) {
+	if (executed + reused_commands == 0) {
 		root.add_bool("validation_available", false);
 		root.add_text("message",
 		    "no fixed build or test command is available; do not retry validation "
@@ -880,6 +1137,13 @@ std::string validate_staged_draft(const std::string &user_root,
 	} else {
 		root.add_bool("validation_available", true);
 	}
+    if (cache_safe) {
+        // Builds add artifacts to the draft. Seal only those outputs so a later
+        // script-only edit does not discard them as an untrusted source change.
+        // Tests that mutate source keep the prior snapshot invalid instead.
+        libai::ai::agent_draft_store_t(user_root, project_path, run_id)
+            .record_validation_outputs(validation_inputs, build_outputs, cache_error);
+    }
 	trace.ok = true;
 	return serialize_json(root);
 }

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../validation/proposal_response_recovery.h"
 #include "ai_agent_tools_internal.h"
 #include "../storage/agent_request_store.h"
 
@@ -128,8 +129,9 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 	std::set<size_t> excluded;
 	bool inspect = false;
 	acl::json reference(payload.c_str());
-	if (reference.finish() && reference.get_root().is_object() &&
-	    !json_text(reference["saved_batch"]).empty()) {
+	if (reference.finish() && reference.get_root().is_object() && reference["saved_batch"]) {
+		if (!reference["saved_batch"]->is_string() || json_text(reference["saved_batch"]).empty())
+			return tool_error_json("saved_batch requires a nonempty string reference");
 		if (!context.saved_proposal_batch ||
 		    context.saved_proposal_batch->empty() ||
 		    json_text(reference["saved_batch"]) !=
@@ -137,6 +139,32 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 		            *context.saved_proposal_batch))
 			return tool_error_json(
 			    "saved_batch is unavailable in this running task");
+        if (reference["inspect_raw"]) {
+            if (!json_bool(reference["inspect_raw"], false) || reference["raw_edits"] || reference["decode_tool"])
+                return tool_error_json("inspect_raw must be true and cannot stage edits");
+            if (reference["query"] && !reference["query"]->is_string())
+                return tool_error_json("query must be a decimal byte-offset string");
+            const auto query = json_text(reference["query"]);
+            if (query.size() > 10 || (!query.empty() && query.find_first_not_of("0123456789") != std::string::npos))
+                return tool_error_json("query must be a decimal byte offset");
+            const size_t offset = query.empty() ? 0 : static_cast<size_t>(std::stoull(query));
+            const auto &saved = *context.saved_proposal_batch;
+            if (offset > saved.size()) return tool_error_json("raw offset exceeds retained response");
+            if (offset < saved.size() && (static_cast<unsigned char>(saved[offset]) & 0xc0) == 0x80)
+                return tool_error_json("raw offset must be a UTF-8 character boundary");
+            const auto part = libai::ai::utf8_prefix(saved.substr(offset), 8192);
+            context.root.add_bool("ok", true).add_bool("inspection_only", true).add_bool("staged", false)
+                .add_text("content", part.c_str()).add_number("offset", offset).add_number("total_bytes", saved.size())
+                .add_bool("eof", offset + part.size() == saved.size())
+                .add_text("next_query", std::to_string(offset + part.size()).c_str());
+            return finish_workspace_tool_result(context);
+        }
+        if (reference["raw_edits"] || reference["decode_tool"]) {
+            std::string error;
+            if (!libai::ai::recover_proposal_response(*context.saved_proposal_batch, payload, payload, error))
+                return tool_error_json(error);
+            // Resume normal atomic batch validation; no bytes have been staged.
+        } else {
 		inspect = reference["inspect_index"] != NULL;
 		if (inspect) {
 			inspect_index = json_number(reference["inspect_index"], -1);
@@ -160,14 +188,21 @@ std::string execute_workspace_propose_batch(workspace_tool_context_t &context)
 			}
 		}
 		payload = *context.saved_proposal_batch;
+        }
 	}
 	acl::json batch_json(payload.c_str());
 	acl::json_node *items = batch_json.finish() ?
 	    json_array_node(&batch_json.get_root()) :
 	    NULL;
-	if (items == NULL)
-		return tool_error_json(
-		    "propose_batch content must be a JSON array or saved_batch reference");
+	if (items == NULL) {
+		// Keep parse failures distinct from path, policy and replay errors so
+		// completed model rounds can archive unparsed content without retrying.
+		acl::json failure;
+		auto &root = failure.create_node();
+		root.add_bool("ok", false).add_text("code", "proposal_batch_unparsed")
+		    .add_text("error", "propose_batch content must be a JSON array or saved_batch reference");
+		return serialize_json(root);
+	}
 	std::vector<acl::json_node *> records;
 	for (auto *item=items->first_child();item;item=items->next_child())
 		records.push_back(item->is_object()?item:item->get_obj());

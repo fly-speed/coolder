@@ -217,7 +217,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::reject_browser_edit()
 	transcript += guidance;
 	persistent_transcript += guidance;
 	provider_tool_history.clear();
-	read_coverage.clear();
+	restore_read_coverage(read_context, read_coverage);
 	provider_history_base = transcript;
 	append_simple_operation_event(runtime_task, "browser_edit_blocked",
 	    "missing_live_evidence", "", executed_tool_calls);
@@ -316,7 +316,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 		transcript += guidance;
 		persistent_transcript += guidance;
 		provider_tool_history.clear();
-		read_coverage.clear();
+		restore_read_coverage(read_context, read_coverage);
 		provider_history_base = transcript;
 		if (save_coding_progress(progress_store, provider, runtime_task,
 		        project_path, original_prompt, persistent_transcript,
@@ -326,7 +326,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::check_tool_admission(
 	}
 	if (turn.provider_tool_call_count > 16 ||
 	    turn.provider_tool_call_count >
-	        effective_tool_call_limit - turn.call) {
+	        model_tool_call_limit() - std::min(turn.call, model_tool_call_limit())) {
 		final_output = turn.output;
 		// Reaching the budget after producing reviewable work is a successful
 		// bounded delivery, not a transport interruption. Keep the revision and
@@ -766,7 +766,9 @@ void coding_tool_loop_t::record_tool_outputs(coding_turn_t &turn)
 	    turn.have_native_outputs) {
 		libai::ai::completion_tool_exchange_t exchange;
 		exchange.preceding_instructions = turn.input.turn_instructions;
-		exchange.assistant_text = turn.output.text;
+		exchange.assistant_text = (!libai::ai::read_only_analysis_task(original_prompt) &&
+		    !libai::ai::verification_only_task(original_prompt)) ?
+		    libai::ai::utf8_prefix(turn.output.text, 1536) : turn.output.text;
 		exchange.reasoning_content = turn.output.reasoning;
 		exchange.calls = turn.output.tool_calls;
 		exchange.outputs = turn.current_tool_outputs;
@@ -860,6 +862,8 @@ void coding_tool_loop_t::materialize_tool_changes(coding_turn_t &turn)
 	// present stale text as the current file. Reads carry a full-file hash.
 	if (turn.staged_progress) {
 		invalidate_changed_read_context(turn);
+		if (turn.trace.ok && (is_incremental_proposal_tool(turn.message.tool.name) ||
+		        turn.message.tool.name=="workspace.execute_batch")) ++mutation_batches_this_invocation;
 	}
 }
 

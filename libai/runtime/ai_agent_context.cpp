@@ -417,7 +417,8 @@ void append_project_context(libai::ai::agent_workspace_t &workspace,
 		const bool source = name.find("main.") == 0 || name.find("main_test.") == 0 ||
 		    name.find("server.") == 0 || name.find("test_") == 0 ||
 		    name.find("_test.") != std::string::npos || name.find(".test.") != std::string::npos;
-		if (!script && !source && !root_ignore) continue;
+		const std::set<std::string> manifests = {"README.md", "go.mod", "go.sum", "package.json", "Cargo.toml", "pom.xml", "CMakeLists.txt", "build.gradle", "build.gradle.kts", "stdafx.h"};
+		if (!script && !source && !root_ignore && !manifests.count(name)) continue;
 		std::string content, ignored;
 		bool truncated = false;
 		if (!workspace.read(entry.path, content, truncated, ignored) || truncated ||

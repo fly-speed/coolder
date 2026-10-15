@@ -32,6 +32,14 @@ coding_tool_loop_t::coding_tool_loop_t(const coding_loop_arguments_t &arguments)
 	    !libai::ai::verification_only_task(original_prompt);
 }
 
+size_t coding_tool_loop_t::model_tool_call_limit() const
+{
+    return !runtime_task->text_preview && !runtime_task->assistant_chat &&
+        !libai::ai::read_only_analysis_task(original_prompt) &&
+        !libai::ai::verification_only_task(original_prompt) && max_tool_calls > 1 ?
+        effective_tool_call_limit - 1 : effective_tool_call_limit;
+}
+
 bool coding_tool_loop_t::run_impl()
 {
 	preparation.bind(runtime_task);
@@ -51,6 +59,7 @@ bool coding_tool_loop_t::run_impl()
 	preparation.phase("discover_toolchain");
 	discover_validation_capabilities();
 	has_task_revision = !changes.empty();
+	initial_proposal_identity = libai::ai::agent_workspace_t::content_sha256(staged_cycle_fingerprint(changes));
 	preparation.complete();
 	preparation.finish();
 	while (executed_tool_calls <= effective_tool_call_limit) {
@@ -60,6 +69,9 @@ bool coding_tool_loop_t::run_impl()
 		}
 		if (!require_browser_connection())
 			return false;
+		if (executed_tool_calls >= model_tool_call_limit() &&
+            model_tool_call_limit() < effective_tool_call_limit)
+            return finish_budget_boundary();
 		coding_turn_t turn;
 		turn.call = executed_tool_calls;
 		const step_t result = run_turn(turn);

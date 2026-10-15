@@ -74,23 +74,75 @@ void coding_tool_loop_t::record_acceptance_evidence(const std::string &report)
 	// budget-boundary paths. Never extract evidence from model prose.
 	acl::json evidence(report.c_str());
 	if (evidence.finish()) {
+		reasoning_validation_report = report;
 		const auto scope = json_text(evidence["validation_scope"]);
 		const bool passed = json_bool(evidence["validation_passed"], false);
-		if (!passed && (json_text(evidence["test_status"]) == "failed" ||
-		        libai::ai::is_test_command(json_text(evidence["failed_command_id"]))))
-			pending_test_failure_report = report;
-		if (scope == "targeted-tests") return; // Never promote a partial check to final evidence.
-		if (scope == "build-only" && passed && !pending_test_failure_report.empty()) return;
-		if (passed && scope != "build-only" && json_text(evidence["test_status"]) == "passed") {
-			pending_test_failure_report.clear();
-			repair_failures.clear();
-			unresolved_repair_contract.clear();
-			repair_contract_findings.clear();
-			repair_required_reads.clear();
-			repair_supplied_versions.clear();
-			pending_repair_edits.clear();
-			repair_changed_paths.clear();
-		}
+        auto clear_failures = [&]() {
+            pending_test_failure_report.clear();
+            repair_failures.clear();
+            unresolved_repair_contract.clear();
+            repair_contract_findings.clear();
+            repair_required_reads.clear();
+            repair_supplied_versions.clear();
+            pending_repair_edits.clear();
+            repair_changed_paths.clear();
+        };
+        if (scope == "targeted-tests" && passed && json_text(evidence["test_status"]) == "passed") {
+            const auto pending = focused_go_test_packages(pending_test_failure_report);
+            std::set<std::string> tested;
+            auto *packages = json_array_node(evidence["targeted_packages"]);
+            for (auto *item = packages ? packages->first_child() : NULL; item; item = packages->next_child())
+                tested.insert(json_text(item));
+            // A passing partial check clears only failures it actually covered.
+            // Missing/ambiguous scope stays unresolved and needs a full run.
+            if (!pending.empty() && std::all_of(pending.begin(), pending.end(),
+                    [&](const std::string &p) { return tested.count(p) != 0; })) {
+                clear_failures();
+                repair_full_validation_pending = true;
+                acceptance_report = report;
+                acceptance_draft.clear();
+                acceptance_baseline.clear();
+            }
+            return; // Not final acceptance evidence.
+        }
+        if (scope == "project") {
+            // A later HTTP failure must not resurrect Go tests that passed.
+            auto *commands = json_array_node(evidence["commands"]);
+            for (auto *item = commands ? commands->first_child() : NULL; item; item = commands->next_child()) {
+                auto *command = item->is_object() ? item : item->get_obj();
+                acl::json pending(pending_test_failure_report.c_str());
+                if (command && json_text((*command)["command_id"]) == "go.test" &&
+                    json_bool((*command)["passed"], false) && pending.finish() &&
+                    json_text(pending["failed_command_id"]) == "go.test") clear_failures();
+            }
+            repair_full_validation_pending = false;
+        }
+        if (!passed && (json_text(evidence["test_status"]) == "failed" ||
+                libai::ai::is_test_command(json_text(evidence["failed_command_id"])))) {
+            if (scope != "targeted-tests" || pending_test_failure_report.empty()) {
+                pending_test_failure_report = report;
+            } else {
+                const auto previous = focused_go_test_packages(pending_test_failure_report);
+                const auto current = focused_go_test_packages(report);
+                const bool covered = !previous.empty() && !current.empty() &&
+                    std::all_of(current.begin(), current.end(), [&](const std::string &package) {
+                        return std::find(previous.begin(), previous.end(), package) != previous.end();
+                    });
+                if (!covered) {
+                    acl::json pending(pending_test_failure_report.c_str());
+                    if (pending.finish()) {
+                        pending.get_root().add_bool("repair_requires_full_validation", true);
+                        pending_test_failure_report = serialize_json(pending.get_root());
+                    }
+                }
+            }
+        }
+        if (scope == "targeted-tests") return;
+        if (scope == "build-only" && passed && !pending_test_failure_report.empty()) return;
+        if (passed && scope != "build-only" && json_text(evidence["test_status"]) == "passed") {
+            clear_failures();
+            repair_full_validation_pending = false;
+        }
 	}
 	acceptance_report = report;
 	acceptance_draft =
@@ -223,9 +275,18 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 	evidence.add_text("status", state.c_str());
 	evidence.add_text("run_id", runtime_task->id.c_str());
 	evidence.add_bool("run_completed", completed);
+	evidence.add_number("mutation_batches_this_invocation",mutation_batches_this_invocation);
+	evidence.add_number("retained_proposal_count",changes.size());
+	evidence.add_bool("proposals_changed_since_invocation_start",!initial_proposal_identity.empty() &&
+	    initial_proposal_identity!=libai::ai::agent_workspace_t::content_sha256(staged_cycle_fingerprint(changes)));
 	evidence.add_bool("evidence_current_at_run_end", current);
 	evidence.add_bool("all_user_requirements_verified", false);
 	evidence.add_text("evidence_source", "runtime_fixed_validator");
+	if(valid && report["source_contract_review"]) {
+		auto *review=report["source_contract_review"];
+		if(!review->is_object())review=review->get_obj();
+		if(review)evidence.add_child("source_contract_review",json.duplicate_node(*review));
+	}
 	bool browser_interaction_required = libai::ai::needs_browser_interaction(original_prompt);
 	auto &coverage = json.create_array();
 	evidence.add_child("requirement_coverage", coverage);
@@ -301,6 +362,10 @@ bool coding_tool_loop_t::finish_task_acceptance(bool completed)
 		summary += chinese ?
 		    " 临时样式撤销失败，请在扩展中断开连接以清理。" :
 		    " Temporary-style cleanup failed; disconnect the extension to clear it.";
+	if (completed && mutation_batches_this_invocation==0 &&
+	    !libai::ai::read_only_analysis_task(original_prompt) && !libai::ai::verification_only_task(original_prompt))
+		summary += chinese ? " 本次执行未新增或修改文件提案；已有提案不代表本轮实施了修复。" :
+		    " This invocation created or changed no file proposals; retained proposals do not establish a repair performed in this invocation.";
 	evidence.add_text("summary", summary.c_str());
 	evidence.add_text(
 	    "requirement_progress_json", requirement_progress_json.c_str());

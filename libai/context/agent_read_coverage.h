@@ -9,7 +9,7 @@ namespace libai
 {
 namespace ai
 {
-// Only coverage metadata, never source text. Reset when model history is compacted.
+// Only coverage metadata, never source text. Rebuild from retained pages after compaction.
 class agent_read_coverage_t {
 	// Cached source version and the context records retained for that
 	// file.

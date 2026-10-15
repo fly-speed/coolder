@@ -139,7 +139,8 @@ public:
 	// Trusted streaming digest, including binary dependencies; no bytes exposed.
 	bool tree_sha256(const std::string &relative_directory,
 	    std::string &digest, std::string &err,
-	    const std::vector<std::string> &included_paths = {}) const;
+	    const std::vector<std::string> &included_paths = {},
+	    const std::vector<std::string> &excluded_files = {}) const;
 	// Compute the digest of a file while reporting read failures.
 	bool file_sha256(const std::string &relative_file, std::string &digest,
 	    std::string &err) const;

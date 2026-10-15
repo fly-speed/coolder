@@ -291,7 +291,7 @@ inline bool repair_failure_tracker_t::observe(const std::string &command,
 	for (const auto &failure : failures) {
 		if (prior && prior->failures.count(failure)) {
 			persisting_.insert(failure);
-			if (!(failure.find("ctest:") == 0 && older &&
+			if (!((failure.find("ctest:") == 0 || failure.find("go-test:") == 0) && older &&
 			        older->failures.count(failure)))
 				continue;
 			stalled_tests_ = true;

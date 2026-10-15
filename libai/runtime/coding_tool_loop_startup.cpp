@@ -18,10 +18,13 @@ bool coding_tool_loop_t::prepare_execution_revision()
     acl::json context,input,policy;auto &root=context.create_node();
     auto &arguments=input.create_node();auto &settings=policy.create_node();
     if(!libai::ai::coding_detail::runtime("runtime.policy.get",arguments,settings,err))return false;
-    root.add_text("implementation","libai-coding-execution-v16-batch-recovery")
+    root.add_text("implementation",coding_execution_implementation())
         .add_text("policy_json",serialize_json(settings).c_str())
         .add_text("provider_protocol",provider.protocol.c_str()).add_text("provider_url",provider.base_url.c_str())
         .add_text("provider_model",provider.model.c_str()).add_bool("allow_file_content",provider.allow_file_content)
+        .add_text("model_profile_json",provider.model_profile_json.c_str())
+        .add_bool("responses_store",provider.responses_store).add_bool("responses_background",provider.responses_background)
+        .add_bool("responses_compact",provider.responses_compact).add_bool("responses_strict_tools",provider.responses_strict_tools)
         .add_number("tool_budget",static_cast<long long>(max_tool_calls))
         .add_number("output_budget",max_output_tokens)
         .add_number("no_progress_budget",static_cast<long long>(max_no_progress_tool_calls))
@@ -433,6 +436,7 @@ void coding_tool_loop_t::restore_context()
 			continue;
 		read_context.erase(change.target_path);
 	}
+	restore_read_coverage(read_context, read_coverage);
 	// Keep assistant's visible findings separately so large source reads cannot
 	// evict the task decision along with the oldest tool result.
 	// Rehydrate the same bounded findings after a checkpoint resume.

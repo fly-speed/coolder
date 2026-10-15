@@ -8,6 +8,12 @@ namespace action
 namespace agent_detail
 {
 
+// Stable label shared by execution binding and audit telemetry.
+inline const char *coding_execution_implementation()
+{
+    return "libai-coding-execution-v23-bounded-investigation";
+}
+
 // Shared only by the coding-loop implementation files.
 struct coding_turn_t {
     std::string effect_key;
@@ -19,7 +25,7 @@ struct coding_turn_t {
 	bool budget_delivery_turn{};
 	// Provider-neutral request prepared for the current model turn.
 	libai::ai::completion_request_t input{};
-	std::string reasoning_policy;
+	std::string reasoning_policy, reasoning_trigger;
 	size_t context_bytes_before = 0, context_bytes_after = 0;
 	size_t source_bytes_elided = 0, source_records_reused = 0;
 	// Normalized provider completion for the current model turn.

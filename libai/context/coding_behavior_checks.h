@@ -1,46 +1,23 @@
 #pragma once
-#include <algorithm>
-#include <cctype>
-#include <initializer_list>
 #include <string>
 
 namespace libai { namespace ai {
 
-// Test-design hints, not trusted coverage evidence. Only validators can report
-// that a generated test ran. Never add these as new user requirements.
-inline std::string coding_behavior_checks(std::string request)
+// General test-design guidance, not a keyword-selected domain checklist or
+// trusted coverage evidence. The caller excludes analysis and verification tasks.
+inline std::string coding_behavior_checks(const std::string &)
 {
-    std::transform(request.begin(), request.end(), request.begin(),
-        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    auto mentions = [&](std::initializer_list<const char *> terms) {
-        for (auto term : terms) if (request.find(term) != std::string::npos) return true;
-        return false;
-    };
-    const bool shared = mentions({"多人", "联机", "multiplayer", "multi-user", "multiple players"});
-    const bool timed = mentions({"游戏", "贪吃蛇", "game", "animation", "simulation"});
-    std::string cases;
-    if (shared)
-        cases += "\nshared_lifecycle: two participants join the SAME shared session and remain valid through its first update; "
-            "assert distinct valid initial state where overlap is invalid. Drive updates with one and two connections and "
-            "assert that connection count does not multiply the shared clock. Include disconnect/rejoin if requested.";
-    if (shared && mentions({"房间", "room"}))
-        cases += "\nroom_isolation: exercise joining/switching rooms through the real application/adapter path; "
-            "assert state isolation and the intended old-room membership after switching.";
-    if (timed && mentions({"速度", "speed", "频率"}))
-        cases += "\nobservable_speed: use an injected clock or deterministic elapsed-time driver at the actual scheduler boundary; "
-            "over equal elapsed time assert slow/medium/fast produce different movement counts. "
-            "Comparing constants or stored speed labels alone does not test this requirement.";
-    if (mentions({"暂停", "pause", "resume"}))
-        cases += "\ntoggle_resume: drive the requested input through its handler into state changes; "
-            "pause stops progress, resume preserves position/score rather than restarting. "
-            "Where restart-after-failure is requested, test that separate transition and repeated input/state updates.";
-    if (cases.empty()) return "";
-    return "\n<behavior_acceptance_cases>Use only the scenarios applicable to the user's request. "
-        "Include observable behavioral tests with the FIRST complete implementation, using the native test runner; "
-        "do not postpone them until a passing build. Test input -> application/scheduler -> observable state, "
-        "not only constructors, helper constants, control existence, or source text. Keep clocks deterministic, "
-        "avoid sleeps and respect command_network. Use an authorized functional acceptance runner for adapter behavior "
-        "when available. Backend or simulated DOM tests remain distinct from real browser verification." + cases +
-        "\nThese cases guide implementation; they are not proof that coverage exists or that any test passed.</behavior_acceptance_cases>\n";
+    return "\n<behavior_contract>Derive observable checks from the request using real entry points: normal success, "
+        "first and repeated updates, failure/recovery. Assert valid state remains valid until a real failure. "
+        "For shared participants, join/create at least two before advancing; verify nonconflicting initial resources "
+        "and progress for each without pausing one to hide conflicts. Check shared authoritative state and isolation. "
+        "For runtime settings, start the actual scheduler, change configuration, then compare downstream updates "
+        "over equal elapsed time. A getter/echo or changed position alone cannot verify a running timer. "
+        "Check actual serialization, identity and input/state/output boundaries: consumer-visible field names "
+        "and real transport inputs, not constants, typed round trips or fallback paths. Compare measured results "
+        "explicitly; do not discard them. Prefer supported protocol libraries to hand-written framing. "
+        "Use native tests, deterministic fixtures and permitted network capabilities; report unavailable browser "
+        "or runtime checks. Apply only relevant checks, with the implementation. These guidelines and source review "
+        "signals are not executed evidence or proof of coverage.</behavior_contract>\n";
 }
 } }

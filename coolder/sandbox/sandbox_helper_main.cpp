@@ -320,6 +320,9 @@ bool parse_options(int argc, char *argv[], options_t &options)
 			if (!safe_text(value) || value[0] != '/')
 				return false;
 			options.browser_evidence_root = value;
+        } else if (name == "--acceptance-node") {
+            if (!safe_text(value) || value[0] != '/') return false;
+            options.acceptance_node = value;
 		} else if (name == "--browser-node" ||
 		    name == "--browser-runner") {
 			if (!safe_text(value) || value[0] != '/')
@@ -353,6 +356,7 @@ bool parse_options(int argc, char *argv[], options_t &options)
 	    (options.probe_port == 0 || options.loopback_network) &&
 	    (options.browser_node.empty() == options.browser_runner.empty()) &&
 	    (options.browser_node.empty() || options.probe_port != 0) &&
+        (options.acceptance_node.empty() || (options.probe_port != 0 && options.browser_node.empty())) &&
 	    options.command_index > 0 && options.command_index < argc;
 }
 
@@ -642,7 +646,7 @@ static int run_macos_sandbox(options_t &options, int argc, char **argv,
 		if (service > 0) {
 			return probe_http_service(service, options.probe_port,
 			    options.probe_path,
-			    options.browser_node.empty() ? NULL : &options);
+			    options.browser_node.empty() && options.acceptance_node.empty() ? NULL : &options);
 		}
 		if (!options.browser_node.empty() &&
 		    (!set_limit(RLIMIT_CPU, options.cpu, "CPU") ||
@@ -699,6 +703,21 @@ int main(int argc, char *argv[])
 	options.user_root = user_root;
 	options.project_root = project_root;
 	options.workdir = workdir;
+    if (!options.acceptance_node.empty()) {
+        char node[PATH_MAX], script[PATH_MAX]; struct stat st;
+        if (!realpath(options.acceptance_node.c_str(), node) || access(node, X_OK) != 0 ||
+            stat(node, &st) != 0 || !S_ISREG(st.st_mode) ||
+            !realpath((project_root + "/tests/acceptance.test.cjs").c_str(), script) ||
+            !path_is_within(project_root, script) || stat(script, &st) != 0 || !S_ISREG(st.st_mode)) return 126;
+        options.acceptance_node = node;
+#ifdef __linux__
+        std::string install(node); install = install.substr(0, install.find_last_of('/'));
+        if (install.size() > 4 && install.substr(install.size()-4) == "/bin")
+            install = install.substr(0, install.find_last_of('/'));
+        if (install != "/" && !path_is_within(project_root, install) && !path_is_within(install, project_root))
+            options.readonly_roots.push_back(install);
+#endif
+    }
 	for (auto &path : options.readonly_roots) {
 		std::string canonical;
 		if (!canonical_directory(path, canonical) ||

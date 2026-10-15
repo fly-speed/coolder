@@ -149,7 +149,21 @@ void close_fd(int &fd)
 bool ensure_sandbox_temp_directory(
     const std::string &workdir, std::string &temp_directory, std::string &err)
 {
-	temp_directory = workdir + "/.libai-sandbox-tmp";
+	const std::string build_directory = workdir + "/.libai-build";
+    struct stat build;
+    if (lstat(build_directory.c_str(), &build) != 0) {
+        if (errno != ENOENT || mkdir(build_directory.c_str(), 0700) != 0 ||
+            lstat(build_directory.c_str(), &build) != 0) { err = "cannot create private sandbox build directory"; return false; }
+    }
+    if (!S_ISDIR(build.st_mode) || S_ISLNK(build.st_mode)) { err = "unsafe sandbox build directory"; return false; }
+    const std::string private_home = build_directory + "/home";
+    struct stat home;
+    if (lstat(private_home.c_str(), &home) != 0) {
+        if (errno != ENOENT || mkdir(private_home.c_str(), 0700) != 0 ||
+            lstat(private_home.c_str(), &home) != 0) { err = "cannot create sandbox home"; return false; }
+    }
+    if (!S_ISDIR(home.st_mode) || S_ISLNK(home.st_mode)) { err = "unsafe sandbox home"; return false; }
+    temp_directory = build_directory + "/tmp";
 	struct stat st;
 	if (lstat(temp_directory.c_str(), &st) != 0) {
 		if (errno != ENOENT ||
@@ -591,6 +605,11 @@ bool program_sandbox_t::resolve_request(const sandbox_request_t &request,
 		    "sandbox command accepts only its server-defined arguments";
 		return false;
 	}
+    if (!command->acceptance_probe_node.empty() &&
+        (command->http_probe_port == 0 || command->acceptance_probe_node[0] != '/' ||
+         !safe_argument(command->acceptance_probe_node) || !command->browser_probe_node.empty())) {
+        err = "sandbox acceptance service policy is invalid"; return false;
+    }
 	if ((!command->browser_probe_node.empty() &&
 	        (command->http_probe_port == 0 ||
 	            command->browser_probe_node[0] != '/' ||

@@ -42,25 +42,34 @@ void coding_tool_loop_t::supply_repair_review_sources(coding_turn_t &turn)
 		record.add_text("file_sha256", it->second.c_str());
 		record.add_text("content", content.c_str());
 		const std::string encoded = serialize_json(record);
-		if (reviewed_source_bytes + encoded.size() > 32 * 1024) {
-			++it;
-			continue;
-		}
-		reviewed_source_bytes += encoded.size();
 		if (libai::ai::request_has_source(
 		        turn.input, it->first, content) ||
 		    libai::ai::request_has_source(
 		        turn.input, relative, content)) {
 			++reused_source_files;
+            record.add_number("offset", 0).add_number("next_offset", content.size())
+                .add_number("total_bytes", content.size()).add_bool("eof", true);
+            remember_read_result("workspace.read", serialize_json(record), read_context);
+            read_coverage.observe(it->first, it->second, 0, content.size());
 			repair_supplied_versions.insert(*it);
 			it = repair_required_reads.erase(it);
 			continue;
 		}
+		// Already-present evidence consumes no additional source budget.
+		if (reviewed_source_bytes + encoded.size() > 32 * 1024) {
+			++it;
+			continue;
+		}
+		reviewed_source_bytes += encoded.size();
 		source_bytes += encoded.size();
 		acl::json_node &entry = sources.add_child(false, true);
 		entry.add_text("path", it->first.c_str());
 		entry.add_text("file_sha256", it->second.c_str());
 		entry.add_text("content", content.c_str());
+        entry.add_number("offset", 0).add_number("next_offset", content.size())
+            .add_number("total_bytes", content.size()).add_bool("eof", true);
+        remember_read_result("workspace.read", serialize_json(entry), read_context);
+        read_coverage.observe(it->first, it->second, 0, content.size());
 		repair_supplied_versions.insert(*it);
 		it = repair_required_reads.erase(it);
 	}
@@ -134,7 +143,9 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 		// Keep model rationale separately labelled, never promote it to a user requirement.
 		const std::string rationale =
 		    "\n<assistant_repair_rationale>\n" +
-		    libai::ai::utf8_prefix(turn.output.text, 1536) +
+		    libai::ai::utf8_prefix(turn.output.text,
+		        (libai::ai::read_only_analysis_task(original_prompt) ||
+		            libai::ai::verification_only_task(original_prompt)) ? 8192 : 1536) +
 		    "\n</assistant_repair_rationale>\n";
 		// Preserve the initial resolution and the latest explanation, with
 		// complete wrappers and a fixed bound; small cleanup notes cannot erase it.
@@ -147,7 +158,9 @@ void coding_tool_loop_t::build_tool_feedback(coding_turn_t &turn)
 	}
 	if (!turn.output.text.empty())
 		recent_findings.append("\n<assistant_findings>\n" +
-		    libai::ai::utf8_prefix(turn.output.text, 8192) +
+		    libai::ai::utf8_prefix(turn.output.text,
+		        (libai::ai::read_only_analysis_task(original_prompt) ||
+		            libai::ai::verification_only_task(original_prompt)) ? 8192 : 1536) +
 		    "\n</assistant_findings>\n");
 	turn.addition = "\n\n<assistant_tool_call>\n" + call_summary +
 	    "\n</assistant_tool_call>\n<tool_result>\n" + turn.tool_result +
@@ -294,7 +307,9 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 	const std::string findings = turn.output.text.empty() ?
 	    "" :
 	    "\n<assistant_findings>\n" +
-	        libai::ai::utf8_prefix(turn.output.text, 8192) +
+	        libai::ai::utf8_prefix(turn.output.text,
+		        (libai::ai::read_only_analysis_task(original_prompt) ||
+		            libai::ai::verification_only_task(original_prompt)) ? 8192 : 1536) +
 	        "\n</assistant_findings>\n";
 	const size_t uncompressed_bytes =
 	    transcript.size() + findings.size() + turn.addition.size();
@@ -355,15 +370,16 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 			        turn.addition.size(), kMaxToolTranscriptBytes);
 	}
 	if (compact_now) {
-		read_coverage.clear();
 		const size_t previous_bytes = transcript.size();
 		persistent_transcript = compacted;
 		transcript = persistent_transcript;
 		// The guard must track evidence still available to the model, not
 		// every source page ever read. Compaction can evict whole files.
 		std::vector<std::string> retained_reads;
+		libai::ai::agent_read_coverage_t retained_coverage;
 		collect_observation_signatures("workspace.read_batch",
-		    "{\"files\":" + read_context.records() + "}",
+		    annotate_read_coverage("workspace.read_batch",
+		        "{\"files\":" + read_context.records() + "}", retained_coverage, chinese),
 		    retained_reads);
 		progress_supervisor.retain_read_observations(retained_reads);
 		// Leave headroom above the retained working set, otherwise a compacted
@@ -373,7 +389,7 @@ bool coding_tool_loop_t::compact_and_checkpoint(coding_turn_t &turn)
 		        compacted_request_bytes, tool_context_compaction_bytes,
 		        turn.addition.size(), kMaxToolTranscriptBytes);
 		provider_tool_history.clear();
-		read_coverage.clear();
+		restore_read_coverage(read_context, read_coverage);
 		provider_history_base = transcript;
 		acl::json context_json;
 		acl::json_node &context_event = context_json.create_node();

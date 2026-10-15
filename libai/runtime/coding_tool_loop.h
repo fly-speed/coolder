@@ -129,6 +129,7 @@ private:
 	bool acceptance_review_requested = false;
 	// Survives intermediate builds; cleared only by a full passing test report.
 	std::string pending_test_failure_report;
+	bool repair_full_validation_pending = false;
 	void review_validation_failure(coding_turn_t &turn, const std::string &report);
 	// Serialized progress evidence for the task requirements.
 	std::string requirement_progress_json;
@@ -266,6 +267,7 @@ private:
 	bool compact_and_checkpoint(coding_turn_t &turn);
 	// Deliver saved work and recovery information when the call budget is
 	// exhausted.
+	size_t model_tool_call_limit() const;
 	bool finish_budget_boundary();
 
 	// Timing trace for preparing the coding loop.
@@ -333,6 +335,9 @@ private:
 	    saved_proposal_batch; // One bounded payload, scoped to this running task.
 	// Exact structural rejection retained until the draft changes.
 	std::string proposal_batch_recovery;
+	size_t mutation_batches_this_invocation = 0;
+	std::string initial_proposal_identity;
+	std::string reasoning_validation_report, last_deep_repair_evidence;
 	// Once a model has exhausted an entire output budget on reasoning, keep the
 	// remainder of this run in direct protocol mode. A single successful recovery
 	// must not be followed immediately by another high-effort reasoning loop.

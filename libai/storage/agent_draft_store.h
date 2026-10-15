@@ -30,6 +30,10 @@ public:
 	    size_t &skipped_files, std::string &err, bool *reused = NULL,
 	    std::string *source_fingerprint = NULL,
 	    const std::function<bool()> &should_cancel = {}) const;
+    // Adopt only host validation outputs after verifying every non-output file
+    // is unchanged. A mismatch keeps the old snapshot untrusted for rebuilding.
+    bool record_validation_outputs(const std::string &input_sha256,
+        const std::vector<std::string> &output_files, std::string &err) const;
 	// Remove the identified saved record; report failures through err.
 	bool remove(std::string &err) const;
 	// Detach a fully reviewed tree to a fresh identity before background cleanup.

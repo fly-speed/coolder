@@ -39,10 +39,13 @@ std::string annotate_read_coverage(const std::string &name,
 			const size_t added =
 			    coverage.observe(json_text(page["path"]), version,
 			        begin, begin + length);
+            for (const char *key : {"new_read_bytes", "low_value_read", "reuse_guidance"})
+                if (auto *old = page[key]) old->detach();
 			page.add_number(
 			    "new_read_bytes", static_cast<long long>(added));
-			if (length && added < length && added <= length / 10) {
-				page.add_bool("low_value_read", true);
+			const bool repeated = length && added < length && added <= length / 10;
+			page.add_bool("low_value_read", repeated);
+			if (repeated) {
 				page.add_text("reuse_guidance",
 				    prompt_text(
 				        prompt_id::read_overlap_guidance,
@@ -62,6 +65,15 @@ std::string annotate_read_coverage(const std::string &name,
 			annotate(parsed.get_root());
 	}
 	return serialize_json(parsed.get_root());
+}
+
+void restore_read_coverage(const libai::ai::agent_read_context_t &context,
+    libai::ai::agent_read_coverage_t &coverage)
+{
+    coverage.clear();
+    // This seeds byte ranges even when the retained record was itself a repeat.
+    annotate_read_coverage("workspace.read_batch",
+        "{\"files\":" + context.records() + "}", coverage, false);
 }
 
 std::string workspace_inspection_error(

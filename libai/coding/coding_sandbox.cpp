@@ -86,6 +86,7 @@ std::string command_receipt(const sandbox_execution_plan_t &plan,
 	    .add_number("http_probe_port",plan.command.http_probe_port)
 	    .add_text("http_probe_path",plan.command.http_probe_path.c_str())
 	    .add_text("browser_node",plan.command.browser_probe_node.c_str())
+        .add_text("acceptance_node",plan.command.acceptance_probe_node.c_str())
 	    .add_text("browser_evidence_root",plan.command.browser_evidence_root.c_str())
 	    .add_number("timeout_ms",static_cast<long long>(plan.limits.timeout_ms))
 	    .add_number("memory_bytes",static_cast<long long>(plan.limits.memory_bytes))

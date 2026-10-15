@@ -375,6 +375,12 @@ void discover_go_commands(const std::string &normalized,
 			add_fixed_command(result, "go.test", go_program,
 			    std::vector<std::string>{
 			        "test", "-count=1", "./..." });
+#ifndef _WIN32
+            // Native HTTP/transport tests use ephemeral loopback listeners.
+            // Keep external networking disabled, including dependency downloads.
+            if (!result.commands.empty() && result.commands.back().id == "go.test")
+                result.commands.back().allow_loopback_network = true;
+#endif
 			if (http_service) {
 				const std::string service =
 				    project_root + "/.libai-go-app";

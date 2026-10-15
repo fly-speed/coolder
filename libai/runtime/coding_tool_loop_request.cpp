@@ -5,6 +5,7 @@
 #include "browser_debug.h"
 #include "ai_agent_tools_internal.h"
 #include "../context/coding_turn_budget.h"
+#include "../context/compile_failure_cache.h"
 #include "../provider/glm_reasoning.h"
 #include "../context/coding_behavior_checks.h"
 #include "../context/source_request_compactor.h"
@@ -16,7 +17,7 @@ namespace agent_detail
 
 void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 {
-	turn.remaining_tool_calls = effective_tool_call_limit - turn.call;
+	turn.remaining_tool_calls = model_tool_call_limit() - std::min(turn.call, model_tool_call_limit());
 	// Once useful work exists, reserve the tail of the budget for delivering
 	// the remaining related files. Continuing broad discovery here was the main
 	// reason quick Kimi/DeepSeek runs ended with one partial file and no build.
@@ -46,56 +47,78 @@ void coding_tool_loop_t::build_request_instructions(coding_turn_t &turn)
 	turn.input.system_prompt +=
 	    prompt_text(prompt_id::interface_language, chinese);
 	std::string runtime_guidance;
+#ifndef _WIN32
+    runtime_guidance += "\n<acceptance_service_contract>For a marked HTTP project, functional.acceptance starts the real service, "
+        "waits for readiness, runs tests/acceptance.test.cjs, then cleans up the service and test processes. "
+        "Read LIBAI_HTTP_BASE (ready origin), LIBAI_HTTP_PORT and LIBAI_ACCEPTANCE_SERVICE_MANAGED=1 in that script; "
+        "do not spawn or kill a server, assume port 18080, or skip assertions when the service is unavailable. "
+        "Native go.test permits loopback only: use httptest or 127.0.0.1:0 / [::1]:0, never a fixed port; external networking is denied. "
+        "Other native tests follow the command_network capability snapshot. HTTP readiness is not behavior coverage.</acceptance_service_contract>\n";
+#else
+    runtime_guidance += "\n<acceptance_service_contract>Managed HTTP acceptance is not available on this host. "
+        "Use native in-process tests; do not assume a previous HTTP smoke process is still running. "
+        "Report unavailable live-service behavior checks as unverified.</acceptance_service_contract>\n";
+#endif
+
 	if (!runtime_task->text_preview && !runtime_task->assistant_chat &&
 	    !libai::ai::read_only_analysis_task(original_prompt) &&
 	    !libai::ai::verification_only_task(original_prompt) &&
 	    !libai::ai::focused_compile_repair(original_prompt))
 		runtime_guidance += libai::ai::coding_behavior_checks(original_prompt);
+	if (!runtime_task->text_preview && !runtime_task->assistant_chat) {
+		runtime_guidance += thinking_mode == "disabled" ?
+		    "\n<mode_contract>Thinking stays disabled. Use exact source, failing inputs and actual diagnostics; reconcile imports, signatures, callers and test preconditions in related edits. Do not guess interfaces or rewrite equivalent conditions.</mode_contract>\n" :
+		    "\n<mode_contract>Reuse the chosen interfaces, state transitions and transport contract from current staged source and concise prior decisions. Do not redesign after reads or compaction. Inspect missing evidence directly; reserve reasoning for contract choices and evidenced behavioral failures, not scaffold rediscovery.</mode_contract>\n";
+	}
+    if (repair_full_validation_pending && pending_test_failure_report.empty())
+        runtime_guidance += "\n<repair_session>{\"resolved\":true,\"state\":\"focused_tests_passed\",\"requires_full_validation\":true}</repair_session>\n"
+            "The known test failures passed their targeted rerun. Do not repair or reread the old diagnostics. "
+            "Complete any still-missing implementation and run one full validation. This is not final acceptance.\n";
 	if (!pending_test_failure_report.empty()) {
 		acl::json report(pending_test_failure_report.c_str());
 		acl::json session_json;
 		auto &session = session_json.create_node();
 		session.add_bool("resolved", false);
 		session.add_text("failed_command", report.finish() ? json_text(report["failed_command_id"]).c_str() : "");
-		session.add_text("failure_report", libai::ai::utf8_prefix(pending_test_failure_report, 8192).c_str());
+		session.add_text("failure_report", libai::ai::utf8_prefix(
+            pending_test_failure_report, 8192).c_str());
+        auto &packages = session_json.create_array();
+        session.add_child("unresolved_packages", packages);
+        const auto pending_packages = focused_go_test_packages(pending_test_failure_report);
+        for (const auto &package : pending_packages) packages.add_array_text(package.c_str());
+        session.add_bool("requires_full_validation", pending_packages.empty());
 		runtime_guidance += "\n<repair_session>" + serialize_json(session) +
 		    "</repair_session>\nA passing intermediate build does not resolve these test failures. "
 		    "Use the exact current supplied implementation and failing tests. Correct the root cause with a small related patch; "
-		    "the runtime automatically retests known failing Go packages after an edit. A focused pass still requires one full validation. "
-		    "Keep the user's thinking choice unchanged. Before changing a test, check its input, expected state and API return contract; "
+		    "the runtime retests known failing Go packages after an edit, or all configured checks when package mapping is ambiguous. A focused pass still requires one full validation. "
+		    "Keep the user's thinking choice unchanged. Before changing code, trace the failing test's actual entry point, "
+        "setup and lifecycle (whether the worker/event loop was launched), then input and expected state; "
 		    "never weaken a requirement to obtain a pass. State only a concise evidence-based repair decision, not speculative rewrites.\n";
 	}
+	if(!runtime_task->text_preview && !runtime_task->assistant_chat &&
+	    !libai::ai::focused_compile_repair(original_prompt) && !libai::ai::read_only_analysis_task(original_prompt)) {
+		acl::json review_report(acceptance_report.c_str());
+		auto *review=review_report.finish()?review_report["source_contract_review"]:NULL;
+		if(review)runtime_guidance += "\nThe validator's source_contract_review contains host-observed source patterns, not proven defects or test evidence. "
+		    "Resolve compiler blockers first, then check applicable boundaries using actual producer output and consumer input. "
+		    "Fix confirmed defects and add small deterministic regression assertions with the related patch. "
+		    "An existing test is relevant only if its executed assertions cover that path; do not add placeholder tests or rewrite unrelated code. "
+		    "Use current source if this report predates an edit. Explain inapplicable or unverified findings in the existing final response; "
+		    "do not start a separate review/validation loop merely to clear lexical signals.\n";
+	}
 	if (!runtime_task->text_preview)
-		runtime_guidance +=
-		    "\n<read_efficiency>Read known files together. workspace.read_batch accepts paths or {path, query} objects. "
-		    "Use returned next_content unchanged to continue all remaining pages and omitted files in one call. "
-		    "Reuse source pages still present in read_working_set or tool history; do not restart a truncated batch. "
-		    "</read_efficiency>\n"
-		    "<implementation_contract>Reuse the supplied scaffold, source and directory evidence; read only missing "
-		    "files or ranges. Submit related definitions, imports, callers and assets together, with tests for the changed "
-		    "behavior. Keep existing APIs, entry points and build/run scripts consistent. Choose batch boundaries from "
-		    "actual dependencies, without a fixed stage count or prescribed layer order. Do not submit placeholders as "
-		    "completed features, weaken tests, or repeat design and directory discovery after a rejected batch; correct "
-		    "the precise tool error using its retained payload and current source.</implementation_contract>\n"
-		    "<test_environment>Read command_network in validation capabilities before choosing test fixtures. "
-		    "When the test command forbids loopback, use in-process HTTP handlers and deterministic stream writers "
-		    "rather than opening listening sockets (Go: httptest.NewRecorder with ServeHTTP, not httptest.NewServer). "
-		    "Keep real service readiness and browser checks in their separately authorized validators; never treat "
-		    "in-process tests as proof of browser behavior.</test_environment>\n"
-		    "<failure_scope>A failing test alone does not establish a regression caused by this task. "
-		    "Relate failures to the user request and changed behavior before editing more files. Do not rewrite assertions "
-		    "or change unrelated behavior merely to obtain a green suite. If a failure is unrelated or its intended contract "
-		    "is unclear, report the unresolved failure and verification limit instead of expanding the task.</failure_scope>\n";
-	if (!runtime_task->text_preview)
-		runtime_guidance +=
-		    "\nAfter each saved batch of code changes, LibAI automatically runs the project build script "
-		    "(or the fixed toolchain build when no script is present) in the draft sandbox. "
-		    "Submit mutually dependent edits together. Read the automatic build report and repair compiler errors "
-		    "before moving on; do not ask the user to compile manually. Test-only source edits defer this intermediate gate "
-		    "to the next full validation. workspace.validate compiles and runs fixed tests independently of the build script "
-		    "(Go: go.test runs go test -count=1 ./...). Automatic build test_status=not-run is expected, not a missing "
-		    "test capability. Keep newly generated build scripts focused on building; never insert duplicate test commands "
-		    "merely to obtain test evidence, and preserve existing user-required script behavior.\n";
+        runtime_guidance +=
+            "\n<implementation_contract>Reuse supplied source and decisions. Read missing evidence together with read_batch; "
+            "continue pages using next_content. Submit dependent definitions, imports, callers, assets and behavior tests together. "
+            "Preserve entry points and scripts; repair the precise diagnostic or rejected batch instead of restarting design. "
+            "Keep progress explanations brief.</implementation_contract>\n"
+            "<test_environment>Respect command_network. If loopback is forbidden, use deterministic in-process endpoints "
+            "or streams, not listening sockets. These do not verify a real browser.</test_environment>\n"
+            "<failure_scope>Check failing inputs, expected state and the user contract before editing. "
+            "Correct a demonstrably wrong fixture with evidence; do not weaken requirements or fix unrelated behavior.</failure_scope>\n"
+            "After source edits the host runs an intermediate build; test-only edits defer it. "
+            "workspace.validate runs fixed tests independently of build scripts. "
+            "Repair compiler errors from the automatic report; do not duplicate tests in build scripts.\n";
 	if (!runtime_task->text_preview &&
 	    libai::ai::focused_compile_repair(original_prompt)) {
 		runtime_guidance +=
@@ -238,6 +261,8 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 		turn.input.tool_outputs = provider_tool_outputs;
 	}
 	if (turn.budget_delivery_turn) {
+        turn.input.turn_instructions += "\nOne tool slot is reserved by the host for final fixed validation. "
+            "Finish related edits together within the remaining model tool budget; do not add ceremonial reads or tests.\n";
 		turn.input.user_prompt +=
 		    prompt_with_value(prompt_id::remaining_tool_budget, chinese,
 		        std::to_string(turn.remaining_tool_calls));
@@ -287,18 +312,43 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 	turn.input.max_output_tokens = max_output_tokens;
 	turn.input.thinking_mode = thinking_mode;
 	turn.input.reasoning_effort = reasoning_effort;
+	const bool coding = !runtime_task->text_preview && !runtime_task->assistant_chat;
+	const bool inspection = libai::ai::read_only_analysis_task(original_prompt) ||
+	    libai::ai::verification_only_task(original_prompt);
+	const std::string report = !reasoning_validation_report.empty() ? reasoning_validation_report :
+	    acceptance_report.empty() ? last_validation_report : acceptance_report;
+	acl::json validation(report.c_str());
+	const bool failed = validation.finish() && !json_bool(validation["validation_passed"], true);
+	const bool compile_failure = failed && libai::ai::deterministic_compile_failure(report);
+	const bool behavior_failure = failed && !compile_failure &&
+	    json_text(validation["test_status"]) == "failed" && report.find("\"timed_out\":true") == std::string::npos;
+	agent_tool_request_t last_request;
+	if (!traces.empty()) last_request.name = traces.back().name;
+	const bool read_turn = !traces.empty() && repair_review_read_only(last_request);
+	const bool design = coding && !inspection && !failed && changes.empty() && traces.empty();
+	const auto evidence = libai::ai::agent_workspace_t::content_sha256(acceptance_draft + report);
+	const bool persistent = !repair_failures.persisting().empty() || repair_failures.stalled_tests();
+	const bool deep = coding && !inspection && !read_turn && behavior_failure && persistent &&
+	    last_deep_repair_evidence != evidence;
+	turn.reasoning_trigger = inspection || read_turn ? "source_inspection" : compile_failure ? "compiler_diagnostic" :
+	    deep ? "persistent_behavior_failure" : behavior_failure ? "behavior_contract" :
+	    failed ? "environment_or_unclassified_failure" : design ? "initial_implementation" : "routine_execution";
+	const bool deliberate = !inspection && !read_turn && (design || behavior_failure);
 	const auto budget = libai::ai::coding_turn_budget(reasoning_effort,
 	    thinking_mode, max_output_tokens,
 	    libai::ai::provider_client_t::supports_reasoning_effort(provider) &&
 	        (!provider_is_glm(provider) || thinking_mode == "adaptive"),
-	    !runtime_task->text_preview && !runtime_task->assistant_chat,
-	    initial_prompt.find("<execution_mode>large:") != std::string::npos ||
-	        !repair_required_reads.empty() ||
-	        (acceptance_report.empty() ? last_validation_report : acceptance_report)
-	            .find("\"validation_passed\":false") != std::string::npos);
+	    coding, deliberate, deep);
+	// One escalation per observed failed revision; reading and implementing
+	// the same diagnosis must not repeatedly pay for a high-effort plan.
+	if (deep && budget.thinking != "disabled") last_deep_repair_evidence = evidence;
 	turn.input.reasoning_effort = budget.effort;
 	turn.input.thinking_mode = budget.thinking;
 	turn.input.max_output_tokens = budget.output_tokens;
+	// Preserve the previous ordinary first-request ceiling; selecting low
+	// design effort must not silently enlarge the reasoning allowance.
+	if (design && (thinking_mode == "adaptive" || reasoning_effort.empty()))
+		turn.input.max_output_tokens = std::min(turn.input.max_output_tokens, 65536LL);
 	turn.reasoning_policy = budget.policy;
 	// Kimi Code Plan uses this stable value to associate repeated prefixes
 	// with one coding session. DeepSeek performs prefix caching automatically
@@ -322,6 +372,34 @@ void coding_tool_loop_t::build_request_options(coding_turn_t &turn)
 	turn.input.prompt_cache_ttl = provider.responses_cache_ttl;
 	turn.input.metadata_run_id = runtime_task->id;
 	turn.input.metadata_session_id = runtime_task->session_id;
+	// DeepSeek cannot enable reasoning while replaying calls originally made
+	// without reasoning text. Start a fresh stateless request from bounded
+	// source/evidence instead of silently overriding the selected mode.
+	if (stateless_history_without_reasoning && !output_budget_recovery_mode &&
+	    turn.input.thinking_mode == "enabled") {
+		const auto exchanges = provider_tool_history.size();
+		const auto compacted = coding_loop_detail::compact_coding_transcript(initial_prompt, changes, traces,
+		    recent_findings.text() + recent_exchanges.text() +
+		        "\n<read_working_set>" + read_context.records() + "</read_working_set>\n" +
+		        unresolved_repair_contract + repair_contract_findings, chinese, &read_context);
+		provider_tool_history.clear();turn.input.tool_history.clear();
+		transcript=compacted;persistent_transcript=compacted;provider_history_base=compacted;
+		const size_t reserve=task_contract.size()+validation_capabilities.size()+8192;
+		const size_t available=reserve<libai::ai::kMaxAgentPromptBytes ? libai::ai::kMaxAgentPromptBytes-reserve : 0;
+		std::string bounded=compacted;
+		if (bounded.size()>available) {
+			size_t start=bounded.size()-available;
+			while (start<bounded.size() && (static_cast<unsigned char>(bounded[start])&0xc0)==0x80) ++start;
+			bounded="Older context omitted for the complete task contract; leading excerpt may be partial.\n"+bounded.substr(start);
+		}
+		turn.input.user_prompt=validation_capabilities +
+		    (task_contract.empty() ? "" : "<task_contract>\n" + task_contract + "\n</task_contract>\n") + bounded;
+		stateless_history_without_reasoning=false;
+		acl::json json;auto &event=json.create_node();
+		event.add_text("event","reasoning_history_rebased").add_number("previous_exchanges",exchanges)
+		    .add_text("reason","enable_reasoning_after_nonreasoning_exchange");
+		append_runtime_operation_event(runtime_task,event);
+	}
 	// Ordinary checkpoint and protocol recovery retain the user's effort.
 	// Only an exhausted output budget or an incompatible historical exchange
 	// needs the special no-reasoning recovery path.
@@ -353,7 +431,8 @@ void coding_tool_loop_t::select_request_tools(coding_turn_t &turn)
 	turn.investigation_checkpoint = !runtime_task->text_preview &&
 	    !libai::ai::read_only_analysis_task(original_prompt) &&
 	    !libai::ai::verification_only_task(original_prompt) &&
-	    progress_supervisor.investigation_checkpoint_due(max_tool_calls);
+	    progress_supervisor.investigation_checkpoint_due(max_tool_calls,
+            !pending_test_failure_report.empty() || current_cached_compile_failure());
 	if (turn.investigation_checkpoint)
 		turn.input.turn_instructions +=
 		    "\n<investigation_checkpoint>Investigation has reached its checkpoint. Submit the requested implementation now. "
@@ -480,9 +559,13 @@ void coding_tool_loop_t::select_request_tools(coding_turn_t &turn)
 		state.add_text("browser_acceptance", json_text(report["browser_acceptance"]).c_str());
 		state.add_text("functional_acceptance", json_text(report["functional_acceptance"]).c_str());
 		state.add_text("test_status", json_text(report["test_status"]).c_str());
+		if(auto *review=report["source_contract_review"]) {
+			if(!review->is_object())review=review->get_obj();
+			if(review)state.add_child("source_contract_review",state_json.duplicate_node(*review));
+		}
 		turn.input.turn_instructions += "\n<final_evidence_review>" + serialize_json(state) +
 		    "</final_evidence_review>\nThe full validator already passed for this exact draft AND source baseline. "
-		    "Return final JSON with requirement_progress now. Map each requested behavior to actual observed assertions; "
+		    "Complete the existing final review and return final JSON with requirement_progress. Map each requested behavior to actual observed assertions; "
 		    "mark unsupported coverage unknown. A disabled/not-verified check did not pass. No ceremonial reread or "
 		    "unchanged validation is needed. Edit only for a concrete unmet requirement or defect; changed source "
 		    "automatically restores validation.\n";
@@ -608,6 +691,12 @@ void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
 	acl::json request_json;
 	acl::json_node &request_event = request_json.create_node();
 	request_event.add_text("event", "model_request_started");
+	request_event.add_text("generation_implementation",coding_execution_implementation());
+	request_event.add_text("execution_revision",runtime_task->coding_execution_revision.c_str());
+	request_event.add_text("task_sha256",libai::ai::agent_workspace_t::content_sha256(original_prompt).c_str());
+	request_event.add_text("initial_context_sha256",libai::ai::agent_workspace_t::content_sha256(initial_prompt).c_str());
+	request_event.add_text("system_prompt_sha256",libai::ai::agent_workspace_t::content_sha256(turn.input.system_prompt).c_str());
+	request_event.add_text("model_profile_sha256",libai::ai::agent_workspace_t::content_sha256(provider.model_profile_json).c_str());
 	request_event.add_number("context_bytes_before_source_dedup", turn.context_bytes_before);
 	request_event.add_number("context_bytes_after_source_dedup", turn.context_bytes_after);
 	request_event.add_number("source_bytes_elided", turn.source_bytes_elided);
@@ -659,6 +748,7 @@ void coding_tool_loop_t::log_model_request(coding_turn_t &turn)
 	        "provider_default" :
 	        turn.input.reasoning_effort.c_str());
 	request_event.add_text("reasoning_policy", turn.reasoning_policy.c_str());
+	request_event.add_text("reasoning_trigger", turn.reasoning_trigger.c_str());
 	request_event.add_bool(
 	    "require_tool_call", turn.input.require_tool_call);
 	request_event.add_bool("proposal_only_turn", proposal_only_turn);

@@ -126,6 +126,42 @@ int run_browser_probe(const options_t &options)
 #endif
 }
 
+// The host owns service lifetime. Test code receives a ready origin and never
+// needs permission to signal the service or guess another process's port.
+static int run_acceptance_probe(const options_t &options)
+{
+    const pid_t test = fork();
+    if (test < 0) return 126;
+    if (test == 0) {
+        (void)setpgid(0, 0);
+        const std::string port = std::to_string(options.probe_port);
+        const std::string base = "http://127.0.0.1:" + port;
+        if (setenv("LIBAI_HTTP_PORT", port.c_str(), 1) || setenv("LIBAI_HTTP_BASE", base.c_str(), 1) ||
+            setenv("LIBAI_ACCEPTANCE_SERVICE_MANAGED", "1", 1)) _exit(126);
+        const std::string script = options.project_root + "/tests/acceptance.test.cjs";
+#ifdef __APPLE__
+        std::string install = parent_directory(options.acceptance_node);
+        if (install.size() > 4 && install.substr(install.size()-4) == "/bin") install = parent_directory(install);
+        if (install == "/") install.clear();
+        const std::string profile = macos_profile(options.user_root, options.project_root,
+            install, "", true, false, options.readonly_roots);
+        execl("/usr/bin/sandbox-exec", "/usr/bin/sandbox-exec", "-p", profile.c_str(),
+            options.acceptance_node.c_str(), "--test", script.c_str(), static_cast<char *>(NULL));
+#else
+        // Linux already applied namespaces, Landlock and seccomp to this probe.
+        execl(options.acceptance_node.c_str(), options.acceptance_node.c_str(),
+            "--test", script.c_str(), static_cast<char *>(NULL));
+#endif
+        _exit(127);
+    }
+    (void)setpgid(test, test);
+    int status = 0;
+    while (waitpid(test, &status, 0) < 0) { if (errno != EINTR) return terminate_service(test, 126); }
+    // Reap descendants even when a test exits with an assertion failure.
+    (void)kill(-test, SIGKILL);
+    return child_exit_status(status);
+}
+
 // Each readiness attempt owns its socket and closes it on every outcome; a
 // failed attempt must not exhaust descriptors during the bounded retry loop.
 static bool http_service_ready(unsigned short port, const std::string &path)
@@ -169,13 +205,17 @@ int probe_http_service(pid_t child, unsigned short port,
 	while (std::chrono::steady_clock::now() < deadline) {
 		int status = 0;
 		const pid_t waited = waitpid(child, &status, WNOHANG);
-		if (waited == child)
-			return child_exit_status(status);
+		if (waited == child) {
+            const int code = child_exit_status(status);
+            if (code == 0) fputs("libai-sandbox-helper: service exited before HTTP readiness\n", stderr);
+            // A normal process exit is not readiness or executed acceptance.
+            return code == 0 ? 70 : code;
+        }
 		if (http_service_ready(port, path))
 			return terminate_service(child,
-			    browser_options ?
-			        run_browser_probe(*browser_options) :
-			        0);
+			    browser_options && !browser_options->acceptance_node.empty() ?
+                    run_acceptance_probe(*browser_options) :
+                browser_options ? run_browser_probe(*browser_options) : 0);
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 	fputs(

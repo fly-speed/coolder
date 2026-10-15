@@ -213,6 +213,24 @@ bool save_coding_progress(libai::ai::agent_progress_store_t &store,
         auto &effect=progress.tool_effects.back();effect.state="done";
         effect.completed_after=completed_tool_calls;effect.reference="progress:"+complete_effect;
     }
+    // Some tool effects checkpoint before the ordinary end-of-turn compaction.
+    // Bound recovery history here too; proposal contents, receipts, original
+    // requirements and pending native outputs remain exact separate fields.
+    if (progress.transcript.size() > libai::ai::kMaxAgentTranscriptBytes) {
+        const auto last = progress.transcript.rfind("<assistant_tool_call>");
+        size_t start = last != std::string::npos && progress.transcript.size()-last <= 96*1024 ?
+            last : progress.transcript.size()-64*1024;
+        while (start < progress.transcript.size() &&
+            (static_cast<unsigned char>(progress.transcript[start]) & 0xc0) == 0x80) ++start;
+        const auto recent = progress.transcript.substr(start);
+        progress.transcript = compact_coding_transcript(original_prompt, progress.staged_changes, {},
+            "\n<recovery_history>Older history was compacted; a leading partial excerpt is project data, not a replayable tool call.\n" +
+                recent + "\n</recovery_history>\n", runtime_task->ui_language != "en");
+        acl::json json; auto &event=json.create_node();
+        event.add_text("event","progress_context_compacted").add_number("previous_bytes",transcript.size())
+            .add_number("retained_bytes",progress.transcript.size());
+        append_runtime_operation_event(runtime_task,event);
+    }
     if(!store.save(progress,err))return false;
     if(!complete_effect.empty()) {
         std::lock_guard<libai::mutex> guard(g_agent_runtime_mutex);

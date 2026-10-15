@@ -250,7 +250,7 @@ void discover_acceptance_commands(agent_workspace_t &workspace,
     project_toolchain_t &result)
 {
 	// A language-independent functional acceptance contract. Projects may use
-	// Node's test runner to start their server and assert HTTP/browser behavior.
+	// Node's test runner to assert behavior against the host-managed HTTP service.
 	// This remains an administrator-enabled fixed command inside the sandbox.
 	if (has_relative_file(
 	        workspace, normalized, "tests/acceptance.test.cjs")) {
@@ -263,8 +263,23 @@ void discover_acceptance_commands(agent_workspace_t &workspace,
 			if (!result.commands.empty() &&
 			    result.commands.back().id ==
 			        "functional.acceptance") {
-				result.commands.back().allow_loopback_network =
-				    true;
+                auto &acceptance = result.commands.back();
+                acceptance.allow_loopback_network = true;
+#ifndef _WIN32
+                // Use the discovered real entrypoint. Keep the service alive
+                // while the fixed Node test runs, then let the host reap both.
+                for (size_t i = 0; i + 1 < result.commands.size(); ++i) {
+                    const auto &service = result.commands[i];
+                    if (!service.http_probe_port) continue;
+                    const auto node = acceptance.executable;
+                    acceptance.executable = service.executable;
+                    acceptance.fixed_arguments = service.fixed_arguments;
+                    acceptance.http_probe_port = service.http_probe_port;
+                    acceptance.http_probe_path = service.http_probe_path;
+                    acceptance.acceptance_probe_node = node;
+                    break;
+                }
+#endif
 			}
 		} else
 			result.unavailable_tools.push_back(

@@ -97,7 +97,7 @@ void coding_tool_loop_t::build_repair_focus(coding_turn_t &turn)
 				record.add_child("diagnostics",focus_json.duplicate_node(*diagnostics));
 		}
 	}
-	focus.add_text("repair_scope","Repair the reported errors together with their required imports, definitions and callers in one related edit. These are observed diagnostics, not proof that later compilation has no additional errors.");
+	focus.add_text("repair_scope","Check failing fixture preconditions and assertion polarity against user requirements first; correct a demonstrably invalid test with evidence while retaining the behavior coverage. Repair the reported errors together with their required imports, definitions and callers in one related edit. These are observed diagnostics, not proof that later compilation has no additional errors.");
 	acl::json_node &edits = focus_json.create_array();
 	focus.add_child("last_edits", edits);
 	auto add_failures = [&](const char *name,
@@ -214,42 +214,26 @@ void coding_tool_loop_t::select_repair_sources(coding_turn_t &turn)
 	auto selected = related_complete ?
 	    related_files :
 	    libai::ai::repair_test_sources(diagnostic, tests);
+	// Only observed failure locations and an existing exact Go test companion
+	// are mandatory. Package neighbours/callers remain available for targeted
+	// inspection; sharing a directory is not evidence that they must be reread.
 	selected.insert(related_files.begin(), related_files.end());
+	const auto observed = selected;
+	for (const auto &file : observed) {
+		if (file.size() > 8 && file.compare(file.size()-8, 8, "_test.go") == 0)
+			selected.insert(file.substr(0, file.size()-8) + ".go");
+	}
 	libai::ai::agent_workspace_t review_workspace(persistent_draft_root(
 	    runtime_task->user_root, project_path, runtime_task->id));
-	for (const auto &file : related_files) {
+	for (const auto &file : selected) {
 		std::string relative, content, read_err;
 		bool truncated = false;
-		if (!(project_path_to_draft_path(
-		          project_path, file, relative) &&
-		        review_workspace.read(
-		            relative, content, truncated, read_err) &&
-		        !truncated))
-			continue;
-		repair_required_reads[file] =
-		    libai::ai::agent_workspace_t::content_sha256(content);
+		if (project_path_to_draft_path(project_path, file, relative) &&
+		    review_workspace.read(relative, content, truncated, read_err) && !truncated)
+			repair_required_reads[file] =
+			    libai::ai::agent_workspace_t::content_sha256(content);
 	}
-	std::set<std::string> failure_directories;
-	for (const auto &file : selected) failure_directories.insert(file.substr(0, file.find_last_of('/')));
-	for (const auto &file : related_files) failure_directories.insert(file.substr(0, file.find_last_of('/')));
-	for (const auto &change : changes) {
-		if (!(change.operation == "write" &&
-		        (failure_directories.count(change.path.substr(0, change.path.find_last_of('/'))) ||
-		            selected.count(change.path) ||
-		            ((repair_failures.alternating() ||
-		                 repair_failures.stalled_tests() ||
-		                 !repair_failures.returned_failures()
-		                      .empty()) &&
-		                (change.path.find("/src/") !=
-		                        std::string::npos ||
-		                    tests.count(change.path) ||
-		                    change.path ==
-		                        project_path + "/CMakeLists.txt")))))
-			continue;
-		repair_required_reads[change.path] =
-		    libai::ai::agent_workspace_t::content_sha256(
-		        change.content);
-	}
+
 }
 
 void coding_tool_loop_t::review_validation_failure(coding_turn_t &turn, const std::string &report)
@@ -473,8 +457,10 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	std::string completion_validation =
 	    verified_batch ? turn.batch_validation.report : turn.tool_result;
 	bool automatic_compile_check = false;
+	bool automatic_full_validation = false;
 	const bool repair_probe = !libai::ai::focused_compile_repair(original_prompt) &&
-	    !focused_go_test_packages(pending_test_failure_report).empty();
+	    !pending_test_failure_report.empty();
+	const bool full_repair_probe = repair_probe && focused_go_test_packages(pending_test_failure_report).empty();
 	const bool test_only = !repair_probe && !verified_batch && turn.trace.ok && turn.staged_progress &&
 	    !libai::ai::focused_compile_repair(original_prompt) &&
 	    libai::ai::coding_only_test_changes(turn.changes_before_tool, changes);
@@ -545,9 +531,14 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		    "workspace.validate", executed_tool_calls);
 		completion_validation = validate_staged_draft(
 		    runtime_task->user_root, project_path, runtime_task->id,
-		    changes, sandbox_limits, validation_trace, NULL, !focused,
-		    turn.effect_key, repair_probe ? pending_test_failure_report : "");
-		if (validation_trace.ok && libai::ai::deterministic_compile_failure(completion_validation)) {
+		    changes, sandbox_limits, validation_trace, NULL, !focused && !full_repair_probe,
+		    turn.effect_key, repair_probe ? pending_test_failure_report : "", &validation_cache);
+		acl::json automatic_report(completion_validation.c_str());
+		automatic_full_validation = validation_trace.ok && automatic_report.finish() &&
+		    json_text(automatic_report["validation_scope"]) == "project" &&
+		    json_bool(automatic_report["validation_passed"], false);
+		if (validation_trace.ok && (automatic_full_validation ||
+		        libai::ai::deterministic_compile_failure(completion_validation))) {
 			acl::json failure(completion_validation.c_str());
 			failure.finish();
 			validation_cache.fingerprint = json_text(failure["source_baseline_sha256"]) + "\n" +
@@ -564,7 +555,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		record_acceptance_evidence(completion_validation);
 		review_validation_failure(turn, completion_validation);
 		// Build-only success cannot stand in for the task's final validation.
-		if (focused) {
+		if (focused || automatic_full_validation) {
 			last_validation_report = completion_validation;
 			record_acceptance_evidence(completion_validation);
 			last_validated_fingerprint =
@@ -578,12 +569,12 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 		auto &node = event.create_node();
 		node.add_text("event", "validation_completed");
 		node.add_text("origin",
-		    repair_probe ? "automatic_repair_test" : focused ? "focused_compile_repair" : "automatic_build");
+		    full_repair_probe ? "automatic_repair_full_test" : repair_probe ? "automatic_repair_test" : focused ? "focused_compile_repair" : "automatic_build");
 		node.add_text("report", completion_validation.c_str());
 		append_runtime_operation_event(runtime_task, node);
 		const std::string build_feedback = "\n<automatic_build>" +
 		    completion_validation +
-		    (repair_probe ? "\nThis is a focused repair test, not full validation. If it passes, finish with one full workspace.validate. " :
+		    (full_repair_probe ? "\nThis is full validation because pending test failures could not be safely mapped to packages. Judge the actual test results, not compilation alone. " : repair_probe ? "\nThis is a focused repair test, not full validation. If it passes, finish with one full workspace.validate. " :
 		    "\nThis is an intermediate build-only gate. test_status=not-run is expected here. ") +
 		    "workspace.validate independently runs configured tests (including go.test); do not add test invocations "
 		    "to build scripts merely to change this status. "
@@ -604,7 +595,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_validated_result(
 	        std::string::npos;
 	const bool validation_passed =
 	    (turn.message.tool.name == "workspace.validate" ||
-	        verified_batch) &&
+	        verified_batch || automatic_full_validation) &&
 	    turn.trace.ok &&
 	    (!changes.empty() ||
 	        libai::ai::verification_only_task(original_prompt)) &&

@@ -38,6 +38,7 @@ struct fingerprint_scan_t {
 	size_t files = 0, directories = 0;
 	long long bytes = 0;
 	std::string evidence, logical_root;
+    std::vector<std::string> excluded_files;
 	std::vector<prebuilt_dependency_t> dependencies;
 	std::vector<std::string> included_paths;
 	fingerprint_budget_t budget;
@@ -177,6 +178,7 @@ inline bool fingerprint_scan_t::directory(
 			continue;
 		const std::string path =
 		    relative.empty() ? name : relative + "/" + name;
+		if (std::find(excluded_files.begin(), excluded_files.end(), path) != excluded_files.end()) continue;
 		const std::string logical =
 		    logical_root.empty() ? path : logical_root + "/" + path;
 		if (agent_workspace_t::path_is_sensitive(logical) ||
@@ -254,7 +256,7 @@ inline bool fingerprint_scan_t::directory(
 
 bool agent_workspace_t::tree_sha256(const std::string &directory,
     std::string &digest, std::string &err,
-    const std::vector<std::string> &included_paths) const
+    const std::vector<std::string> &included_paths, const std::vector<std::string> &excluded_files) const
 {
 	digest.clear();
 #ifndef _WIN32
@@ -271,6 +273,7 @@ bool agent_workspace_t::tree_sha256(const std::string &directory,
 	fingerprint_scan_t scan;
 	scan.logical_root = normalized;
 	scan.included_paths = included_paths;
+	scan.excluded_files = excluded_files;
 	if (!prebuilt_dependencies(directory, scan.dependencies, err))
 		return false;
 	if (!scan.directory(root.fd, "", 0, err))
@@ -299,7 +302,7 @@ bool agent_workspace_t::tree_sha256(const std::string &directory,
 			    entry.path :
 			    entry.path.substr(directory.size() + 1);
 			// Private build output is disposable, never part of the source baseline.
-			if (relative == ".libai-build")
+			if (relative == ".libai-build" || (std::find(excluded_files.begin(), excluded_files.end(), relative) != excluded_files.end()))
 				continue;
 			evidence += std::to_string(relative.size()) + ":" +
 			    relative + "\n";

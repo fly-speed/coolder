@@ -93,6 +93,7 @@ struct options_t {
 	// browser_evidence_root: Directory used to exchange browser probe
 	// evidence.
 	std::string browser_node, browser_runner, browser_evidence_root;
+	std::string acceptance_node;
 	// Index of the command executable in the helper's argv array.
 	int command_index = -1;
 };

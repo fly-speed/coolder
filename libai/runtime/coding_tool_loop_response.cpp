@@ -2,6 +2,7 @@
 // Model response parsing, preview handling and final-answer validation.
 #include "coding_tool_loop_internal.h"
 #include "../sdk/json_schema.h"
+#include "../validation/proposal_response_recovery.h"
 #include "../sdk/vendor/rapidjson/writer.h"
 
 namespace action
@@ -72,6 +73,8 @@ std::string check_coding_tool(const libai::ai::completion_request_t &input,
 		const auto result = libai::validate_json_schema(
 		    coding_tool_schema(tool), arguments);
 		if (result.valid) return "";
+        const auto parse_error = libai::ai::proposal_json_error(arguments);
+        if (!parse_error.empty()) return "tool arguments rejected: " + parse_error;
 		return "tool arguments rejected: " + result.code + " " +
 		    result.keyword + " " + result.instance_pointer;
 	}
@@ -91,8 +94,9 @@ std::string check_fallback_tool(const libai::ai::completion_request_t &input,
 		wire["arguments"].Accept(writer);
 		return check_coding_tool(input, message.tool.name,
 		    std::string(buffer.GetString(), buffer.GetSize()));
-	} catch (const std::exception &) {
-		return "invalid fallback tool JSON";
+	} catch (const std::exception &error) {
+        const auto detail = libai::ai::proposal_json_error(message.raw_tool_json);
+        return "invalid fallback tool JSON: " + (detail.empty() ? std::string(error.what()) : detail);
 	}
 }
 }
@@ -129,12 +133,52 @@ coding_tool_loop_t::step_t coding_tool_loop_t::validate_tool_schema(
 	if (rejection.empty()) return step_t::proceed;
 	// Reject before preview reads, browser tools, merging or any workspace effect.
 	record_model_response(turn);
-	const std::string guidance = "\n<tool_schema_rejection>Entire tool batch was not executed. " +
-	    rejection + ". Return corrected arguments matching the advertised schemas.</tool_schema_rejection>\n";
+    namespace raw_json = libai::governance_detail::json;
+    raw_json::StringBuffer archive;
+    raw_json::Writer<raw_json::StringBuffer> writer(archive);
+    auto field = [&](const char *key, const std::string &value) {
+        writer.Key(key); writer.String(value.data(), static_cast<raw_json::SizeType>(value.size()));
+    };
+    writer.StartObject();
+    field("kind", "rejected_tool_response"); field("run_id", runtime_task->id);
+    field("raw_text", turn.output.text); field("error", rejection);
+    writer.Key("executed"); writer.Bool(false);
+    writer.Key("tool_calls"); writer.StartArray();
+    for (const auto &call : turn.output.tool_calls) {
+        writer.StartObject(); field("id", call.id); field("name", call.name);
+        field("raw_arguments", call.arguments_json); writer.EndObject();
+    }
+    writer.EndArray(); writer.EndObject();
+    libai::ai::agent_request_store_t store(runtime_task->user_root, project_path, runtime_task->id);
+    std::string archive_path, archive_error;
+    if (!store.append_response(std::string(archive.GetString(), archive.GetSize()), archive_path, archive_error)) {
+        err = archive_error; return step_t::failed;
+    }
+    std::string candidate;
+    libai::ai::agent_protocol_message_t rejected;
+    if (!turn.output.native_tool_call && libai::ai::parse_agent_protocol_message(turn.output.text, rejected) &&
+        rejected.tool.name == "workspace.propose_batch") candidate = turn.output.text;
+    if (turn.output.native_tool_call && turn.output.tool_calls.size() == 1 &&
+        turn.output.tool_calls[0].name == "workspace.propose_batch")
+        candidate = "{\"type\":\"tool_call\",\"name\":\"workspace.propose_batch\",\"arguments\":" +
+            turn.output.tool_calls[0].arguments_json + "}";
+    std::string recovery;
+    if (!candidate.empty() && candidate.size() <= libai::ai::kMaxSavedProposalBytes) {
+        saved_proposal_batch = candidate;
+        acl::json hint; auto &value = hint.create_node();
+        value.add_text("saved_batch", libai::ai::agent_workspace_t::content_sha256(candidate).c_str())
+            .add_text("response_archive", archive_path.c_str()).add_text("error", rejection.c_str())
+            .add_text("next_action", "Inspect original response via workspace.propose_batch content {saved_batch,inspect_raw:true,query:\"0\"}; pages return next_query. Repair with {saved_batch,raw_edits:[{old_text,new_text}],decode_tool:true}. Edits must match exactly once. This validates the entire repaired envelope and file batch before any staging. Do not regenerate files or reread the scaffold.");
+        proposal_batch_recovery = serialize_json(value);
+        recovery = "\n<proposal_batch_recovery>" + proposal_batch_recovery + "</proposal_batch_recovery>\n";
+    }
+    const std::string guidance = "\n<tool_schema_rejection>Entire tool batch was not executed. " +
+        rejection + ". Original response archived at " + archive_path +
+        ". Correct only the rejected arguments; retained source evidence remains valid.</tool_schema_rejection>\n" + recovery;
 	transcript += guidance;
 	persistent_transcript += guidance;
 	next_tool_guidance = guidance;
-	provider_tool_history.clear(); read_coverage.clear();
+	provider_tool_history.clear(); // Retain exact read coverage across protocol rejection.
 	provider_history_base = transcript;
 	append_simple_operation_event(runtime_task, "tool_schema_rejected",
 	    "batch_not_executed", rejection, executed_tool_calls);
@@ -256,7 +300,7 @@ void coding_tool_loop_t::record_model_response(coding_turn_t &turn)
 	}
 	if (!turn.output.native_tool_call) {
 		provider_tool_history.clear();
-		read_coverage.clear();
+		restore_read_coverage(read_context, read_coverage);
 		provider_history_base = transcript;
 	}
 }
@@ -325,7 +369,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::parse_model_response(
 				transcript += guidance;
 				persistent_transcript += guidance;
 				provider_tool_history.clear();
-				read_coverage.clear();
+				restore_read_coverage(read_context, read_coverage);
 				provider_history_base = transcript;
 				++protocol_repair_attempts;
 				return save_coding_progress(progress_store,
@@ -459,7 +503,7 @@ bool coding_tool_loop_t::run_automatic_validation(const std::string &operation,
 	++executed_tool_calls;
 	update_runtime_progress(runtime_task,"tool_call","workspace.validate",executed_tool_calls);
 	validation=validate_staged_draft(runtime_task->user_root,project_path,
-	    runtime_task->id,changes,sandbox_limits,validation_trace,NULL,false,verification.effect_key);
+	    runtime_task->id,changes,sandbox_limits,validation_trace,NULL,false,verification.effect_key,"",&validation_cache);
 	if(!validation_trace.ok) {
 		err="automatic validation outcome requires host reconciliation: "+verification.effect_key;
 		return false;
@@ -624,7 +668,7 @@ coding_tool_loop_t::step_t coding_tool_loop_t::finish_model_answer(
 			    initial_prompt, changes, traces, guidance, chinese);
 			transcript = persistent_transcript;
 			provider_tool_history.clear();
-			read_coverage.clear();
+			restore_read_coverage(read_context, read_coverage);
 			provider_history_base = transcript;
 			proposal_only_turn = false;
 			if (save_coding_progress(progress_store, provider,

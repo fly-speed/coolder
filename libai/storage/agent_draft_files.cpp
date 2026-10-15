@@ -267,14 +267,14 @@ std::string write_manifest(const agent_draft_store_t &store,
 	std::map<std::string, std::string> entries;
 	for (const auto &change : changes) {
 		std::string path, normalized, err;
-		if (!(change.operation != "write" ||
+		if (!((change.operation != "write" && change.operation != "mkdir") ||
 		        !store.to_draft_path(change.path, path) ||
 		        !agent_workspace_t::normalize_path(
 		            path, normalized, false, err) ||
 		        path != normalized ||
 		        !entries
 		             .emplace(path,
-		                 agent_workspace_t::content_sha256(
+		                 change.operation == "mkdir" ? "directory" : agent_workspace_t::content_sha256(
 		                     change.content))
 		             .second))
 			continue;
@@ -282,7 +282,7 @@ std::string write_manifest(const agent_draft_store_t &store,
 	}
 	acl::json json;
 	auto &root = json.create_node();
-	root.add_text("format", "draft-writes-v1");
+	root.add_text("format", "draft-writes-v2");
 	for (const auto &item : entries)
 		root.add_text(
 		    ("path:" + item.first).c_str(), item.second.c_str());
@@ -297,7 +297,7 @@ bool parse_write_manifest(
 		return false;
 	auto *format = json["format"];
 	if (!format || !format->get_text() ||
-	    std::string(format->get_text()) != "draft-writes-v1")
+	    (std::string(format->get_text()) != "draft-writes-v1" && std::string(format->get_text()) != "draft-writes-v2"))
 		return false;
 	auto &root = json.get_root();
 	for (auto *node = root.first_child(); node; node = root.next_child()) {
@@ -344,6 +344,13 @@ bool update_verified_writes(const agent_draft_store_t &store,
 	for (const auto &change : changes) {
 		std::string path;
 		store.to_draft_path(change.path, path);
+        if (change.operation == "mkdir") {
+            std::string directory, check_error;
+            if (!previous.count(path) || previous[path] != "directory" || current[path] != "directory" ||
+                !agent_workspace_t::resolve_project_root(target,path,directory,check_error) ||
+                !file_ops::safe_directory(directory)) return false;
+            continue; // Existing unchanged directory; new structural edits still rebuild.
+        }
 		if (previous.count(path) && previous[path] == current[path]) {
 			std::string existing, check_error;
 			bool truncated = false;

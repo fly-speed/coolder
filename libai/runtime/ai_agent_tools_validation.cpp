@@ -76,7 +76,7 @@ std::string execute_workspace_validate(workspace_tool_context_t &context)
 	const std::string report = validate_staged_draft(context.user_root,
 	    context.project_path, context.run_id, validation_changes,
 	    context.sandbox_limits, context.trace, &validated_source, false,
-	    context.tool_execution_key);
+	    context.tool_execution_key, "", context.validation_cache);
 	if (!context.validation_cache)
 		return report;
 	context.validation_cache->report.clear();

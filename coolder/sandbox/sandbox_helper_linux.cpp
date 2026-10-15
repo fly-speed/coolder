@@ -380,7 +380,7 @@ static void run_service_probe(const std::string &project_root,
 	}
 	_exit(probe_http_service(service, runtime_options.probe_port,
 	    runtime_options.probe_path,
-	    runtime_options.browser_node.empty() ? NULL : &runtime_options));
+	    runtime_options.browser_node.empty() && runtime_options.acceptance_node.empty() ? NULL : &runtime_options));
 }
 
 int run_linux_sandbox(const options_t &options, char *argv[],

@@ -211,6 +211,26 @@ static void save_draft_snapshot(const std::string &run_id,
 	}
 }
 
+bool agent_draft_store_t::record_validation_outputs(const std::string &expected,
+    const std::vector<std::string> &outputs, std::string &err) const
+{
+    const auto target = root_path();
+    agent_workspace_t draft(target);
+    std::string actual, complete;
+    if (expected.empty() || !draft.tree_sha256("", actual, err, {}, outputs) || actual != expected ||
+        !draft.tree_sha256("", complete, err)) return false;
+    const auto slash = target.find_last_of("/\\");
+    if (slash == std::string::npos) return false;
+    agent_workspace_t records(target.substr(0, slash), false);
+    std::string saved; bool truncated = false;
+    if (!records.read(run_id_ + ".snapshot", saved, truncated, err) || truncated) return false;
+    const auto first = saved.find('\n'), second = saved.find('\n', first + 1);
+    const auto third = saved.find('\n', second + 1);
+    if (first == std::string::npos || second == std::string::npos || third == std::string::npos) return false;
+    saved.replace(second + 1, third - second - 1, complete);
+    return records.save_generated_text(run_id_ + ".snapshot", saved, err);
+}
+
 static bool validate_draft_identity(const std::string &run_id_,
     const std::string &project_path_, std::string &err)
 {

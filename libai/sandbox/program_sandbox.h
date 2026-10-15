@@ -53,6 +53,8 @@ struct sandbox_command_t {
 	std::string http_probe_path = "/";
 	// Trusted host runner, not a project supplied executable.
 	std::string browser_probe_node;
+	// Host-managed service, then sandboxed fixed tests/acceptance.test.cjs.
+	std::string acceptance_probe_node;
 	// Directory used to exchange browser probe evidence.
 	std::string browser_evidence_root;
 };
